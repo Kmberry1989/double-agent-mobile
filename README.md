@@ -33,6 +33,10 @@ On a phone, tap **Tap to infiltrate**. No pointer lock is required —
 the game starts directly with touch controls (see Touch controls
 below).
 
+Asset wishlist with a copy button for every item: open
+`wishlist.html` — the same list as `ASSETS-WISHLIST.md`, with a
+search filter and a Copy all button per section.
+
 ## Touch controls (phones only)
 
 Touch controls appear automatically on touch devices. They use

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Double Agent — Asset Wishlist</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #111; color: #eee; padding: 16px; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  .note { color: #bbb; font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+  .note a { color: #8fd0ff; }
+  #filter { width: 100%; min-height: 48px; font-size: 16px; padding: 10px 12px; border-radius: 8px; border: 1px solid #444; background: #222; color: #eee; margin-bottom: 20px; }
+  section { margin-bottom: 28px; }
+  section h2 { font-size: 18px; margin: 0 0 10px; }
+  .sec-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .sec-head h2 { margin: 0; flex: 1 1 auto; }
+  .card { background: #1e1e1e; border: 1px solid #333; border-radius: 10px; padding: 12px; margin-bottom: 10px; display: flex; gap: 10px; align-items: flex-start; }
+  .card-text { flex: 1 1 auto; font-size: 15px; line-height: 1.45; }
+  .badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-bottom: 4px; }
+  .badge.obtained { background: #1e5c2e; color: #c8f5d2; }
+  .badge.missing { background: #5c4a1e; color: #ffe9a8; }
+  button { min-height: 44px; padding: 0 16px; font-size: 15px; border-radius: 8px; border: 1px solid #555; background: #2a2a2a; color: #eee; cursor: pointer; flex: 0 0 auto; }
+  button:active { background: #3a3a3a; }
+  .copy-all { background: #24384d; border-color: #4a6a8a; }
+  .hidden { display: none !important; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #333; color: #eee; padding: 12px 20px; border-radius: 8px; font-size: 15px; display: none; z-index: 10; }
+</style>
+</head>
+<body>
+<h1>Double Agent — Asset Wishlist</h1>
+<p class="note">Every item below has its own Copy button, and every section has a Copy all button. This mirrors <a href="ASSETS-WISHLIST.md">ASSETS-WISHLIST.md</a> in this repo. Object, character, and weapon textures are already baked into the model files (Agent_Kyle, terror guards, weapon GLBs), so they are not listed here — only environment textures are.</p>
+<input id="filter" type="search" placeholder="Filter wishlist…" aria-label="Filter wishlist">
+
+<section data-section="Already in repo, but not wired">
+  <div class="sec-head"><h2>Already in repo, but not wired</h2><button class="copy-all" type="button">Copy all</button></div>
+  <div class="card"><div class="card-text">white/black Walther, Makarov, AKS74U, RPG7</div><button class="copy-btn" type="button" data-copy="white/black Walther, Makarov, AKS74U, RPG7">Copy</button></div>
+  <div class="card"><div class="card-text">Suppressors</div><button class="copy-btn" type="button" data-copy="Suppressors">Copy</button></div>
+  <div class="card"><div class="card-text">Throwable knife / grenade</div><button class="copy-btn" type="button" data-copy="Throwable knife / grenade">Copy</button></div>
+  <div class="card"><div class="card-text">Placeable C4 / claymore</div><button class="copy-btn" type="button" data-copy="Placeable C4 / claymore">Copy</button></div>
+  <div class="card"><div class="card-text">Lockpicks</div><button class="copy-btn" type="button" data-copy="Lockpicks">Copy</button></div>
+  <div class="card"><div class="card-text">Watch / glasses / pen / cufflinks / bag</div><button class="copy-btn" type="button" data-copy="Watch / glasses / pen / cufflinks / bag">Copy</button></div>
+  <div class="card"><div class="card-text">White Lambo driving gameplay</div><button class="copy-btn" type="button" data-copy="White Lambo driving gameplay">Copy</button></div>
+</section>
+
+<section data-section="Animations missing">
+  <div class="sec-head"><h2>Animations missing</h2><button class="copy-all" type="button">Copy all</button></div>
+  <div class="card"><div class="card-text">Pistol Crouch Walk</div><button class="copy-btn" type="button" data-copy="Pistol Crouch Walk">Copy</button></div>
+  <div class="card"><div class="card-text">Pistol Crouch Fire</div><button class="copy-btn" type="button" data-copy="Pistol Crouch Fire">Copy</button></div>
+  <div class="card"><div class="card-text">Checking Watch</div><button class="copy-btn" type="button" data-copy="Checking Watch">Copy</button></div>
+  <div class="card"><div class="card-text">Driving Turn</div><button class="copy-btn" type="button" data-copy="Driving Turn">Copy</button></div>
+  <div class="card"><div class="card-text">Motorcycle riding</div><button class="copy-btn" type="button" data-copy="Motorcycle riding">Copy</button></div>
+</section>
+
+<section data-section="Animations that would complete stealth">
+  <div class="sec-head"><h2>Animations that would complete stealth</h2><button class="copy-all" type="button">Copy all</button></div>
+  <div class="card"><div class="card-text">Prone crawl</div><button class="copy-btn" type="button" data-copy="Prone crawl">Copy</button></div>
+  <div class="card"><div class="card-text">Lean / peek</div><button class="copy-btn" type="button" data-copy="Lean / peek">Copy</button></div>
+  <div class="card"><div class="card-text">Drag / hide body</div><button class="copy-btn" type="button" data-copy="Drag / hide body">Copy</button></div>
+  <div class="card"><div class="card-text">Disguise change</div><button class="copy-btn" type="button" data-copy="Disguise change">Copy</button></div>
+  <div class="card"><div class="card-text">Interrogate</div><button class="copy-btn" type="button" data-copy="Interrogate">Copy</button></div>
+  <div class="card"><div class="card-text">Climb wall</div><button class="copy-btn" type="button" data-copy="Climb wall">Copy</button></div>
+  <div class="card"><div class="card-text">Slide under</div><button class="copy-btn" type="button" data-copy="Slide under">Copy</button></div>
+  <div class="card"><div class="card-text">Swim</div><button class="copy-btn" type="button" data-copy="Swim">Copy</button></div>
+</section>
+
+<section data-section="Models missing">
+  <div class="sec-head"><h2>Models missing</h2><button class="copy-all" type="button">Copy all</button></div>
+  <div class="card"><div class="card-text">Motorcycle</div><button class="copy-btn" type="button" data-copy="Motorcycle">Copy</button></div>
+  <div class="card"><div class="card-text">Drivable car rig</div><button class="copy-btn" type="button" data-copy="Drivable car rig">Copy</button></div>
+  <div class="card"><div class="card-text">Civilian / scientist / boss characters</div><button class="copy-btn" type="button" data-copy="Civilian / scientist / boss characters">Copy</button></div>
+  <div class="card"><div class="card-text">Female agent variant</div><button class="copy-btn" type="button" data-copy="Female agent variant">Copy</button></div>
+</section>
+
+<section data-section="Environments missing">
+  <div class="sec-head"><h2>Environments missing</h2><button class="copy-all" type="button">Copy all</button></div>
+  <div class="card"><div class="card-text">Enterable interior office / server / warehouse</div><button class="copy-btn" type="button" data-copy="Enterable interior office / server / warehouse">Copy</button></div>
+  <div class="card"><div class="card-text">Opening doors</div><button class="copy-btn" type="button" data-copy="Opening doors">Copy</button></div>
+  <div class="card"><div class="card-text">Vents</div><button class="copy-btn" type="button" data-copy="Vents">Copy</button></div>
+  <div class="card"><div class="card-text">Camera-disable security office</div><button class="copy-btn" type="button" data-copy="Camera-disable security office">Copy</button></div>
+  <div class="card"><div class="card-text">Real cover models</div><button class="copy-btn" type="button" data-copy="Real cover models">Copy</button></div>
+</section>
+
+<section data-section="Textures — environment only">
+  <div class="sec-head"><h2>Textures — environment only</h2><button class="copy-all" type="button">Copy all</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Ground concrete slabs (main) — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Ground concrete slabs (main) — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Dirt path patch — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Dirt path patch — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Grass patch — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Grass patch — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Gravel patch — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Gravel patch — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Asphalt patch — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Asphalt patch — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Brick interior walls — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Brick interior walls — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Corrugated boundary walls — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Corrugated boundary walls — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Painted metal blue / red / olive buildings — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Painted metal blue / red / olive buildings — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Sandbags cover walls — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Sandbags cover walls — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Wood-plank crates — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Wood-plank crates — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Vent grille panel — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Vent grille panel — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge obtained">Obtained</span><br>Transparent chain-link fence panel — now wired into the courtyard, in assets/textures/</div><button class="copy-btn" type="button" data-copy="Transparent chain-link fence panel — obtained, in assets/textures/">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge missing">Still missing</span><br>Details: hazard stripes, signage / posters, floor markings, night / wet-look variants</div><button class="copy-btn" type="button" data-copy="Details: hazard stripes, signage / posters, floor markings, night / wet-look variants">Copy</button></div>
+  <div class="card"><div class="card-text"><span class="badge missing">Still missing</span><br>Metal barrels (cover / prop texture, not yet supplied)</div><button class="copy-btn" type="button" data-copy="Metal barrels (cover / prop texture, not yet supplied)">Copy</button></div>
+</section>
+
+<section data-section="Audio missing entirely">
+  <div class="sec-head"><h2>Audio missing entirely</h2><button class="copy-all" type="button">Copy all</button></div>
+  <div class="card"><div class="card-text">Suppressed / unsuppressed gunshots</div><button class="copy-btn" type="button" data-copy="Suppressed / unsuppressed gunshots">Copy</button></div>
+  <div class="card"><div class="card-text">Footsteps</div><button class="copy-btn" type="button" data-copy="Footsteps">Copy</button></div>
+  <div class="card"><div class="card-text">Reload clicks</div><button class="copy-btn" type="button" data-copy="Reload clicks">Copy</button></div>
+  <div class="card"><div class="card-text">Alert / caution stingers</div><button class="copy-btn" type="button" data-copy="Alert / caution stingers">Copy</button></div>
+  <div class="card"><div class="card-text">Guard barks</div><button class="copy-btn" type="button" data-copy="Guard barks">Copy</button></div>
+  <div class="card"><div class="card-text">Ambient</div><button class="copy-btn" type="button" data-copy="Ambient">Copy</button></div>
+  <div class="card"><div class="card-text">Stealth / alert music loops</div><button class="copy-btn" type="button" data-copy="Stealth / alert music loops">Copy</button></div>
+</section>
+
+<section data-section="Ballroom mission">
+  <div class="sec-head"><h2>Ballroom mission</h2><button class="copy-all" type="button">Copy all</button></div>
+  <div class="card"><div class="card-text">Cat character model: Margo — tortoiseshell gray, mottled gray coat, harder to find (currently a simple procedural cat in that look)</div><button class="copy-btn" type="button" data-copy="Cat character model: Margo — tortoiseshell gray, mottled gray coat, harder to find">Copy</button></div>
+  <div class="card"><div class="card-text">Cat character model: Moxie — black and white, black ears, black nose (currently a simple procedural cat in that look)</div><button class="copy-btn" type="button" data-copy="Cat character model: Moxie — black and white, black ears, black nose">Copy</button></div>
+  <div class="card"><div class="card-text">Cat character model: Mabel — black and white, white ears, pink nose (currently a simple procedural cat in that look)</div><button class="copy-btn" type="button" data-copy="Cat character model: Mabel — black and white, white ears, pink nose">Copy</button></div>
+  <div class="card"><div class="card-text">Cat collar + electronic ID tag models (currently a procedural collar and glowing tag box)</div><button class="copy-btn" type="button" data-copy="Cat collar + electronic ID tag models">Copy</button></div>
+  <div class="card"><div class="card-text">Rochelle NPC model: formal ballroom look, distinct from Agent_Kyle (currently a recoloured capsule guest)</div><button class="copy-btn" type="button" data-copy="Rochelle NPC model: formal ballroom look, distinct from Agent_Kyle">Copy</button></div>
+  <div class="card"><div class="card-text">Real ballroom models: chandelier, round tables, chairs, bar (currently procedural)</div><button class="copy-btn" type="button" data-copy="Real ballroom models: chandelier, round tables, chairs, bar">Copy</button></div>
+  <div class="card"><div class="card-text">Cat animations: walk, sit, idle, tail flick (currently cats wander with a simple sway; no cat clips are in the repo)</div><button class="copy-btn" type="button" data-copy="Cat animations: walk, sit, idle, tail flick">Copy</button></div>
+</section>
+
+<div id="toast" role="status">Copied ✓</div>
+<script>
+function copyText(text, btn) {
+  function done() {
+    var toast = document.getElementById('toast');
+    toast.style.display = 'block';
+    setTimeout(function () { toast.style.display = 'none'; }, 1400);
+    if (btn) {
+      var old = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      setTimeout(function () { btn.textContent = old; }, 1400);
+    }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
+  } else {
+    fallbackCopy(text, done);
+  }
+}
+function fallbackCopy(text, done) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  document.body.removeChild(ta);
+  done();
+}
+document.querySelectorAll('.copy-btn').forEach(function (btn) {
+  btn.addEventListener('click', function () { copyText(btn.getAttribute('data-copy'), btn); });
+});
+document.querySelectorAll('.copy-all').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var section = btn.closest('section');
+    var items = [];
+    section.querySelectorAll('.copy-btn').forEach(function (b) { items.push(b.getAttribute('data-copy')); });
+    copyText(items.join('\n'), btn);
+  });
+});
+document.getElementById('filter').addEventListener('input', function (e) {
+  var q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('section').forEach(function (section) {
+    var anyVisible = false;
+    section.querySelectorAll('.card').forEach(function (card) {
+      var show = !q || card.textContent.toLowerCase().indexOf(q) !== -1;
+      card.classList.toggle('hidden', !show);
+      if (show) anyVisible = true;
+    });
+    section.classList.toggle('hidden', !anyVisible);
+  });
+});
+</script>
+</body>
+</html>
