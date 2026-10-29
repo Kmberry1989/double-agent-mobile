@@ -44,14 +44,14 @@
 - Camera-disable security office
 - Real cover models
 
-## Textures missing — environment only
+## Textures — environment only
 
-The courtyard currently uses flat procedural colors — no textures at all. Only environment surfaces need textures: object, character, and weapon textures are already baked into the model files (Agent_Kyle, terror guards, weapon GLBs), so they are not listed here.
+Obtained from user (now wired into the courtyard, in `assets/textures/`): ground concrete slabs (main) plus dirt path, grass, gravel, and asphalt patches; brick interior walls; corrugated boundary walls; painted metal blue / red / olive buildings; sandbags cover walls; wood-plank crates; vent grille panel; transparent chain-link fence panel. Object, character, and weapon textures are already baked into the model files (Agent_Kyle, terror guards, weapon GLBs), so they are not listed here.
 
-- Ground: concrete, asphalt, gravel, grass, dirt path (seamless / tileable)
-- Walls / buildings: concrete, brick, painted metal panels, vent grilles
-- Cover / props: wood crates, metal barrels, sandbags, chain-link fence
+Still missing:
+
 - Details: hazard stripes, signage / posters, floor markings, night / wet-look variants
+- Metal barrels (cover / prop texture, not yet supplied)
 
 ## Audio missing entirely
 
@@ -62,3 +62,13 @@ The courtyard currently uses flat procedural colors — no textures at all. Only
 - Guard barks
 - Ambient
 - Stealth / alert music loops
+
+## Ballroom mission
+
+The ballroom mission (`ballroom.html`) currently uses procedural placeholders for these — the real assets it still needs are:
+
+- Cat character models: Margo, Moxie, and Mabel, with distinct looks (currently simple procedural cats)
+- Cat collar + electronic ID tag models (currently a procedural collar and glowing tag box)
+- Rochelle NPC model: formal ballroom look, distinct from Agent_Kyle (currently a recoloured capsule guest)
+- Real ballroom models: chandelier, round tables, chairs, bar (currently procedural)
+- Cat animations: walk, sit, idle, tail flick (currently cats wander with a simple sway; no cat clips are in the repo)

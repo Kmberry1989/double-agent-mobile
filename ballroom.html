@@ -26,10 +26,10 @@
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
-<div id="hud"><b>Undercover Ballroom</b> — no weapons, no combat<br>Clues: <span id="clueCount">0/3</span> · Contact: <span id="contactState">not found</span><br>Goal: gather 3 clues, find Vera, then leave by the north exit.</div>
+<div id="hud"><b>Undercover Ballroom</b> — no weapons, no combat<br>Clues: <span id="clueCount">0/3</span> · Contact: <span id="contactState">not found</span><br>Goal: gather 3 clues, find Rochelle, then leave by the north exit.</div>
 <div id="prompt"></div>
 <div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div><div class="hint">Press E / USE again for the next line · Walk away to end the chat</div></div>
-<div id="overlay"><h1>Undercover Ballroom</h1><p>You are undercover at a gala. No weapons. No fighting.<br>Talk to the guests, gather 3 clues, find Vera, then leave by the north exit.</p><p>Desktop: WASD + mouse (click to lock) · E to talk<br>Phone: left joystick to move, drag to look, USE to talk</p><button id="startBtn">Enter the ballroom</button><p><a href="index.html">Back to the courtyard mission</a></p></div>
+<div id="overlay"><h1>Undercover Ballroom</h1><p>You are undercover at a gala. No weapons. No fighting.<br>Talk to the guests and scan the cats' collar ID tags, gather 3 clues, find Rochelle, then leave by the north exit.</p><p>Desktop: WASD + mouse (click to lock) · E to talk<br>Phone: left joystick to move, drag to look, USE to talk</p><button id="startBtn">Enter the ballroom</button><p><a href="index.html">Back to the courtyard mission</a></p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="joy"><div id="knob"></div></div>
 <button id="useBtn">USE</button>
@@ -146,17 +146,53 @@ function makeGuest(npc) {
   return npc;
 }
 const NPCS = [
-  makeGuest({ name: 'Vera', role: 'contact', color: 0x0e5a3a, skin: 0xe8b48a, x: 15, z: 6, wps: [[15, 6], [12, 4], [16, 2]], lines: ['You found me. So — do you know the three words?', 'The words are velvet, midnight, waltz. Say them in that order and the door will open.'] }),
-  makeGuest({ name: 'Milo', role: 'clue', clue: 'velvet', color: 0x222244, skin: 0xd9a06b, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['First word of the passphrase? Velvet. Like the curtains in here.', 'Vera is near the bar, in green. Tell her you know velvet.'] }),
-  makeGuest({ name: 'Priya', role: 'clue', clue: 'midnight', color: 0x6b1a3a, skin: 0xc98a5a, x: -14, z: -9, wps: [[-14, -9], [-11, -8]], lines: ['Second word: midnight. The party ends at midnight, or so they say.', 'Ask Milo for the first word if you missed it.'] }),
-  makeGuest({ name: 'Theo', role: 'clue', clue: 'waltz', color: 0x333333, skin: 0xe8b48a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['Third word: waltz. Everyone dances, nobody watches the door.', 'With all three words, Vera will trust you.'] }),
+  makeGuest({ name: 'Rochelle', role: 'contact', color: 0x0e5a3a, skin: 0xe8b48a, x: 15, z: 6, wps: [[15, 6], [12, 4], [16, 2]], lines: ['You found me. So — do you know the three words?', 'Come back when you have all three. The cats carry them on their collars.'] }),
+  makeGuest({ name: 'Milo', role: 'flavour', color: 0x222244, skin: 0xd9a06b, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['Have you seen the cats? One of them has a tag that glitters.', 'Rochelle is near the bar, in green.'] }),
+  makeGuest({ name: 'Priya', role: 'flavour', color: 0x6b1a3a, skin: 0xc98a5a, x: -14, z: -9, wps: [[-14, -9], [-11, -8]], lines: ['The cats wander everywhere. Try scanning a collar tag.', 'Rochelle is the one to find, once you have all three clues.'] }),
+  makeGuest({ name: 'Theo', role: 'flavour', color: 0x333333, skin: 0xe8b48a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['Everyone dances, nobody watches the door.', 'With all three clues, Rochelle will trust you.'] }),
   makeGuest({ name: 'Ana', role: 'flavour', color: 0x7a2a2a, skin: 0xd9a06b, x: -4, z: 3, wps: [[-4, 3], [-2, 4]], lines: ['The band is wonderful tonight, is it not?', 'Have you tried the drinks at the bar?'] }),
   makeGuest({ name: 'Jonas', role: 'flavour', color: 0x1a3a5a, skin: 0xc98a5a, x: -3, z: 2, wps: [[-3, 2], [-4, 3]], lines: ['I come for the music, not the gossip.', 'Careful on the dance floor — it is slippery.'] }),
-  makeGuest({ name: 'Lena', role: 'flavour', color: 0x3a1a5a, skin: 0xe8b48a, x: 11, z: 9, wps: [[11, 9], [13, 10]], lines: ['This dress took three weeks to finish.', 'Vera? She was by the bar a moment ago.'] }),
+  makeGuest({ name: 'Lena', role: 'flavour', color: 0x3a1a5a, skin: 0xe8b48a, x: 11, z: 9, wps: [[11, 9], [13, 10]], lines: ['This dress took three weeks to finish.', 'Rochelle? She was by the bar a moment ago.'] }),
   makeGuest({ name: 'Omar', role: 'flavour', color: 0x2a2a2a, skin: 0x8a5a3a, x: 2, z: 6, wps: [[2, 6], [4, 6]], lines: ['A quiet night, I hope. No drama, please.', 'The north door is staff only, I think.'] }),
-  makeGuest({ name: 'Sofia', role: 'flavour', color: 0x5a1a1a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['Have you met everyone yet? The room is full of stories.', 'Milo knows everything about this party.'] }),
-  makeGuest({ name: 'Ben', role: 'flavour', color: 0x24382a, skin: 0xe8b48a, x: 9, z: 3, wps: [[9, 3], [10, 5]], lines: ['I only came for the cake, honestly.', 'Theo was humming a waltz all evening.'] }),
+  makeGuest({ name: 'Sofia', role: 'flavour', color: 0x5a1a1a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['Have you met everyone yet? The room is full of stories.', 'The cats are the real guests of honour tonight.'] }),
+  makeGuest({ name: 'Ben', role: 'flavour', color: 0x24382a, skin: 0xe8b48a, x: 9, z: 3, wps: [[9, 3], [10, 5]], lines: ['I only came for the cake, honestly.', 'Theo was humming all evening.'] }),
 ];
+
+// ---- Cats: clue sources, friendly, never fightable/damageable ----
+// Each cat wears a collar with an electronic ID tag. Walking up and
+// pressing E / USE scans the tag and collects that cat's clue word.
+function makeCat(cat) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 12), new THREE.MeshStandardMaterial({ color: cat.color }));
+  body.scale.set(1, 0.72, 1.5); body.position.y = 0.26; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), new THREE.MeshStandardMaterial({ color: cat.color }));
+  head.position.set(0, 0.38, 0.42); g.add(head);
+  const earGeo = new THREE.ConeGeometry(0.07, 0.14, 4);
+  const earMat = new THREE.MeshStandardMaterial({ color: cat.color });
+  const earL = new THREE.Mesh(earGeo, earMat); earL.position.set(-0.1, 0.55, 0.42); g.add(earL);
+  const earR = new THREE.Mesh(earGeo, earMat); earR.position.set(0.1, 0.55, 0.42); g.add(earR);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.45), new THREE.MeshStandardMaterial({ color: cat.color }));
+  tail.position.set(0, 0.32, -0.55); tail.rotation.x = 0.4; g.add(tail);
+  // Collar + glowing electronic ID tag
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 8, 20), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+  collar.position.set(0, 0.34, 0.32); collar.rotation.x = 0.5; g.add(collar);
+  const tag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.02), new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x00ffcc, emissiveIntensity: 1.4 }));
+  tag.position.set(0, 0.22, 0.48); g.add(tag);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(cat.name + ' 🐱'), transparent: true }));
+  sp.scale.set(2.2, 0.42, 1); sp.position.y = 0.85; g.add(sp);
+  g.position.set(cat.x, 0, cat.z); scene.add(g);
+  cat.group = g; cat.phase = Math.random() * 6.28; cat.wp = 0; cat.pause = 0;
+  return cat;
+}
+const CATS = [
+  makeCat({ name: 'Margo', role: 'cat', clue: 'velvet', color: 0xd97a2a, x: -6, z: 0, wps: [[-6, 0], [-3, 1], [-5, -3]], lines: ['*purr* — Tag scan: velvet. Collar ID registered.', 'Margo stretches and pads away.'] }),
+  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x444444, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5]], lines: ['*purr* — Tag scan: midnight. Collar ID registered.', 'Moxie flicks her tail and sits down.'] }),
+  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0xf0e6d0, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4]], lines: ['*purr* — Tag scan: waltz. Collar ID registered.', 'Mabel blinks slowly at you.'] }),
+];
+// Cats join the talkable/wandering set, so E / USE, prompts, and
+// wandering all work for them exactly like the guests. They have no
+// health, damage, or combat code anywhere — they cannot be fought.
+NPCS.push(...CATS);
 
 // ---- Goal state ----
 const clues = new Set(); let contactFound = false, won = false, talking = null, lineIdx = 0;
@@ -169,14 +205,14 @@ function updateHUD() {
 updateHUD();
 function talkTo(npc) {
   talking = npc; lineIdx = 0; showLine();
-  if (npc.role === 'clue' && !clues.has(npc.clue)) { clues.add(npc.clue); }
+  if (npc.role === 'cat' && !clues.has(npc.clue)) { clues.add(npc.clue); }
   if (npc.role === 'contact' && clues.size === 3) { contactFound = true; }
   updateHUD();
 }
 function showLine() {
   if (!talking) return;
   let line = talking.lines[lineIdx % talking.lines.length];
-  if (talking.role === 'contact' && clues.size < 3 && !contactFound) line = 'I can only trust someone who knows all three passphrase words. Ask around — Milo, Priya and Theo each know one.';
+  if (talking.role === 'contact' && clues.size < 3 && !contactFound) line = 'I can only trust someone who knows all three passphrase words. The cats carry them — scan the ID tags on Margo, Moxie, and Mabel.';
   if (talking.role === 'contact' && contactFound) line = 'Velvet, midnight, waltz — that is right. The north door is open. Go, quietly.';
   document.getElementById('dlgName').textContent = talking.name;
   document.getElementById('dlgLine').textContent = line;
@@ -233,7 +269,7 @@ function nearestTalk() {
   else {
     // Near exit?
     if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
-      if (contactFound && !won) { won = true; document.getElementById('winText').textContent = 'You gathered all 3 clues (velvet, midnight, waltz), found Vera, and slipped out the north door — without a single fight.'; document.getElementById('win').style.display = 'flex'; }
+      if (contactFound && !won) { won = true; document.getElementById('winText').textContent = 'You scanned all 3 cat collar tags (velvet, midnight, waltz), found Rochelle, and slipped out the north door — without a single fight.'; document.getElementById('win').style.display = 'flex'; }
     }
   }
 }
@@ -266,9 +302,9 @@ function animate() {
     let best = null, bd = 3.2;
     for (const n of NPCS) { const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
     const prompt = document.getElementById('prompt');
-    if (best) { prompt.textContent = 'Talk to ' + best.name + ' — press E / USE'; prompt.style.display = 'block'; }
+    if (best) { prompt.textContent = (best.role === 'cat' ? 'Scan ' + best.name + '\'s collar tag' : 'Talk to ' + best.name) + ' — press E / USE'; prompt.style.display = 'block'; }
     else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
-      prompt.textContent = contactFound ? 'North exit open — press E / USE to leave' : 'North exit is locked — find Vera first (gather 3 clues)';
+      prompt.textContent = contactFound ? 'North exit open — press E / USE to leave' : 'North exit is locked — find Rochelle first (gather 3 clues)';
       prompt.style.display = 'block';
     } else { prompt.style.display = 'none'; if (talking) endTalk(); }
     // NPC wander + sway
