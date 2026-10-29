@@ -67,7 +67,7 @@ Still missing:
 
 The ballroom mission (`ballroom.html`) currently uses procedural placeholders for these — the real assets it still needs are:
 
-- Cat character models: Margo, Moxie, and Mabel, with distinct looks (currently simple procedural cats)
+- Cat character models: Margo (tortoiseshell gray, mottled gray coat, harder to find), Moxie (black and white, black ears, black nose), and Mabel (black and white, white ears, pink nose) — currently simple procedural cats in those looks
 - Cat collar + electronic ID tag models (currently a procedural collar and glowing tag box)
 - Rochelle NPC model: formal ballroom look, distinct from Agent_Kyle (currently a recoloured capsule guest)
 - Real ballroom models: chandelier, round tables, chairs, bar (currently procedural)

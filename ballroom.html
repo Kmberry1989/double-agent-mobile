@@ -161,10 +161,22 @@ function makeCat(cat) {
   body.scale.set(1, 0.72, 1.5); body.position.y = 0.26; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), new THREE.MeshStandardMaterial({ color: cat.color }));
   head.position.set(0, 0.38, 0.42); g.add(head);
+  // Mottled coat patches (tortoiseshell gray) or black-and-white patches:
+  // small flattened blobs on the body so the coat reads as mixed, not solid.
+  (cat.patches || []).forEach((p, i) => {
+    const patch = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshStandardMaterial({ color: p }));
+    patch.scale.set(1, 0.4, 1.4);
+    patch.position.set(i % 2 === 0 ? -0.2 : 0.2, 0.42, i < 2 ? 0.12 : -0.28);
+    g.add(patch);
+  });
   const earGeo = new THREE.ConeGeometry(0.07, 0.14, 4);
-  const earMat = new THREE.MeshStandardMaterial({ color: cat.color });
+  // Ears are their own colour on purpose: Moxie black ears, Mabel white ears.
+  const earMat = new THREE.MeshStandardMaterial({ color: cat.earColor !== undefined ? cat.earColor : cat.color });
   const earL = new THREE.Mesh(earGeo, earMat); earL.position.set(-0.1, 0.55, 0.42); g.add(earL);
   const earR = new THREE.Mesh(earGeo, earMat); earR.position.set(0.1, 0.55, 0.42); g.add(earR);
+  // Nose is its own colour on purpose: Moxie black nose, Mabel pink nose.
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshStandardMaterial({ color: cat.noseColor !== undefined ? cat.noseColor : 0x111111 }));
+  nose.position.set(0, 0.36, 0.62); g.add(nose);
   const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.45), new THREE.MeshStandardMaterial({ color: cat.color }));
   tail.position.set(0, 0.32, -0.55); tail.rotation.x = 0.4; g.add(tail);
   // Collar + glowing electronic ID tag
@@ -179,9 +191,13 @@ function makeCat(cat) {
   return cat;
 }
 const CATS = [
-  makeCat({ name: 'Margo', role: 'cat', clue: 'velvet', color: 0xd97a2a, x: -6, z: 0, wps: [[-6, 0], [-3, 1], [-5, -3]], lines: ['*purr* — Tag scan: velvet. Collar ID registered.', 'Margo stretches and pads away.'] }),
-  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x444444, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5]], lines: ['*purr* — Tag scan: midnight. Collar ID registered.', 'Moxie flicks her tail and sits down.'] }),
-  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0xf0e6d0, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4]], lines: ['*purr* — Tag scan: waltz. Collar ID registered.', 'Mabel blinks slowly at you.'] }),
+  // Margo: tortoiseshell gray (mottled gray coat), harder to find — she
+  // sticks to secluded corners/edges and pauses much longer between moves.
+  makeCat({ name: 'Margo', role: 'cat', clue: 'velvet', color: 0x8a8a8a, patches: [0x555555, 0xb0b0b0, 0x666666], earColor: 0x555555, noseColor: 0x111111, shy: true, x: -17, z: 11, wps: [[-17, 11], [-15, -10], [17, -11], [-18, -4]], lines: ['*purr* — Tag scan: velvet. Collar ID registered.', 'Margo stretches and pads away.'] }),
+  // Moxie: black and white, black ears, black nose.
+  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0x111111, noseColor: 0x111111, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5]], lines: ['*purr* — Tag scan: midnight. Collar ID registered.', 'Moxie flicks her tail and sits down.'] }),
+  // Mabel: black and white, white ears, pink nose.
+  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0xffffff, noseColor: 0xff9eb0, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4]], lines: ['*purr* — Tag scan: waltz. Collar ID registered.', 'Mabel blinks slowly at you.'] }),
 ];
 // Cats join the talkable/wandering set, so E / USE, prompts, and
 // wandering all work for them exactly like the guests. They have no
@@ -307,8 +323,8 @@ function animate() {
       n.group.position.y = Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
       if (n.pause > 0) { n.pause -= dt; continue; }
       const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
-      if (d < 0.3) { n.wp = (n.wp + 1) % n.wps.length; n.pause = 2 + Math.random() * 3; }
-      else { n.group.position.x += ddx / d * 0.8 * dt; n.group.position.z += ddz / d * 0.8 * dt; n.group.rotation.y = Math.atan2(ddx, ddz); }
+      if (d < 0.3) { n.wp = (n.wp + 1) % n.wps.length; n.pause = n.shy ? 6 + Math.random() * 4 : 2 + Math.random() * 3; }
+      else { const sp = n.shy ? 0.5 : 0.8; n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); }
     }
   }
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
