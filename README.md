@@ -367,6 +367,42 @@ keeps its flat colour and the game carries on.
   is intentionally unused. If the PNG fails to load, the panel
   hides instead of showing a white sheet.
 
+## Sky & weather
+
+The courtyard previously had no sky at all — just a flat background
+colour. It now has:
+
+- **Sky dome:** a large BackSide sphere with a shader gradient
+  (warm light horizon, blue zenith), centred on the player every
+  frame so you can never walk out of it. It is in no gameplay list:
+  it blocks no movement, shooting, or guard vision.
+- **Sun:** a bright core sprite plus a soft glow sprite, placed in
+  the same direction as the directional light.
+- **Clouds:** 8 sprites using a canvas-generated soft-puff texture
+  (no external assets, no per-frame texture regeneration). They drift
+  slowly sideways and wrap around the sky.
+- **Rain:** 600 short line segments falling in a 60×30×60 m box
+  around the player, re-centred on the player every frame. Capped at
+  600 for phones.
+
+Weather is **visual only**: it never changes guard vision ranges,
+detection, weapon damage, or movement. Fog thickens what the *player*
+sees, but guards see exactly as before.
+
+| State | What changes |
+|---|---|
+| Clear (start) | Bright blue sky, full sun, light fog (60–140 m) |
+| Cloudy | Greyer sky, dim sun, darker clouds, fog 45–110 m |
+| Rain | Dark sky, rain streaks on, dim light, fog 30–85 m |
+| Fog | Grey sky, faint sun, very thick fog (8–45 m) |
+
+Cycle them in order Clear → Cloudy → Rain → Fog → Clear with:
+
+- **Keyboard:** `Y`
+- **Touch:** the `WX` button below the minimap (top-right, touch
+  devices only)
+- The current weather is shown in the HUD (`Weather: …`).
+
 ## Known gaps / simplifications
 
 - Player FBX playback is now wired (see Poses & animations above),

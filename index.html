@@ -36,6 +36,7 @@
     #objectives p{font-size:11px}
     body.touch-on #hud{bottom:184px}
   }
+  #btnWeather{position:absolute;right:16px;top:216px;width:52px;height:52px;pointer-events:auto}
   #hud{position:fixed;left:16px;bottom:16px;z-index:5;pointer-events:none}
   .bar{width:260px;height:14px;background:rgba(0,0,0,.55);border:1px solid #556; margin:4px 0}
   .bar>i{display:block;height:100%;background:#57d977}
@@ -75,7 +76,7 @@
 <div id="cross">+</div>
 <div id="msg"></div>
 <div id="hud">
-  <p><b id="stateText">UNDETECTED</b> &nbsp; <span id="weaponText">Pistol</span> &nbsp; <span id="animText">Anim: idle (procedural capsule)</span></p>
+  <p><b id="stateText">UNDETECTED</b> &nbsp; <span id="weaponText">Pistol</span> &nbsp; <span id="weatherText">Weather: Clear</span> &nbsp; <span id="animText">Anim: idle (procedural capsule)</span></p>
   <p>Health</p><div class="bar"><i id="healthBar" style="width:100%"></i></div>
   <p>Detection</p><div class="bar" id="detectBar"><i id="detectFill" style="width:0%"></i></div>
   <p id="ammoText">Ammo: 12 / 12</p>
@@ -95,6 +96,7 @@
     <button class="tbtn" id="btnWeapon" type="button">WEAPON</button>
     <button class="tbtn" id="btnLoadout" type="button">SET</button>
   </div>
+  <button class="tbtn" id="btnWeather" type="button">WX</button>
 </div>
 <div id="overlay"><div class="box">
   <h1>DOUBLE AGENT</h1>
@@ -107,6 +109,7 @@
     <li>Hold <b>Right-mouse</b> to aim.</li>
     <li><b>Click</b> fire &nbsp; <b>R</b> reload &nbsp; <b>1</b> pistol &nbsp; <b>2</b> rifle &nbsp; <b>L</b> toggle player loadout (white / black set) &nbsp; <b>E</b> interact / pick up intel &nbsp; <b>F</b> silent takedown from behind an unaware guard</li>
     <li><b>Q</b> punch &nbsp; <b>X</b> kick &nbsp; <b>G</b> wave &nbsp; <b>T</b> talk &nbsp; <b>N</b> talk on phone &nbsp; <b>V</b> male crouch pose (hold) &nbsp; <b>B</b> female crouch pose (hold) — animation keys, no existing key changed</li>
+    <li><b>Y</b> cycle weather (Clear → Cloudy → Rain → Fog) — on phones, the <b>WX</b> button below the minimap does the same. Weather is visual only and never changes guard vision, detection, or damage.</li>
   </ul>
   <p class="warn">Note on controls: the brief asked for both “F aim” and “F takedown”. This build resolves the clash by using right-mouse for aim and F only for takedown, so the two actions cannot conflict. See README for the full note.</p>
   <p class="small">Models: guards use enemy-terror1–4.fbx, player weapons are the white_ / black_ sets (press L to toggle sets), and Agent_Kyle.fbx is your player model. The 62 Mixamo FBX clips in assets/animations/ now actually play on Agent_Kyle.fbx via the animation mixer (loops crossfade, actions are one-shots, crouch poses hold) — with a clean fallback to the procedural capsule if the rig or a clip fails.</p>
@@ -871,6 +874,117 @@ function damageDestructible(o, dmg, point, normal){
 }
 
 
+// ---------- Sky & weather (mobile duplicate only; visual only) ----------
+// Sky dome: a BackSide sphere with a gradient shader (warm horizon, blue
+// zenith, sun glow). It is centred on the player every frame, so the player
+// can never leave it, and it is in no gameplay list — it blocks no movement,
+// shooting, or guard vision. Clouds are 8 shared-material sprites with a
+// canvas-generated soft-puff texture (no external assets, no per-frame
+// texture regeneration). Rain is 600 line segments in a box around the
+// player (capped for phones). Weather NEVER changes guard vision ranges,
+// detection, weapon damage, or movement — fog only changes what the player
+// sees; hasLOS() and guard AI read the same lists as before.
+const skyGroup = new THREE.Group(); scene.add(skyGroup);
+const SUN_DIR = new THREE.Vector3(0.5, 0.62, 0.35).normalize();
+const skyUniforms = {
+  topColor: { value: new THREE.Color(0x2f6fc0) },
+  horizonColor: { value: new THREE.Color(0xd9e8e6) },
+  sunDir: { value: SUN_DIR },
+  sunColor: { value: new THREE.Color(0xfff2b0) },
+  sunIntensity: { value: 1.0 }
+};
+const skyMat = new THREE.ShaderMaterial({
+  uniforms: skyUniforms, side: THREE.BackSide, depthWrite: false, fog: false,
+  vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: 'varying vec3 vDir; uniform vec3 topColor; uniform vec3 horizonColor; uniform vec3 sunDir; uniform vec3 sunColor; uniform float sunIntensity; void main(){ float h = clamp(vDir.y, -1.0, 1.0); vec3 col = mix(horizonColor, topColor, pow(max(h, 0.0), 0.55)); if (h < 0.0) col = mix(horizonColor, horizonColor * 0.72, clamp(-h * 3.0, 0.0, 1.0)); float s = max(dot(normalize(vDir), sunDir), 0.0); col += sunColor * (pow(s, 350.0) * 1.2 + pow(s, 8.0) * 0.18) * sunIntensity; gl_FragColor = vec4(col, 1.0); }'
+});
+skyGroup.add(new THREE.Mesh(new THREE.SphereGeometry(200, 24, 16), skyMat));
+// Sun sprites (always face the camera): a bright core + a soft glow.
+function radialTex(inner, outer){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'); const grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+  grad.addColorStop(0, inner); grad.addColorStop(1, outer);
+  g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const sunCore = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTex('rgba(255,246,200,1)', 'rgba(255,220,120,0)'), transparent: true, fog: false, depthWrite: false }));
+sunCore.scale.set(26, 26, 1); sunCore.position.copy(SUN_DIR).multiplyScalar(170); skyGroup.add(sunCore);
+const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTex('rgba(255,230,150,0.55)', 'rgba(255,230,150,0)'), transparent: true, fog: false, depthWrite: false }));
+sunGlow.scale.set(70, 70, 1); sunGlow.position.copy(SUN_DIR).multiplyScalar(170); skyGroup.add(sunGlow);
+// Cloud texture: a few soft white puffs on a transparent canvas.
+const cloudCanvas = document.createElement('canvas'); cloudCanvas.width = 256; cloudCanvas.height = 128;
+(function drawCloud(){
+  const g = cloudCanvas.getContext('2d');
+  const puffs = [[60, 80, 42], [110, 60, 55], [170, 70, 48], [130, 88, 40], [90, 90, 34], [200, 88, 30]];
+  for (const [x, y, r] of puffs){
+    const grad = g.createRadialGradient(x, y, 2, x, y, r);
+    grad.addColorStop(0, 'rgba(255,255,255,0.9)'); grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  }
+})();
+const cloudTex = new THREE.CanvasTexture(cloudCanvas); cloudTex.colorSpace = THREE.SRGBColorSpace;
+const cloudMat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.75, fog: false, depthWrite: false });
+const clouds = [];
+for (let i = 0; i < 8; i++){
+  const sp = new THREE.Sprite(cloudMat);
+  const sc = 30 + Math.random() * 45;
+  sp.scale.set(sc, sc * 0.45, 1);
+  sp.position.set(-140 + Math.random() * 280, 45 + Math.random() * 45, -140 + Math.random() * 280);
+  skyGroup.add(sp); clouds.push(sp);
+}
+// Rain: 600 short line segments in a 60x30x60 box. Reused every frame;
+// the group is re-centred on the player, so rain always falls around you.
+const RAIN_COUNT = 600;
+const rainPos = new Float32Array(RAIN_COUNT * 6);
+const rainDrops = [];
+for (let i = 0; i < RAIN_COUNT; i++) rainDrops.push({ x: -30 + Math.random() * 60, y: Math.random() * 30, z: -30 + Math.random() * 60 });
+const rainGeo = new THREE.BufferGeometry();
+rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+const rainGroup = new THREE.Group();
+const rainLines = new THREE.LineSegments(rainGeo, new THREE.LineBasicMaterial({ color: 0xa8c0d4, transparent: true, opacity: 0.55 }));
+rainGroup.add(rainLines); rainGroup.visible = false; scene.add(rainGroup);
+function updateRain(dt){
+  if (!rainGroup.visible) return;
+  for (let i = 0; i < RAIN_COUNT; i++){
+    const d = rainDrops[i];
+    d.y -= 30 * dt; d.x -= 2 * dt;
+    if (d.y < 0){ d.y = 28 + Math.random() * 4; d.x = -30 + Math.random() * 60; d.z = -30 + Math.random() * 60; }
+    rainPos[i * 6] = d.x; rainPos[i * 6 + 1] = d.y; rainPos[i * 6 + 2] = d.z;
+    rainPos[i * 6 + 3] = d.x + 0.15; rainPos[i * 6 + 4] = d.y - 0.7; rainPos[i * 6 + 5] = d.z;
+  }
+  rainGeo.attributes.position.needsUpdate = true;
+}
+const WEATHERS = {
+  Clear:  { fogColor: 0x87a5a0, fogNear: 60, fogFar: 140, top: 0x2f6fc0, horizon: 0xd9e8e6, sunI: 1.0,  hemi: 0.9,  sun: 1.2, cloudOp: 0.75, cloudTint: 0xffffff, rain: false },
+  Cloudy: { fogColor: 0x9aa5a8, fogNear: 45, fogFar: 110, top: 0x5a7a94, horizon: 0xc8cfcf, sunI: 0.25, hemi: 0.7,  sun: 0.7, cloudOp: 1.0,  cloudTint: 0xd0d5d8, rain: false },
+  Rain:   { fogColor: 0x6f7d82, fogNear: 30, fogFar: 85,  top: 0x3d4f5e, horizon: 0x8a9499, sunI: 0.05, hemi: 0.55, sun: 0.4, cloudOp: 1.0,  cloudTint: 0x8f979c, rain: true },
+  Fog:    { fogColor: 0xb8c0bd, fogNear: 8,  fogFar: 45,  top: 0x9aa8a6, horizon: 0xcdd2cd, sunI: 0.1,  hemi: 0.65, sun: 0.5, cloudOp: 0.35, cloudTint: 0xe8ecea, rain: false }
+};
+const WEATHER_ORDER = ['Clear', 'Cloudy', 'Rain', 'Fog'];
+let weather = 'Clear';
+function setWeather(name, announce){
+  weather = name; const w = WEATHERS[name];
+  skyUniforms.topColor.value.setHex(w.top); skyUniforms.horizonColor.value.setHex(w.horizon); skyUniforms.sunIntensity.value = w.sunI;
+  scene.fog.color.setHex(w.fogColor); scene.fog.near = w.fogNear; scene.fog.far = w.fogFar;
+  scene.background.setHex(w.horizon);
+  hemi.intensity = w.hemi; sun.intensity = w.sun;
+  cloudMat.opacity = w.cloudOp; cloudMat.color.setHex(w.cloudTint);
+  sunCore.material.opacity = 0.25 + 0.75 * w.sunI; sunGlow.material.opacity = w.sunI;
+  rainGroup.visible = w.rain;
+  const el = document.getElementById('weatherText'); if (el) el.textContent = 'Weather: ' + name;
+  const btn = document.getElementById('btnWeather'); if (btn) btn.textContent = 'WX';
+  if (announce) showMsg('Weather: ' + name, 1400);
+}
+function cycleWeather(){ setWeather(WEATHER_ORDER[(WEATHER_ORDER.indexOf(weather) + 1) % WEATHER_ORDER.length], true); }
+setWeather('Clear', false);
+function updateSky(dt){
+  skyGroup.position.copy(player.position);
+  rainGroup.position.set(player.position.x, 0, player.position.z);
+  for (const c of clouds){ c.position.x += dt * 1.5; if (c.position.x > 160) c.position.x = -160; }
+  updateRain(dt);
+}
+
+
 // ---------- Input (desktop keys unchanged; touch added below, mobile only) ----------
 const keys = {};
 let locked = false;
@@ -883,6 +997,7 @@ const isTouchDevice = (typeof window !== 'undefined') && (window.matchMedia('(po
 addEventListener('keydown', e=>{
   keys[e.code]=true;
   if (e.code==='KeyC') crouching = !crouching;
+  if (e.code==='KeyY') cycleWeather();
   if (e.code==='Digit1'){ weapon='pistol'; ammoInMag = Math.min(ammoInMag,12); if (ammoInMag>12) ammoInMag=12; updateWeaponVisibility(); }
   if (e.code==='Digit2'){ weapon='rifle'; ammoInMag = 30; updateWeaponVisibility(); }
   if (e.code==='KeyL'){ playerLoadout = playerLoadout==='white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
@@ -1000,6 +1115,7 @@ document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLo
   bindBtn('btnTakedown', tryTakedown);
   bindBtn('btnWeapon', doWeapon);
   bindBtn('btnLoadout', doLoadout);
+  bindBtn('btnWeather', cycleWeather);
   // Prevent iOS double-tap zoom / page scroll while playing on touch.
   document.addEventListener('touchmove', (e)=>{
     if (touchMode && !gameOver && !won && document.getElementById('overlay').style.display === 'none') e.preventDefault();
@@ -1298,6 +1414,7 @@ function animate(){
   document.getElementById('animText').textContent = 'Anim: '+_dispAnim+' ('+(fbxPlaying ? 'Agent_Kyle.fbx, FBX' : 'procedural capsule')+') — FBX: '+(ANIM_MAP[_dispAnim]||ANIM_MAP[currentAnim]||'—');
   document.getElementById('posText').textContent = 'Intel: '+intel+'/3  •  X '+player.position.x.toFixed(0)+' Z '+player.position.z.toFixed(0);
   drawMinimap();
+  updateSky(dt);
   renderer.render(scene,camera);
 }
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
