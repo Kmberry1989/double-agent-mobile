@@ -44,16 +44,13 @@
 - Camera-disable security office
 - Real cover models
 
-## Textures missing entirely
+## Textures missing — environment only
 
-The courtyard currently uses flat procedural colors — no textures at all.
+The courtyard currently uses flat procedural colors — no textures at all. Only environment surfaces need textures: object, character, and weapon textures are already baked into the model files (Agent_Kyle, terror guards, weapon GLBs), so they are not listed here.
 
 - Ground: concrete, asphalt, gravel, grass, dirt path (seamless / tileable)
 - Walls / buildings: concrete, brick, painted metal panels, vent grilles
 - Cover / props: wood crates, metal barrels, sandbags, chain-link fence
-- Vehicles: Lambo paint / tires / glass, tire tread
-- Characters: agent uniform fabric, camouflage, guard uniform fabric, skin tones
-- Weapons: gunmetal, polymer grips, white / black weapon finishes
 - Details: hazard stripes, signage / posters, floor markings, night / wet-look variants
 
 ## Audio missing entirely
