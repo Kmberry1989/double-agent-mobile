@@ -130,6 +130,7 @@ const ANIM_MAP = {
   firePistol:'Shooting_Pistol.fbx', reloadPistol:'Reloading_Walking.fbx', sneak:'Sneaking_Forward.fbx',
   crawl:'Crawling.fbx', cover:'Taking_Cover_Idle.fbx', punch:'Punching.fbx', kick:'Side_Kick.fbx',
   hitReaction:'Hit_Reaction.fbx', death:'Death.fbx', deathRifle:'Rifle_Death.fbx', deathFallBack:'Falling_Back_Death.fbx',
+  deathForward:'Standing_React_Death_Forward.fbx', deathHeadshot:'Death_From_Front_Headshot.fbx', deathBack:'Dying_Backwards.fbx', deathCrouch:'Crouch_Death.fbx',
   knockedOut:'Knocked_Out.fbx', jump:'Jump.fbx', fall:'Falling.fbx', land:'Landing.fbx',
   climb:'Climbing_Ladder.fbx', vault:'Vault_Over_Box.fbx', drive:'Driving.fbx', enterCar:'Entering_Car.fbx',
   exitCar:'Exiting_Car.fbx', wave:'Waving.fbx', talk:'Talking.fbx', talkPhone:'Talking_On_A_Cell_Phone.fbx',
@@ -164,10 +165,50 @@ const ANIM_LOOPS = new Set(['idle','walk','run','sprint','crouchIdle','crouchWal
   'pistolKneelingIdle','rifleIdle','rifleWalk','rifleRun','rifleSprint','rifleCrouchWalk','idleCrouchingRifle',
   'sittingIdle','typing']);
 const ANIM_ONESHOTS = new Set(['fireRifle','fireRifleCrouch','reloadRifle','firePistol','reloadPistol','jump','land',
-  'punch','kick','hitReaction','death','deathRifle','deathFallBack','knockedOut','climb','vault','enterCar','exitCar',
+  'punch','kick','hitReaction','death','deathRifle','deathFallBack','deathForward','deathHeadshot','deathBack','deathCrouch','knockedOut','climb','vault','enterCar','exitCar',
   'toRun','turn','wave','talk','talkPhone','pickingUp','grabPistol','headNodYes','honkingHorn','lookingAround',
   'openingDoor','pointingForward','shakingHeadNo','shrugging','standingUp']);
 const ANIM_HELD = new Set(['maleCrouchPose','femaleCrouchPose']);
+// ---------- Random death pick (7-clip pool, guards + player) ----------
+// Existing: Death, Rifle_Death, Falling_Back_Death. New (2026-10-29):
+// Standing_React_Death_Forward, Death_From_Front_Headshot,
+// Dying_Backwards, Crouch_Death. A dead guard must never stay standing:
+// if no guard mixer/clip can play, the caller falls back to tip-over.
+const DEATH_POOL = ['death','deathRifle','deathFallBack','deathForward','deathHeadshot','deathBack','deathCrouch'];
+function pickRandomDeath(){ return DEATH_POOL[Math.floor(Math.random()*DEATH_POOL.length)]; }
+function tipGuardOver(g){ g.group.rotation.x = -Math.PI/2; g.group.position.y = 0.4; }
+function playGuardDeath(g, action){
+  // Returns true = death clip playing now, 'pending' = clip loading (the
+  // async callback tips the guard over if it is rejected/missing),
+  // false = no usable guard mixer/clip (caller must tip over now).
+  if (!g.mixer || !g.guardAnimOk || !g.realModel) return false;
+  const run = ()=>{
+    const clip = fbxClips[action]; if (!clip) return false;
+    // Guard-specific bone gate: at least one clip track must name a bone
+    // this guard model actually has, else the clip would play silently
+    // and the guard would stay standing. (Player-processed clips are
+    // cached by action, so the player rig check alone is not enough.)
+    try {
+      const bones = modelBoneSet(g.realModel); let hit = false;
+      clip.tracks.forEach((t)=>{ if (bones.has(boneKey(t.name))) hit = true; });
+      if (!hit) return false;
+      if (g.guardLoop && g.guardActions && g.guardActions[g.guardLoop]) g.guardActions[g.guardLoop].stop();
+      if (g.deathAction) g.deathAction.stop();
+      const a = g.mixer.clipAction(clip);
+      a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true;
+      a.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(0.06).play();
+      g.deathAction = a; g.deathPlaying = true; g.mixerStopped = false;
+      return true;
+    } catch (e) { return false; }
+  };
+  if (fbxClips[action]) return run();
+  loadClipFile(action, g.realModel).then((clip)=>{
+    if (!g.dead || g.deathPlaying) return;
+    if (clip && run()) return;
+    if (g.group.rotation.x === 0) tipGuardOver(g);
+  });
+  return 'pending';
+}
 const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak'];
 let playerMixer = null, playerActions = {}, playerCurrentLoop = null, playerOneShot = null, playerOneShotName = null,
     playerOneShotHold = false, playerHeldPose = null, playerDesiredLoop = 'idle',
@@ -1160,7 +1201,7 @@ function tryShoot(){
     if (g){ guardHit = true; g.hp -= w.dmg; g.meter = 100; g.state='ALERT'; g.lastKnown = player.position.clone();
       spawnHitSpray(hits[0].point.clone());
       addDecal(new THREE.Vector3(g.group.position.x, 0.02, g.group.position.z), new THREE.Vector3(0, 1, 0), 'blood');
-      if (g.hp<=0){ g.dead=true; g.group.rotation.x = -Math.PI/2; g.group.position.y = 0.4; showMsg('Guard down',1400); }
+      if (g.hp<=0){ g.dead=true; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g); showMsg('Guard down',1400); }
       else showMsg('Hit!',700);
     }
   }
@@ -1193,7 +1234,7 @@ function tryTakedown(){
     const fwd = new THREE.Vector3(Math.sin(g.yaw),0,Math.cos(g.yaw));
     const behind = fwd.dot(toPlayer) < -0.6;
     if (behind && g.state!=='ALERT' && g.meter<80){
-      g.dead=true; g.hp=0; g.group.rotation.x = -Math.PI/2; g.group.position.y = 0.4;
+      g.dead=true; g.hp=0; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g);
       showMsg('Silent takedown — no alarm',1800); return;
     }
     if (behind) showMsg('Guard is alert — takedown blocked',1400); else showMsg('Get behind an unaware guard for a takedown',1400);
@@ -1224,7 +1265,7 @@ function endScreen(text){
 
 // ---------- Guard AI ----------
 function updateGuard(g, dt, now){
-  if (g.dead){ if (g.mixer && !g.mixerStopped){ try { g.mixer.stopAllAction(); } catch (e) {} g.mixerStopped = true; } return; }
+  if (g.dead){ if (g.deathPlaying && g.mixer){ try { g.mixer.update(dt); } catch (e) {} return; } if (g.mixer && !g.mixerStopped){ try { g.mixer.stopAllAction(); } catch (e) {} g.mixerStopped = true; } return; }
   const p = player.position, gp = g.group.position;
   const toP = new THREE.Vector3().subVectors(p,gp); const dist = toP.length(); toP.y=0; toP.normalize();
   const fwd = new THREE.Vector3(Math.sin(g.yaw),0,Math.cos(g.yaw));
@@ -1254,7 +1295,7 @@ function updateGuard(g, dt, now){
     desiredYaw = Math.atan2(toP.x,toP.z); speed=0.5;
   } else if (g.state==='ALERT'){
     if (g.lastKnown){ const dx=g.lastKnown.x-gp.x, dz=g.lastKnown.z-gp.z; const d=Math.hypot(dx,dz); desiredYaw=Math.atan2(dx,dz); speed = d>2?4.5:0;
-      if (seen && dist<22 && now-g.shotT>900){ g.shotT=now; health-=6; playPlayerOneShot('hitReaction'); showMsg('Taking fire!',800); if (health<=0){ health=0; playPlayerOneShot(weapon==='rifle' ? 'deathRifle' : 'death', {hold:true}); endScreen('MISSION FAILED — you were taken down.'); } }
+      if (seen && dist<22 && now-g.shotT>900){ g.shotT=now; health-=6; playPlayerOneShot('hitReaction'); showMsg('Taking fire!',800); if (health<=0){ health=0; playPlayerOneShot(pickRandomDeath(), {hold:true}); endScreen('MISSION FAILED — you were taken down.'); } }
     }
   } else if (g.state==='SEARCH'){
     g.searchT += dt;
