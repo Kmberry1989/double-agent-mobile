@@ -281,6 +281,43 @@ faces the wrong way, flip that model's yaw in `index.html`
 (`normalizeCharacter`'s yaw offset for characters, `fitWeapon`'s
 rotation for weapons).
 
+## Bullet holes & destructibles
+
+No external assets — holes, blood, sparks, chips, and casings are all
+generated in code (canvas textures and tiny meshes).
+
+- **Bullet holes:** every player shot that hits a wall, crate, floor,
+  or other static surface leaves a small dark decal at the exact hit
+  point, oriented to the surface normal and offset 0.02 m so it never
+  z-fights. Holes persist for the rest of the run (restart reloads
+  the page, so they clear then), capped at 200 decals shared with
+  blood — oldest removed first.
+- **Destructible:** all 5 crates (150 HP: 3 rifle hits, 5 pistol
+  hits) and 2 interior cover walls — at (-8, 10) and (22, 18)
+  (250 HP: 5 rifle hits, 8 pistol hits). Each hit chips them: they
+  darken, shrink slightly, throw off debris chips, and gain a hole
+  decal. At 0 HP they break apart and are removed entirely, so they
+  no longer block movement, guard vision, or shots (collision,
+  line-of-sight, and minimap all read the same obstacle list).
+- **Indestructible, always:** the outer boundary walls, the
+  southwest silent-start alcove wall, and the green EXFIL gate.
+- **Shell casings:** every shot ejects a small brass casing from
+  the weapon — it arcs, bounces once on the floor, rests ~4 s, then
+  fades. Capped at 30 active casings.
+- **Blood spatter:** a shot hitting a guard leaves a dark red
+  spatter decal on the floor beneath them (same 200-decal cap as
+  holes), plus a brief red particle spray in the air at the hit
+  point that arcs, falls, and fades in under a second. No gore
+  beyond that — no lingering cloud, no body parts.
+- **Metal sparks:** shots hitting a metal surface (the three big
+  metal buildings) throw a brief orange spark burst plus a quick
+  flash. Concrete and wood hits throw grey / brown dust and chips
+  instead. Surfaces are tagged by a simple material flag
+  (`concrete` / `wood` / `metal`) on the level boxes; the level
+  layout itself is unchanged.
+- **Guard damage is unchanged:** pistol 34, rifle 50 per hit, same
+  as before — destructible HP is separate from guard HP.
+
 ## Known gaps / simplifications
 
 - Player FBX playback is now wired (see Poses & animations above),

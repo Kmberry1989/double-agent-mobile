@@ -391,21 +391,23 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.2); sun.position.set(30,50,20
 function mat(c){ return new THREE.MeshStandardMaterial({ color:c, roughness:0.9 }); }
 const obstacles = []; // {mesh, minX,maxX,minZ,maxZ} for collision + LOS
 const losMeshes = [];
-function box(x,z,w,d,h,color,y){
+function box(x,z,w,d,h,color,y,opts){
+  opts = opts || {};
   const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat(color));
   m.position.set(x,(y===undefined?h/2:y),z); m.castShadow = true; m.receiveShadow = true; scene.add(m);
-  const o = { mesh:m, minX:x-w/2, maxX:x+w/2, minZ:z-d/2, maxZ:z+d/2, h };
+  const o = { mesh:m, cx:x, cz:z, ow:w, od:d, oh:h, minX:x-w/2, maxX:x+w/2, minZ:z-d/2, maxZ:z+d/2, h,
+    material: opts.material || 'concrete', destructible: !!opts.destructible, hp: opts.hp || 0, maxHp: opts.hp || 0, baseColor: color };
   obstacles.push(o); losMeshes.push(m); return o;
 }
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(90,90), mat(0x6f7d5a));
 ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 // Perimeter + courtyard structures. Coordinates are in metres, centre is (0,0).
 box(0,-42,90,2,4,0x555a55); box(0,42,90,2,4,0x555a55); box(-42,0,2,90,4,0x555a55); box(42,0,2,90,4,0x555a55);
-box(-20,-18,14,2,3,0x8a7a5a); box(18,-12,2,16,3,0x8a7a5a); box(-8,10,16,2,3,0x777777);
-box(22,18,12,2,3,0x777777); box(-28,24,2,12,3,0x8a7a5a); box(8,-26,18,2,3,0x777777);
-box(-14,0,3,3,1.2,0xa0824a); box(-10,2,3,3,1.2,0xa0824a); box(12,6,3,3,1.2,0xa0824a);
-box(30,-24,4,4,2,0x9a6a3a); box(-34,-28,4,4,2,0x9a6a3a); box(0,-34,10,6,5,0x5a6a7a);
-box(-32,8,8,8,6,0x5a6a7a); box(34,28,8,8,6,0x5a6a7a);
+box(-20,-18,14,2,3,0x8a7a5a); box(18,-12,2,16,3,0x8a7a5a); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250});
+box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250}); box(-28,24,2,12,3,0x8a7a5a); box(8,-26,18,2,3,0x777777);
+box(-14,0,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood'}); box(-10,2,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood'}); box(12,6,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood'});
+box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood'}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood'}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal'});
+box(-32,8,8,8,6,0x5a6a7a,undefined,{material:'metal'}); box(34,28,8,8,6,0x5a6a7a,undefined,{material:'metal'});
 // SILENT START: a walled alcove in the southwest corner. The player spawns here,
 // alone — no guard patrol waypoint and no security camera is within 30 m of it.
 // The only way out is east, around the end of the north wall, into the courtyard.
@@ -611,6 +613,135 @@ function hasLOS(from,to){
 }
 function showMsg(t,ms){ const el=document.getElementById('msg'); el.textContent=t; el.style.display='block'; setTimeout(()=>el.style.display='none', ms||2600); }
 
+// ---------- Bullet holes, blood, debris, casings, sparks (no external assets) ----------
+// Decals: small canvas-textured circles laid on the hit surface, offset
+// 0.02 m along the normal so they never z-fight. Holes + blood share one
+// cap (200); oldest is removed first. Restart reloads the page, so all
+// decals clear on restart.
+function makeDecalTexture(kind){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  if (kind === 'blood'){
+    g.fillStyle = 'rgba(0,0,0,0)'; g.clearRect(0,0,64,64);
+    for (let i=0;i<9;i++){
+      const x = 18 + Math.random()*28, y = 18 + Math.random()*28, r = 4 + Math.random()*9;
+      g.fillStyle = i % 2 ? 'rgba(122,10,10,0.9)' : 'rgba(90,5,5,0.9)';
+      g.beginPath(); g.arc(x,y,r,0,7); g.fill();
+    }
+  } else {
+    const grad = g.createRadialGradient(32,32,2,32,32,30);
+    grad.addColorStop(0,'rgba(5,5,5,1)'); grad.addColorStop(0.7,'rgba(20,20,20,0.95)'); grad.addColorStop(1,'rgba(120,120,120,0.35)');
+    g.fillStyle = grad; g.beginPath(); g.arc(32,32,30,0,7); g.fill();
+  }
+  const t = new THREE.CanvasTexture(c); return t;
+}
+const holeTex = makeDecalTexture('hole'), bloodTex = makeDecalTexture('blood');
+const decals = []; const MAX_DECALS = 200;
+function addDecal(point, normal, kind){
+  const size = kind === 'blood' ? 0.35 : 0.11;
+  const m = new THREE.Mesh(new THREE.CircleGeometry(size, 12),
+    new THREE.MeshBasicMaterial({ map: kind === 'blood' ? bloodTex : holeTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  m.position.copy(point).addScaledVector(normal, 0.02);
+  m.lookAt(point.x + normal.x, point.y + normal.y, point.z + normal.z);
+  m.rotateZ(Math.random() * Math.PI * 2);
+  if (kind === 'blood') m.scale.set(0.8 + Math.random() * 0.7, 0.7 + Math.random() * 0.6, 1);
+  scene.add(m); decals.push(m);
+  while (decals.length > MAX_DECALS){ const old = decals.shift(); scene.remove(old); old.geometry.dispose(); old.material.dispose(); }
+  return m;
+}
+function clearDecalsNear(cx, cz, r){
+  for (let i = decals.length - 1; i >= 0; i--){
+    const d = decals[i];
+    if (Math.hypot(d.position.x - cx, d.position.z - cz) < r){ scene.remove(d); decals.splice(i, 1); }
+  }
+}
+// Cheap particles: tiny boxes with velocity + gravity + fade. One style
+// serves chips (concrete/wood), sparks (metal), and the red hit spray.
+const particles = [];
+function spawnParticles(point, color, count, speed, size, life, grav){
+  for (let i = 0; i < count; i++){
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size),
+      new THREE.MeshBasicMaterial({ color: color, transparent: true }));
+    mesh.position.copy(point);
+    const vel = new THREE.Vector3((Math.random() - 0.5) * 2, Math.random(), (Math.random() - 0.5) * 2).normalize().multiplyScalar(speed * (0.5 + Math.random() * 0.7));
+    vel.y = Math.abs(vel.y) + speed * 0.3;
+    scene.add(mesh);
+    particles.push({ mesh: mesh, vel: vel, life: life, maxLife: life, grav: grav === undefined ? 9.8 : grav });
+  }
+  while (particles.length > 120){ const old = particles.shift(); scene.remove(old.mesh); }
+}
+function spawnSparkBurst(point){
+  spawnParticles(point, 0xffaa00, 8, 4, 0.03, 0.25, 6);
+  spawnParticles(point, 0xffcc55, 1, 0, 0.22, 0.08, 0); // quick flash
+}
+function spawnHitSpray(point){
+  // Brief red spray in the air on a guard hit: arcs out, falls, fades
+  // in under a second. No lingering cloud, no body parts.
+  spawnParticles(point, 0x8a1010, 10, 3.5, 0.05, 0.7, 9.8);
+}
+// Shell casings: small brass boxes, eject right + up, bounce once, rest
+// ~4 s, then fade. Capped at 30 so phones stay smooth.
+const casings = []; const MAX_CASINGS = 30;
+function ejectCasing(){
+  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  const start = player.position.clone().addScaledVector(right, 0.4).addScaledVector(fwd, 0.3);
+  start.y = player.position.y + (crouching ? 1.0 : 1.35);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.7, roughness: 0.3, transparent: true }));
+  mesh.position.copy(start); scene.add(mesh);
+  const vel = right.clone().multiplyScalar(1.8 + Math.random()).add(new THREE.Vector3(0, 2.2 + Math.random(), 0)).addScaledVector(fwd, -0.4);
+  casings.push({ mesh: mesh, vel: vel, bounced: false, restT: 0 });
+  while (casings.length > MAX_CASINGS){ const old = casings.shift(); scene.remove(old.mesh); }
+}
+function updateEffects(dt){
+  for (let i = particles.length - 1; i >= 0; i--){
+    const p = particles[i];
+    p.vel.y -= p.grav * dt;
+    p.mesh.position.addScaledVector(p.vel, dt);
+    if (p.mesh.position.y < 0.03){ p.mesh.position.y = 0.03; p.vel.set(0, 0, 0); }
+    p.life -= dt;
+    p.mesh.material.opacity = Math.max(0, p.life / p.maxLife);
+    if (p.life <= 0){ scene.remove(p.mesh); particles.splice(i, 1); }
+  }
+  for (let i = casings.length - 1; i >= 0; i--){
+    const c = casings[i];
+    if (c.vel.lengthSq() > 0){
+      c.vel.y -= 9.8 * dt;
+      c.mesh.position.addScaledVector(c.vel, dt);
+      if (c.mesh.position.y <= 0.03 && c.vel.y < 0){
+        if (!c.bounced){ c.vel.y *= -0.35; c.vel.x *= 0.6; c.vel.z *= 0.6; c.bounced = true; }
+        else { c.vel.set(0, 0, 0); c.mesh.position.y = 0.03; }
+      }
+    } else {
+      c.restT += dt;
+      if (c.restT > 4) c.mesh.material.opacity = Math.max(0, 1 - (c.restT - 4) / 0.5);
+      if (c.restT > 4.5){ scene.remove(c.mesh); casings.splice(i, 1); }
+    }
+  }
+}
+// Destructible damage: chip (darken + shrink + chips + hole), then break.
+function damageDestructible(o, dmg, point, normal){
+  o.hp -= dmg;
+  const frac = Math.max(0, o.hp / o.maxHp);
+  o.mesh.material.color.setHex(o.baseColor).multiplyScalar(0.55 + 0.45 * frac);
+  const sc = 0.72 + 0.28 * frac;
+  o.mesh.scale.set(sc, sc, sc);
+  o.minX = o.cx - o.ow * sc / 2; o.maxX = o.cx + o.ow * sc / 2;
+  o.minZ = o.cz - o.od * sc / 2; o.maxZ = o.cz + o.od * sc / 2;
+  addDecal(point, normal, 'hole');
+  spawnParticles(point, o.material === 'wood' ? 0x8a6a3a : 0x888888, 6, 3, 0.09, 0.8, 9.8);
+  if (o.hp <= 0){
+    spawnParticles(point, o.material === 'wood' ? 0x8a6a3a : 0x888888, 10, 4, 0.14, 1.0, 9.8);
+    clearDecalsNear(o.cx, o.cz, 3);
+    scene.remove(o.mesh);
+    obstacles.splice(obstacles.indexOf(o), 1);
+    losMeshes.splice(losMeshes.indexOf(o.mesh), 1);
+    showMsg('Cover destroyed!', 1400);
+  }
+}
+
+
 // ---------- Input (desktop keys unchanged; touch added below, mobile only) ----------
 const keys = {};
 let locked = false;
@@ -768,20 +899,40 @@ function tryShoot(){
   if (now-lastShot < w.rate*1000) return;
   if (ammoInMag<=0){ showMsg('Empty — press R to reload',1200); return; }
   lastShot = now; ammoInMag--;
+  ejectCasing();
   playPlayerOneShot(weapon==='rifle' ? (crouching ? 'fireRifleCrouch' : 'fireRifle') : 'firePistol');
   // Ray from camera centre.
   const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
   ray.set(camera.position, dir); ray.far = 60;
   const targets = guards.filter(g=>!g.dead).map(g=>g.group);
   const hits = ray.intersectObjects(targets, true);
+  let guardHit = false;
   if (hits.length){
     // Walk up the parent chain: a hit on a real enemy FBX mesh or its
     // weapon is nested several levels below the guard group.
     let node = hits[0].object; let g = null;
     while (node){ g = guards.find(x=>x.group===node); if (g) break; node = node.parent; }
-    if (g){ g.hp -= w.dmg; g.meter = 100; g.state='ALERT'; g.lastKnown = player.position.clone();
+    if (g){ guardHit = true; g.hp -= w.dmg; g.meter = 100; g.state='ALERT'; g.lastKnown = player.position.clone();
+      spawnHitSpray(hits[0].point.clone());
+      addDecal(new THREE.Vector3(g.group.position.x, 0.02, g.group.position.z), new THREE.Vector3(0, 1, 0), 'blood');
       if (g.hp<=0){ g.dead=true; g.group.rotation.x = -Math.PI/2; g.group.position.y = 0.4; showMsg('Guard down',1400); }
       else showMsg('Hit!',700);
+    }
+  }
+  if (!guardHit){
+    // Surface impact: first wall/crate/floor hit along the same ray.
+    // Guard damage above is untouched; this only adds the visible hit.
+    const surf = ray.intersectObjects(losMeshes.concat([ground]), false);
+    if (surf.length){
+      const sh = surf[0];
+      const n = sh.object === ground ? new THREE.Vector3(0, 1, 0) : sh.face.normal.clone();
+      const o = obstacles.find(x=>x.mesh === sh.object);
+      if (o && o.destructible) damageDestructible(o, w.dmg, sh.point, n);
+      else {
+        addDecal(sh.point, n, 'hole');
+        if (o && o.material === 'metal') spawnSparkBurst(sh.point);
+        else spawnParticles(sh.point, o && o.material === 'wood' ? 0x8a6a3a : 0x888888, 5, 1.5, 0.05, 0.5, 9.8);
+      }
     }
   }
   noiseAlert(26, true);
@@ -974,6 +1125,7 @@ function animate(){
   // Advance real FBX playback (player + experimental guards are updated
   // in their own mixers; player mixer runs even on the menu so idle plays).
   if (playerMixer && fbxPlaying){ try { playerMixer.update(dt); } catch (e) {} }
+  updateEffects(dt);
   // Over-the-shoulder camera.
   const back = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
   const right = new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
