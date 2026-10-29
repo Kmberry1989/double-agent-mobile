@@ -435,3 +435,14 @@ Cycle them in order Clear → Cloudy → Rain → Fog → Clear with:
 - `assets/white_*.glb` / `assets/black_*.glb` — player weapon sets
 - `assets/mp5k.glb` (unprefixed) and other unprefixed GLBs — enemy weapons / props
 - `assets/Agent_Kyle.fbx` — **present**; player model, loaded with fallback to capsule (see Asset map)
+
+
+## Ballroom Mission (undercover, no combat)
+
+Open `ballroom.html` — a separate mission in this repo. The courtyard game in `index.html` is untouched — open `ballroom.html` directly.
+
+- **Setting:** an indoor ballroom — dance floor, 6 round tables with chairs, a bar on the east wall, 3 chandeliers, entrance at the south, exit at the north. The player starts at the entrance, undercover, reusing the Agent_Kyle model with no weapon attached and no weapon HUD.
+- **No combat, no weapons:** no guards, no vision cones, no detection meter, no health loss. There are no fire, weapon-switch, or takedown controls (hidden on touch, disabled on keyboard). Talking to an NPC can never fail the mission.
+- **NPCs (10, friendly):** Vera (the contact, by the bar), Milo, Priya, Theo (the 3 clue-givers), plus Ana, Jonas, Lena, Omar, Sofia, Ben (flavour guests). Guests wander between waypoints, pause, and sway; talk to them with E / USE when nearby.
+- **Goal, in order:** (1) Talk to Milo, Priya, and Theo to collect 3 clue words — velvet, midnight, waltz (tracker: Clues 0/3). (2) Talk to Vera with all 3 clues to gain her trust (Contact: found). (3) Walk to the north exit door and press E / USE to leave. Win screen on completion, with a Play-again restart. The north door stays locked (red) until Vera trusts you.
+- **Movement/animation:** same WASD + mouse look / touch joystick + drag-look as the courtyard game, reusing Standing_Idle, Walking, Talking, and Waving clips when they load, with a capsule fallback. Player is unarmed throughout.
