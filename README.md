@@ -1,4 +1,11 @@
-# Double Agent — Stealth Prototype
+# Double Agent — Mobile Version (Touch Controls)
+
+**This is the mobile duplicate.** It is the exact same game as the
+desktop original at Kmberry1989/double-agent, duplicated so the
+desktop original is preserved untouched, with touch controls added.
+All desktop mouse/keyboard controls below still work exactly as
+before when no touch is used. Do not edit the desktop original to
+change this version, or vice versa.
 
 An original third-person, over-the-shoulder sneaking / tactical espionage
 prototype. It borrows only generic stealth mechanics (vision cones, a
@@ -14,13 +21,45 @@ Locally, serve the folder (module scripts and the manifest fetch do not
 work reliably from `file://`):
 
 ```sh
-cd double-agent
+cd double-agent-mobile
 python3 -m http.server 8000
 # open http://localhost:8000/
 ```
 
-Then click **Click to infiltrate**. Clicking locks the mouse. Press `Esc`
-to release it.
+On desktop, click **Click to infiltrate**. Clicking locks the mouse.
+Press `Esc` to release it.
+
+On a phone, tap **Tap to infiltrate**. No pointer lock is required —
+the game starts directly with touch controls (see Touch controls
+below).
+
+## Touch controls (phones only)
+
+Touch controls appear automatically on touch devices. They use
+independent multi-touch tracking, so the joystick, camera look, and a
+button can be held at the same time. All buttons are at least 44 px
+tap targets, and the game surface uses `touch-action: none` to stop
+iOS double-tap zoom and page scrolling while playing.
+
+| Action | Touch |
+|---|---|
+| Move (analog) | Left virtual joystick — push to the edge to sprint |
+| Look | Drag anywhere on the game view except the joystick / buttons |
+| Fire (hold to repeat) | FIRE button (large, bottom right) |
+| Aim (toggle, since phones have no right-mouse hold) | AIM button |
+| Crouch / sneak (toggle) | CROUCH button |
+| Jump | JUMP button |
+| Reload | RELOAD button |
+| Interact / pick up intel / exfil | USE button |
+| Silent takedown | TAKE DOWN button, from behind an unaware guard |
+| Switch pistol / rifle | WEAPON button |
+| Toggle player loadout (white / black set) | SET button |
+
+Layout on phones: objectives top left (compact), minimap top right
+(110 px), health / detection HUD in a strip above the controls,
+joystick bottom left, and a 3×3 action-button grid bottom right —
+arranged so HUD, objectives, minimap, joystick, and buttons do not
+overlap.
 
 ## Objective
 

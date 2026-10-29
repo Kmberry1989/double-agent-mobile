@@ -2,11 +2,40 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Double Agent — Stealth Prototype</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#0b0f0d;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecea}
-  #game{position:fixed;inset:0;display:block}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0b0f0d;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e8ecea;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+  #game{position:fixed;inset:0;display:block;touch-action:none}
+  /* ---- Touch controls (mobile duplicate only; hidden on desktop) ---- */
+  #touchUI{display:none;position:fixed;inset:0;z-index:7;pointer-events:none}
+  body.touch-on #touchUI{display:block}
+  #joyBase{position:absolute;left:20px;bottom:20px;width:140px;height:140px;border-radius:50%;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none}
+  #joyKnob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.55);border:2px solid rgba(0,0,0,.4)}
+  #joyLabel{position:absolute;left:20px;bottom:168px;font-size:12px;color:#c8d2cc;text-shadow:0 1px 2px #000}
+  #actionGrid{position:absolute;right:16px;bottom:20px;display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:8px;pointer-events:auto}
+  .tbtn{width:52px;height:52px;border-radius:12px;border:2px solid rgba(255,255,255,.4);background:rgba(0,0,0,.55);color:#fff;font-size:13px;font-weight:700;cursor:pointer;touch-action:none;padding:0}
+  .tbtn:active,.tbtn.on{background:rgba(87,217,119,.55)}
+  #btnFire{background:rgba(180,40,40,.65);width:60px;height:60px;font-size:15px}
+  #btnFire:active{background:rgba(255,60,60,.8)}
+  @media (max-width:760px){
+    #objectives{max-width:44vw;padding:7px 9px}
+    #objectives p{font-size:12px}
+    #minimap{width:110px;height:110px;right:10px;top:10px}
+    body.touch-on #hud{left:8px;right:8px;bottom:196px;width:auto}
+    body.touch-on #hud .bar{width:100%}
+    body.touch-on #hud p{font-size:12px}
+    #overlay .box{max-width:94vw;padding:16px;max-height:92vh;overflow:auto}
+    #overlay h1{font-size:30px}
+  }
+  /* Short landscape phones: objectives get tighter so the HUD strip
+     above the controls does not sit on top of them. Pixel-perfect
+     spacing on every phone size still needs a live phone check. */
+  @media (max-width:760px) and (max-height:500px){
+    #objectives p.small{display:none}
+    #objectives p{font-size:11px}
+    body.touch-on #hud{bottom:184px}
+  }
   #hud{position:fixed;left:16px;bottom:16px;z-index:5;pointer-events:none}
   .bar{width:260px;height:14px;background:rgba(0,0,0,.55);border:1px solid #556; margin:4px 0}
   .bar>i{display:block;height:100%;background:#57d977}
@@ -52,8 +81,24 @@
   <p id="ammoText">Ammo: 12 / 12</p>
   <p id="posText" class="small"></p>
 </div>
+<div id="touchUI" aria-label="Touch controls">
+  <div id="joyLabel">MOVE — push to edge to sprint</div>
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <div id="actionGrid">
+    <button class="tbtn" id="btnAim" type="button">AIM</button>
+    <button class="tbtn" id="btnFire" type="button">FIRE</button>
+    <button class="tbtn" id="btnJump" type="button">JUMP</button>
+    <button class="tbtn" id="btnCrouch" type="button">CROUCH</button>
+    <button class="tbtn" id="btnReload" type="button">RELOAD</button>
+    <button class="tbtn" id="btnInteract" type="button">USE</button>
+    <button class="tbtn" id="btnTakedown" type="button">TAKE<br>DOWN</button>
+    <button class="tbtn" id="btnWeapon" type="button">WEAPON</button>
+    <button class="tbtn" id="btnLoadout" type="button">SET</button>
+  </div>
+</div>
 <div id="overlay"><div class="box">
   <h1>DOUBLE AGENT</h1>
+  <p class="small" id="touchNote" style="display:none">Mobile version: tap to start — no pointer lock. Left stick moves (edge = sprint), drag anywhere else to look, buttons on the right fire / aim / crouch / jump / reload / use / takedown / weapon / set.</p>
   <p><b>Original stealth prototype.</b> No characters, story, music or assets from any existing game are used here. You are an unnamed operative infiltrating a generic facility courtyard. Get the intel, avoid the patrols and cameras, get out.</p>
   <p><b>Silent start:</b> you begin alone in a walled alcove in the southwest corner, facing northeast into the courtyard. No guard patrol and no security camera is within 30 m of the spawn, so nothing can see or hear you at the start.</p>
   <h2>Controls</h2>
@@ -566,9 +611,15 @@ function hasLOS(from,to){
 }
 function showMsg(t,ms){ const el=document.getElementById('msg'); el.textContent=t; el.style.display='block'; setTimeout(()=>el.style.display='none', ms||2600); }
 
-// ---------- Input ----------
+// ---------- Input (desktop keys unchanged; touch added below, mobile only) ----------
 const keys = {};
 let locked = false;
+// Touch state (mobile duplicate only). touchMode lets the game run without
+// pointer lock; touchFx/touchFz are the joystick vector (-1..1), touchSprint
+// is set when the stick is pushed to its edge. Desktop keys are untouched.
+let touchMode = false, touchForced = false;
+let touchFx = 0, touchFz = 0, touchSprint = false;
+const isTouchDevice = (typeof window !== 'undefined') && (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0);
 addEventListener('keydown', e=>{
   keys[e.code]=true;
   if (e.code==='KeyC') crouching = !crouching;
@@ -599,9 +650,108 @@ addEventListener('mouseup', e=>{ if (e.button===2) aiming=false; });
 addEventListener('contextmenu', e=>e.preventDefault());
 document.getElementById('startBtn').addEventListener('click', ()=>{
   document.getElementById('overlay').style.display='none';
-  canvas.requestPointerLock();
+  // Mobile: start directly with touch controls — do NOT require pointer lock,
+  // which phones do not support. Desktop keeps the existing pointer-lock flow.
+  if (isTouchDevice || touchForced){
+    touchMode = true; document.body.classList.add('touch-on');
+    const note = document.getElementById('touchNote'); if (note) note.style.display = 'block';
+  } else {
+    canvas.requestPointerLock();
+  }
 });
-document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLockElement===canvas; if (!locked && !gameOver && !won) document.getElementById('overlay').style.display='flex'; });
+document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLockElement===canvas; if (!touchMode && !locked && !gameOver && !won) document.getElementById('overlay').style.display='flex'; });
+
+// ---------- Touch controls (mobile duplicate only; desktop input above is unchanged) ----------
+// Independent multi-touch tracking: joystick, camera-look, and buttons each
+// keep their own touch identifier, so stick + look + a button can be held
+// at once. Look drags are tracked on the game canvas only, so tapping a
+// button or the joystick never also turns the camera.
+(function setupTouch(){
+  const joyBase = document.getElementById('joyBase'), joyKnob = document.getElementById('joyKnob');
+  if (!joyBase) return;
+  let joyId = null, lookId = null, lookLastX = 0, lookLastY = 0, fireTimer = null;
+  const joyCenter = ()=>{ const r = joyBase.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 }; };
+  function joyMove(t){
+    const c = joyCenter(); let dx = (t.clientX - c.x) / c.r, dy = (t.clientY - c.y) / c.r;
+    const len = Math.hypot(dx, dy);
+    if (len > 1){ dx /= len; dy /= len; }
+    // Stick up = forward, stick right = strafe right (same axes as WASD).
+    touchFx = dx; touchFz = -dy; touchSprint = len > 0.85;
+    const kx = dx * 42, ky = dy * 42;
+    joyKnob.style.transform = 'translate(' + kx + 'px,' + ky + 'px)';
+  }
+  function joyEnd(){ joyId = null; touchFx = 0; touchFz = 0; touchSprint = false; joyKnob.style.transform = 'translate(0px,0px)'; }
+  joyBase.addEventListener('touchstart', (e)=>{ e.preventDefault(); if (joyId !== null) return; const t = e.changedTouches[0]; joyId = t.identifier; joyMove(t); }, { passive: false });
+  joyBase.addEventListener('touchmove', (e)=>{ e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === joyId) joyMove(t); }, { passive: false });
+  joyBase.addEventListener('touchend', (e)=>{ for (const t of e.changedTouches) if (t.identifier === joyId) joyEnd(); });
+  joyBase.addEventListener('touchcancel', (e)=>{ for (const t of e.changedTouches) if (t.identifier === joyId) joyEnd(); });
+  canvas.addEventListener('touchstart', (e)=>{
+    if (!touchMode || gameOver || won) return;
+    for (const t of e.changedTouches){
+      if (lookId === null){ lookId = t.identifier; lookLastX = t.clientX; lookLastY = t.clientY; }
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchmove', (e)=>{
+    if (!touchMode) return;
+    for (const t of e.changedTouches){
+      if (t.identifier === lookId){
+        yaw -= (t.clientX - lookLastX) * 0.0042;
+        pitch = Math.max(-0.9, Math.min(0.9, pitch - (t.clientY - lookLastY) * 0.0042));
+        lookLastX = t.clientX; lookLastY = t.clientY;
+      }
+    }
+  }, { passive: true });
+  canvas.addEventListener('touchend', (e)=>{ for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; });
+  canvas.addEventListener('touchcancel', (e)=>{ for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; });
+  let lastTouchBtn = 0;
+  function bindBtn(id, onDown, onUp){
+    const el = document.getElementById(id); if (!el) return;
+    el.addEventListener('touchstart', (e)=>{ e.preventDefault(); lastTouchBtn = Date.now(); onDown && onDown(); }, { passive: false });
+    el.addEventListener('touchend', (e)=>{ e.preventDefault(); onUp && onUp(); }, { passive: false });
+    el.addEventListener('touchcancel', ()=>{ onUp && onUp(); });
+    // Desktop click fallback for the touch buttons (e.g. testing on desktop).
+    // Ignored shortly after a real touch, so a synthetic click after a tap
+    // cannot double-toggle Aim/Crouch or double-fire.
+    el.addEventListener('click', (e)=>{ e.preventDefault(); if (Date.now() - lastTouchBtn < 600) return; onDown && onDown(); onUp && onUp(); });
+  }
+  function doReload(){
+    if (performance.now() > reloadUntil){ reloadUntil = performance.now() + 1500; showMsg('Reloading…', 1200); playPlayerOneShot(weapon === 'rifle' ? 'reloadRifle' : 'reloadPistol'); }
+  }
+  function doJump(){ if (grounded){ vy = 7.5; grounded = false; playPlayerOneShot('jump'); } }
+  function doWeapon(){
+    if (weapon === 'pistol'){ weapon = 'rifle'; ammoInMag = 30; }
+    else { weapon = 'pistol'; ammoInMag = Math.min(ammoInMag, 12); }
+    updateWeaponVisibility();
+  }
+  function doLoadout(){ playerLoadout = playerLoadout === 'white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
+  bindBtn('btnFire', ()=>{
+    tryShoot();
+    if (fireTimer) clearInterval(fireTimer);
+    fireTimer = setInterval(()=>{ if (!gameOver && !won) tryShoot(); }, 180);
+  }, ()=>{ if (fireTimer){ clearInterval(fireTimer); fireTimer = null; } });
+  bindBtn('btnAim', ()=>{
+    aiming = !aiming;
+    document.getElementById('btnAim').classList.toggle('on', aiming);
+  });
+  bindBtn('btnCrouch', ()=>{ crouching = !crouching; document.getElementById('btnCrouch').classList.toggle('on', crouching); });
+  bindBtn('btnJump', doJump);
+  bindBtn('btnReload', doReload);
+  bindBtn('btnInteract', tryInteract);
+  bindBtn('btnTakedown', tryTakedown);
+  bindBtn('btnWeapon', doWeapon);
+  bindBtn('btnLoadout', doLoadout);
+  // Prevent iOS double-tap zoom / page scroll while playing on touch.
+  document.addEventListener('touchmove', (e)=>{
+    if (touchMode && !gameOver && !won && document.getElementById('overlay').style.display === 'none') e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('dblclick', (e)=>{ if (touchMode) e.preventDefault(); });
+  // If this device is touch-capable, show the touch UI + note on load so
+  // the start screen already explains the mobile controls.
+  if (isTouchDevice){
+    document.getElementById('startBtn').textContent = 'Tap to infiltrate';
+    const note = document.getElementById('touchNote'); if (note) note.style.display = 'block';
+  }
+})();
 
 function noiseAlert(radius, isGun){
   guards.forEach(g=>{
@@ -686,7 +836,7 @@ function updateGuard(g, dt, now){
   const eye = new THREE.Vector3(gp.x,1.6,gp.z), target = new THREE.Vector3(p.x,1.4,p.z);
   const seen = dist<19 && angle<0.65 && hasLOS(eye,target);
   const crouchFactor = crouching ? 0.55 : 1;
-  const sprinting = keys['ShiftLeft'] || keys['ShiftRight'];
+  const sprinting = keys['ShiftLeft'] || keys['ShiftRight'] || touchSprint;
   if (seen){
     const gain = (dist<8?55:30) * crouchFactor * dt;
     g.meter = Math.min(100, g.meter + gain);
@@ -769,11 +919,13 @@ let wasGrounded = true;
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta()); const now = performance.now();
-  if (!gameOver && !won && locked){
-    const sprinting = (keys['ShiftLeft']||keys['ShiftRight']) && !crouching;
+  if (!gameOver && !won && (locked || touchMode)){
+    const sprinting = ((keys['ShiftLeft']||keys['ShiftRight']) || touchSprint) && !crouching;
     let speed = crouching?2:(sprinting?7:(aiming?2.5:4.2));
     let fx=0, fz=0;
     if (keys['KeyW']) fz+=1; if (keys['KeyS']) fz-=1; if (keys['KeyA']) fx-=1; if (keys['KeyD']) fx+=1;
+    // Touch joystick overrides/adds to keys when active (analog vector).
+    if (touchMode && (touchFx !== 0 || touchFz !== 0)){ fx = touchFx; fz = touchFz; }
     const moving = fx!==0 || fz!==0;
     if (moving){ const len=Math.hypot(fx,fz); fx/=len; fz/=len;
       const sin=Math.sin(yaw), cos=Math.cos(yaw);
