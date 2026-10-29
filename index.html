@@ -315,14 +315,22 @@ async function loadAnimationManifest() {
 }
 loadAnimationManifest();
 // Resolve the loop clip for a game state, honouring weapon / aim / crouch.
+// AIM POSES ARE AIM-ONLY (playtest fix): the weapon-specific walk/run
+// clips (Pistol_Walk, Pistol_Run, Rifle_Walk, Rifle_Run, etc.) hold the
+// weapon forward in an aim-style pose, so using them for ordinary walking
+// made the pistol hand stay forward whenever the pistol was equipped,
+// even when the player was not aiming. Non-aim locomotion therefore uses
+// the generic walk/run/sprint/crouch clips (weapon lowered/at side);
+// the aim clips are only reached via aimIdle/aimWalk, which animStateName
+// only returns while aiming is actually true.
 function resolveLoopClip(state, weap, isAiming, isCrouching){
   if (state === 'aimIdle') return weap === 'pistol' ? 'aimPistol' : 'aimIdle';
   if (state === 'aimWalk') return weap === 'rifle' ? 'aimWalk' : 'pistolWalkArc';
-  if (state === 'crouchIdle') return weap === 'rifle' ? 'idleCrouchingRifle' : 'crouchIdle';
-  if (state === 'crouchWalk') return weap === 'rifle' ? 'rifleCrouchWalk' : 'sneak';
-  if (state === 'walk') return weap === 'rifle' ? 'rifleWalk' : (weap === 'pistol' ? 'pistolWalk' : 'walk');
-  if (state === 'run') return weap === 'rifle' ? 'rifleRun' : (weap === 'pistol' ? 'pistolRun' : 'run');
-  if (state === 'sprint') return weap === 'rifle' ? 'rifleSprint' : 'sprint';
+  if (state === 'crouchIdle') return 'crouchIdle';
+  if (state === 'crouchWalk') return 'sneak';
+  if (state === 'walk') return 'walk';
+  if (state === 'run') return 'run';
+  if (state === 'sprint') return 'sprint';
   if (state === 'fall') return 'fall';
   return state;
 }
@@ -488,6 +496,7 @@ const armL = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.7,0.16), mat(0x2a3a4a))
 const armR = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.7,0.16), mat(0x2a3a4a)); armR.position.set(0.55,1.35,0.3); player.add(armR);
 player.position.set(-38,0,38);
 let yaw = -Math.PI/4, pitch = 0.12, vy = 0, grounded = true, crouching = false, aiming = false;
+let modelYaw = yaw; // smoothed model yaw (animate lerps this toward camera yaw; never snap)
 let health = 100, detection = 0, intel = 0, gameOver = false, won = false;
 let weapon = 'pistol'; // pistol | rifle
 const weapons = { pistol:{mag:12, max:12, dmg:34, rate:0.28}, rifle:{mag:30, max:30, dmg:50, rate:0.11} };
@@ -502,6 +511,57 @@ let agentModel = null;
 const capsuleParts = [torso, head, armL, armR];
 // Player model is Agent_Kyle.fbx (user-corrected filename; Agent.fbx kept
 // only as a legacy fallback). No model file is invented here.
+// ---------- Hand-bone weapon attachment (playtest fix) ----------
+// Root cause of the "big polygon on my side": weapons were children of
+// the player group at a fixed hip position (0.35,1.35,0.5), NOT of the
+// skeleton, so they never followed the animated arm — and their barrel
+// (+Z of the player group) pointed along +Z of the group, i.e. toward
+// the camera, not forward. Attaching to the right-hand bone fixes both:
+// the weapon moves with the hand through every clip, and its world
+// orientation is set to the body's forward direction before attaching
+// (THREE .attach() then preserves that world transform as a bone-local
+// offset, including scale, so the fitted 0.32 m pistol / 0.60 m rifle
+// size is kept and the model normalisation scale does not inflate it).
+function findHandBone(model){
+  let found = null;
+  model.traverse((o)=>{ if (!o.isBone || found) return; if (boneKey(o.name) === 'righthand') found = o; });
+  if (!found) model.traverse((o)=>{ if (!o.isBone || found) return; if (boneKey(o.name).indexOf('righthand') >= 0) found = o; });
+  if (!found) model.traverse((o)=>{ if (!o.isBone || found) return; const k = boneKey(o.name); if (k.indexOf('hand') >= 0 && k.indexOf('right') >= 0) found = o; });
+  return found;
+}
+let playerHandBone = null;
+function attachPivotToHand(pivot, handBone, worldYaw){
+  if (!pivot || !handBone || pivot.userData.handAttached) return false;
+  try {
+    player.updateMatrixWorld(true);
+    const hp = new THREE.Vector3(); handBone.getWorldPosition(hp);
+    // Weapon +Z must point along (sin worldYaw, cos worldYaw).
+    const fwd = new THREE.Vector3(Math.sin(worldYaw), 0, Math.cos(worldYaw));
+    scene.attach(pivot); // preserve world transform while re-parenting
+    pivot.position.copy(hp).addScaledVector(fwd, 0.08); // grip in the palm, barrel just forward of it
+    pivot.quaternion.setFromEuler(new THREE.Euler(0, worldYaw, 0));
+    pivot.scale.setScalar(1);
+    handBone.attach(pivot); // preserves the world transform above as a bone-local offset
+    pivot.userData.handAttached = true;
+    return true;
+  } catch (e) { console.warn('[double-agent] hand attach failed, keeping group pivot:', e); return false; }
+}
+function attachPlayerWeapons(){
+  if (!playerHandBone) return;
+  // Player model has a PI yaw offset inside its group, so its forward
+  // world yaw is yaw + PI (camera forward), not yaw.
+  const worldYaw = yaw + Math.PI;
+  Object.values(weaponPivots).forEach((set)=>{ Object.values(set).forEach((pivot)=>{
+    if (pivot && attachPivotToHand(pivot, playerHandBone, worldYaw)) console.info('[double-agent] player weapon attached to hand bone:', playerHandBone.name);
+  }); });
+}
+function attachGuardWeapon(g){
+  if (!g.enemyWeapon || !g.realModel || g.enemyWeapon.userData.handAttached) return;
+  const hand = findHandBone(g.realModel);
+  if (!hand) { console.info('[double-agent] guard has no right-hand bone, keeping group weapon pivot'); return; }
+  // Guards have no PI offset: their forward world yaw is their group yaw.
+  if (attachPivotToHand(g.enemyWeapon, hand, g.yaw)) console.info('[double-agent] guard weapon attached to hand bone:', hand.name);
+}
 function loadPlayerModel(file){
   fbxLoader.load('assets/' + file, (obj)=>{
     if (!normalizeCharacter(obj, 2.2, Math.PI)) return;
@@ -509,6 +569,9 @@ function loadPlayerModel(file){
     // hides it then), so there is no T-pose flash while clips preload.
     agentModel = obj; player.add(obj);
     tryLoadFBXAnimations(obj);
+    playerHandBone = findHandBone(obj);
+    if (playerHandBone) { console.info('[double-agent] player hand bone:', playerHandBone.name); attachPlayerWeapons(); }
+    else console.warn('[double-agent] player model has no right-hand bone — weapons stay on the group pivot');
     console.info('[double-agent] Player model loaded:', file);
   }, undefined, ()=>{
     if (file === 'Agent_Kyle.fbx') loadPlayerModel('Agent.fbx');
@@ -534,6 +597,10 @@ function loadPlayerWeapon(set, slot, file, targetLength){
     if (!fitWeapon(gltf.scene, targetLength)) return;
     pivot.position.set(0.35, 1.35, 0.5); pivot.visible = false; player.add(pivot);
     weaponPivots[set][slot] = pivot; updateWeaponVisibility();
+    // If the player model (and its hand bone) is already loaded, attach
+    // straight to the hand; otherwise attachPlayerWeapons() runs when
+    // the model loads. Until then the group pivot is the fallback.
+    attachPlayerWeapons();
     console.info('[double-agent] player weapon loaded:', set, slot, file);
   }, undefined, ()=>{
     console.warn('[double-agent] player weapon failed, keeping box gun:', file);
@@ -638,6 +705,7 @@ guards.forEach((g, i)=>{
     g.capsuleBody.visible = false; g.capsuleHead.visible = false;
     g.realModel = obj; g.group.add(obj);
     setupGuardAnimation(g, obj);
+    attachGuardWeapon(g); // weapon may already be loaded; hand bone is now known
     console.info('[double-agent] guard', i, 'model loaded:', file);
   }, undefined, ()=>{
     console.warn('[double-agent] guard', i, 'model failed, keeping capsule:', file);
@@ -646,6 +714,7 @@ guards.forEach((g, i)=>{
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
     if (!fitWeapon(gltf.scene, 0.60)) return;
     pivot.position.set(0.45, 1.30, 0.25); g.group.add(pivot); g.enemyWeapon = pivot;
+    attachGuardWeapon(g); // attaches now if the guard model is loaded, otherwise when it loads
   }, undefined, ()=>{ /* enemy weapon is visual only; capsule guard still works */ });
 });
 // ---------- Cameras ----------
@@ -1140,7 +1209,14 @@ function animate(){
     const moving = fx!==0 || fz!==0;
     if (moving){ const len=Math.hypot(fx,fz); fx/=len; fz/=len;
       const sin=Math.sin(yaw), cos=Math.cos(yaw);
-      const dx=(fx*cos+fz*sin)*speed*dt, dz=(-fx*sin+fz*cos)*speed*dt;
+      // REVERSED-FORWARD FIX (playtest): camera forward is (-sin,-cos)
+      // (camera sits at +back and looks toward -back), camera right is
+      // (cos,-sin). The old code moved fz=+1 (W / stick-up) along
+      // (+sin,+cos) — toward the camera, i.e. backwards on screen.
+      // Strafe was already correct and is unchanged: fx=+1 still gives
+      // camera right. Joystick needed no sign change: stick-up already
+      // yields fz=+1 (touchFz = -dy); it was this same math that flipped it.
+      const dx=(fx*cos-fz*sin)*speed*dt, dz=(-fx*sin-fz*cos)*speed*dt;
       const nx=player.position.x+dx, nz=player.position.z+dz;
       if (!collides(nx,player.position.z)) player.position.x=nx;
       if (!collides(player.position.x,nz)) player.position.z=nz;
@@ -1167,9 +1243,26 @@ function animate(){
     // Real weapon pivot (if loaded) replaces the box gun; otherwise the
     // box gun stays visible. Do not force gun.visible = true here.
     const _pivot = weaponPivots[playerLoadout] ? weaponPivots[playerLoadout][weapon] : null;
-    if (_pivot){ _pivot.visible = true; _pivot.position.set(aiming?0.22:0.35, aiming?1.45:1.35, 0.5); gun.visible = false; }
+    if (_pivot){ _pivot.visible = true;
+      // NEVER overwrite a hand-attached pivot's position here: it is a
+      // bone-local offset now, and resetting it to group coordinates
+      // would yank the weapon back to the hip every frame. Only the
+      // group-pivot fallback (model/hand not loaded yet) gets positioned.
+      if (!_pivot.userData.handAttached) _pivot.position.set(aiming?0.22:0.35, aiming?1.45:1.35, 0.5);
+      gun.visible = false; }
     else gun.visible = true;
-    player.rotation.y = yaw;
+    // SMOOTH TURNING (playtest): model yaw lerps toward camera yaw along
+    // the shortest arc, so turns never snap and never spin through 360°.
+    // The old code set player.rotation.y = yaw instantly, so every fast
+    // look drag snapped the body while the camera position was still
+    // lerping — that mismatch is what looked ugly. The Turning clip was
+    // never auto-triggered (it is only in the one-shot set, never called
+    // from the loop), so it was not the cause and is left untriggered.
+    // Strafing still faces camera/aim direction, not sideways: turning
+    // the body sideways while strafing would break aim and look worse.
+    { let dyaw = yaw - modelYaw; while (dyaw>Math.PI) dyaw-=Math.PI*2; while (dyaw<-Math.PI) dyaw+=Math.PI*2;
+      modelYaw += dyaw * Math.min(1, dt*10); }
+    player.rotation.y = modelYaw;
     currentAnim = animStateName(moving, sprinting);
     // Drive the FBX state machine from game state. Jump is a one-shot
     // (triggered on Space), not a loop — fall is the airborne loop.

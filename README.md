@@ -61,6 +61,13 @@ joystick bottom left, and a 3×3 action-button grid bottom right —
 arranged so HUD, objectives, minimap, joystick, and buttons do not
 overlap.
 
+## First mobile playtest fixes (2026-10-29, not yet pushed)
+
+- **Forward/backward reversed — fixed:** the movement math moved W / stick-up along (+sin yaw, +cos yaw), which is toward the camera, not camera-forward (-sin yaw, -cos yaw). Strafe was already correct and was not flipped. The joystick itself needed no sign change (stick-up already yields forward=+1); the same math was flipping both keyboard and touch.
+- **Ugly turning — fixed:** the player model used to snap instantly to camera yaw while the camera position was still lerping, which looked like a snap/jerk. The model now lerps its yaw toward camera yaw along the shortest arc (dt*10). The Turning clip was never auto-triggered, so it was not the cause and is still not auto-triggered. Strafing still faces camera/aim direction, not sideways.
+- **Pistol hand not always forward — fixed:** non-aim walking/running/sprinting used to pick weapon-specific clips (Pistol_Walk, Pistol_Run, etc.) that hold the weapon forward. Non-aim locomotion now uses the generic walk/run/sprint/crouch clips; aim clips (aimIdle/aimWalk, Pistol_Aim) are only used while actually aiming (desktop right-mouse hold, mobile AIM toggle).
+- **Weapons attached to the hand bone — fixed:** weapons used to be children of the player group at a fixed hip position (0.35, 1.35, 0.5), so they never followed the animated arm and their barrel (+Z of the group) pointed toward the camera — that is the big polygon Kyle saw on his side. Weapons are now attached to the skeleton's `mixamorig:RightHand` bone (found by exact name, with right-hand fallbacks), with the barrel set to body-forward before attaching, so they follow the hand through every clip at their fitted size (pistol ~0.32 m, rifle ~0.60 m). Guard weapons attach the same way when the terror rig exposes a right-hand bone; otherwise they keep the group pivot. If a model has no hand bone, weapons fall back to the group pivot rather than disappearing.
+
 ## Objective
 
 1. Collect all 3 glowing yellow intel documents in the courtyard.
