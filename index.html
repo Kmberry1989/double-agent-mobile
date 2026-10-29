@@ -389,29 +389,88 @@ const hemi = new THREE.HemisphereLight(0xdfefff, 0x334433, 0.9); scene.add(hemi)
 const sun = new THREE.DirectionalLight(0xffffff, 1.2); sun.position.set(30,50,20); sun.castShadow = true; scene.add(sun);
 
 function mat(c){ return new THREE.MeshStandardMaterial({ color:c, roughness:0.9 }); }
+// ---------- Environment textures (assets/textures/) ----------
+// Textures load asynchronously. A surface keeps its flat colour until its
+// texture arrives, and keeps it forever if the load fails — the game never
+// breaks on a missing texture. On load the material colour goes white so
+// the texture shows true colours; any damage darkening already applied is
+// re-applied via material.userData.darkFrac.
+const texLoader = new THREE.TextureLoader();
+function applyTexture(material, path, rx, ry){
+  texLoader.load(path, function(tex){
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(rx, ry);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    material.map = tex;
+    material.color.setHex(0xffffff);
+    if (material.userData.darkFrac !== undefined) material.color.setScalar(material.userData.darkFrac);
+    material.needsUpdate = true;
+  }, undefined, function(){ /* keep flat-colour fallback */ });
+}
+function texturedMat(color, path, rx, ry){
+  const m = mat(color);
+  if (path) applyTexture(m, path, rx, ry);
+  return m;
+}
+// Visual-only ground patch: flat plane just above the ground. It is NOT in
+// obstacles or losMeshes, so it blocks nothing — no movement collision, no
+// guard vision, no shooting. Its fallback colour shows if the texture fails.
+function groundPatch(x, z, w, d, color, path, rx, ry){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), texturedMat(color, path, rx, ry));
+  m.rotation.x = -Math.PI/2; m.position.set(x, 0.02, z); m.receiveShadow = true; scene.add(m);
+}
 const obstacles = []; // {mesh, minX,maxX,minZ,maxZ} for collision + LOS
 const losMeshes = [];
 function box(x,z,w,d,h,color,y,opts){
   opts = opts || {};
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat(color));
+  const tex = opts.texture ? texturedMat(color, opts.texture, (opts.texRepeat||[1,1])[0], (opts.texRepeat||[1,1])[1]) : mat(color);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), tex);
   m.position.set(x,(y===undefined?h/2:y),z); m.castShadow = true; m.receiveShadow = true; scene.add(m);
   const o = { mesh:m, cx:x, cz:z, ow:w, od:d, oh:h, minX:x-w/2, maxX:x+w/2, minZ:z-d/2, maxZ:z+d/2, h,
-    material: opts.material || 'concrete', destructible: !!opts.destructible, hp: opts.hp || 0, maxHp: opts.hp || 0, baseColor: color };
+    material: opts.material || 'concrete', destructible: !!opts.destructible, hp: opts.hp || 0, maxHp: opts.hp || 0, baseColor: color, textured: !!opts.texture };
   obstacles.push(o); losMeshes.push(m); return o;
 }
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(90,90), mat(0x6f7d5a));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(90,90), texturedMat(0x6f7d5a, 'assets/textures/concrete-slabs.jpg', 12, 12));
 ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 // Perimeter + courtyard structures. Coordinates are in metres, centre is (0,0).
-box(0,-42,90,2,4,0x555a55); box(0,42,90,2,4,0x555a55); box(-42,0,2,90,4,0x555a55); box(42,0,2,90,4,0x555a55);
-box(-20,-18,14,2,3,0x8a7a5a); box(18,-12,2,16,3,0x8a7a5a); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250});
-box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250}); box(-28,24,2,12,3,0x8a7a5a); box(8,-26,18,2,3,0x777777);
-box(-14,0,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood'}); box(-10,2,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood'}); box(12,6,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood'});
-box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood'}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood'}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal'});
-box(-32,8,8,8,6,0x5a6a7a,undefined,{material:'metal'}); box(34,28,8,8,6,0x5a6a7a,undefined,{material:'metal'});
+box(0,-42,90,2,4,0x555a55,undefined,{texture:'assets/textures/corrugated-metal.jpg',texRepeat:[12,1]}); box(0,42,90,2,4,0x555a55,undefined,{texture:'assets/textures/corrugated-metal.jpg',texRepeat:[12,1]}); box(-42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/corrugated-metal.jpg',texRepeat:[12,1]}); box(42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/corrugated-metal.jpg',texRepeat:[12,1]});
+box(-20,-18,14,2,3,0x8a7a5a,undefined,{texture:'assets/textures/brick.jpg',texRepeat:[3,1]}); box(18,-12,2,16,3,0x8a7a5a,undefined,{texture:'assets/textures/brick.jpg',texRepeat:[3,1]}); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/sandbags-1.jpg',texRepeat:[5,1]});
+box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/sandbags-2.jpg',texRepeat:[5,1]}); box(-28,24,2,12,3,0x8a7a5a,undefined,{texture:'assets/textures/brick.jpg',texRepeat:[3,1]}); box(8,-26,18,2,3,0x777777,undefined,{texture:'assets/textures/brick.jpg',texRepeat:[4,1]});
+box(-14,0,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-1.jpg',texRepeat:[1,1]}); box(-10,2,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-2.jpg',texRepeat:[1,1]}); box(12,6,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-1.jpg',texRepeat:[1,1]});
+box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-2.jpg',texRepeat:[1,1]}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-1.jpg',texRepeat:[1,1]}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-blue.jpg',texRepeat:[2,1]});
+box(-32,8,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-red.jpg',texRepeat:[2,1]}); box(34,28,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-olive.jpg',texRepeat:[2,1]});
 // SILENT START: a walled alcove in the southwest corner. The player spawns here,
 // alone — no guard patrol waypoint and no security camera is within 30 m of it.
 // The only way out is east, around the end of the north wall, into the courtyard.
 box(-38,32,12,2,3,0x777777);
+// Visual-only ground patches (no collision, no LOS, no shooting — see groundPatch).
+// They sit on open ground, clear of walls, crates, and buildings.
+groundPatch(0, 36, 40, 3, 0x8a7a5a, 'assets/textures/dirt-path.jpg', 10, 1);      // south dirt path
+groundPatch(31, -32, 14, 12, 0x6f7d5a, 'assets/textures/grass.jpg', 3, 3);         // NE grass
+groundPatch(-31, -31, 14, 14, 0x8a857a, 'assets/textures/gravel.jpg', 4, 4);       // NW gravel
+groundPatch(8, -14, 16, 12, 0x333333, 'assets/textures/asphalt.jpg', 4, 3);       // central asphalt pad
+// Vent grille: flat panel on the south face of the blue building (0,-34; face z=-31).
+(function ventPanel(){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), texturedMat(0x888888, 'assets/textures/vent-grille.jpg', 1, 1));
+  m.position.set(0, 1.5, -30.98); scene.add(m);
+})();
+// Chain-link fence: see-through panel mounted flush on the east face of the
+// red building (-32,8; face x=-28), so the building behind it already blocks
+// movement. The panel itself is in NO list: it blocks nothing — no movement
+// collision, no guard LOS, no shots (shots pass through to the building and
+// decal there). The PNG is genuinely transparent in the diamond gaps
+// (verified: ~82% of pixels have alpha 0), rendered with alphaTest so the
+// gaps are see-through, never an opaque white sheet. If it fails to load,
+// the panel hides instead of showing a white sheet.
+(function chainLinkPanel(){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(8, 3),
+    new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.9, transparent:true, alphaTest:0.5, side:THREE.DoubleSide }));
+  m.position.set(-27.98, 1.5, 8); m.rotation.y = Math.PI/2; scene.add(m);
+  texLoader.load('assets/textures/chain-link-fence.png', function(tex){
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4, 2);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    m.material.map = tex; m.material.needsUpdate = true;
+  }, undefined, function(){ m.visible = false; });
+})();
 // A parked car prop (visual only; drive clips are for a future vehicle system, not this courtyard)
 (function car(){
   const g = new THREE.Group(); g.position.set(-24,0,32); g.rotation.y = 0.6;
@@ -724,7 +783,8 @@ function updateEffects(dt){
 function damageDestructible(o, dmg, point, normal){
   o.hp -= dmg;
   const frac = Math.max(0, o.hp / o.maxHp);
-  o.mesh.material.color.setHex(o.baseColor).multiplyScalar(0.55 + 0.45 * frac);
+  if (o.textured){ o.mesh.material.userData.darkFrac = 0.55 + 0.45 * frac; o.mesh.material.color.setScalar(o.mesh.material.userData.darkFrac); }
+  else o.mesh.material.color.setHex(o.baseColor).multiplyScalar(0.55 + 0.45 * frac);
   const sc = 0.72 + 0.28 * frac;
   o.mesh.scale.set(sc, sc, sc);
   o.minX = o.cx - o.ow * sc / 2; o.maxX = o.cx + o.ow * sc / 2;

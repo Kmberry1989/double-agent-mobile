@@ -318,6 +318,48 @@ generated in code (canvas textures and tiny meshes).
 - **Guard damage is unchanged:** pistol 34, rifle 50 per hit, same
   as before — destructible HP is separate from guard HP.
 
+## Textures
+
+Real environment textures from `assets/textures/`, loaded with
+`THREE.TextureLoader` (RepeatWrapping, sRGB). Layout, coordinates,
+sizes, collision, guard AI, and destructible HP are all unchanged —
+this is texture only. If any texture fails to load, that surface
+keeps its flat colour and the game carries on.
+
+- **Ground (main):** `concrete-slabs.jpg` on the whole 90×90 courtyard
+  plane — concrete slabs fit a facility courtyard better than dark
+  asphalt, and stay bright enough for stealth play.
+- **Ground patches (visual only — no collision, no guard vision, no
+  shooting):** `dirt-path.jpg` south path, `grass.jpg` NE patch,
+  `gravel.jpg` NW patch, `asphalt.jpg` central pad. They sit 0.02 m
+  above the ground on open ground, clear of walls and crates.
+- **Walls:** `brick.jpg` on the interior concrete walls (not the
+  painted-metal buildings, not the silent-start alcove wall, which
+  stays flat and distinct).
+- **Cover walls (destructible):** `sandbags-1.jpg` on (-8, 10),
+  `sandbags-2.jpg` on (22, 18). The texture survives chipping
+  (darkening still works via a grey-scale colour multiply) and is
+  removed with the wall when it breaks.
+- **Crates (destructible):** `wood-planks-1.jpg` / `wood-planks-2.jpg`
+  alternating across the 5 crates, same chipping/breaking behaviour.
+- **Buildings (one colour each):** `painted-metal-blue.jpg` on
+  (0, -34), `painted-metal-red.jpg` on (-32, 8),
+  `painted-metal-olive.jpg` on (34, 28).
+- **Boundary walls:** `corrugated-metal.jpg` on all 4 perimeter walls.
+- **Vent grille:** `vent-grille.jpg` as a flat 2.4×2.4 panel on the
+  south face of the blue building. Visual only, not in any
+  collision / vision / shooting list.
+- **Chain-link fence:** `chain-link-fence.png` (the transparent
+  version — verified ~82% of its pixels are fully transparent, so
+  the diamond gaps are genuinely see-through, rendered with
+  `alphaTest: 0.5`, double-sided). Mounted flush on the east face
+  of the red building, so the building behind it already blocks
+  movement. The panel itself blocks **nothing**: no movement
+  collision, no guard vision, no shots — shots pass through it to
+  the building and decal there. The opaque `chain-link-fence.jpg`
+  is intentionally unused. If the PNG fails to load, the panel
+  hides instead of showing a white sheet.
+
 ## Known gaps / simplifications
 
 - Player FBX playback is now wired (see Poses & animations above),
