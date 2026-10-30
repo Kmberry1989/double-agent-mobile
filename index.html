@@ -64,27 +64,13 @@
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="objectives">
-  <b>OBJECTIVES</b>
-  <p id="obj1">○ Collect intel 1 / 3</p>
-  <p id="obj2">○ Collect intel 2 / 3</p>
-  <p id="obj3">○ Collect intel 3 / 3</p>
-  <p id="objExfil">○ Reach the green EXFIL gate with all 3 intel</p>
-  <p class="small">Silent start: you begin alone in the southwest corner — no patrols or cameras nearby. Stay out of cones. Crouch to be quieter. F behind an unaware guard = silent takedown.</p>
-</div>
 <canvas id="minimap" width="190" height="190"></canvas>
 <div id="cross">+</div>
-<div id="msg"></div>
 <div id="hud">
-  <p><b id="stateText">UNDETECTED</b> &nbsp; <span id="weaponText">Pistol</span> &nbsp; <span id="weatherText">Weather: Clear</span> &nbsp; <span id="animText">Anim: idle (procedural capsule)</span></p>
-  <p>Health</p><div class="bar"><i id="healthBar" style="width:100%"></i></div>
-  <p>Detection</p><div class="bar" id="detectBar"><i id="detectFill" style="width:0%"></i></div>
-  <p id="ammoText">Ammo: 12 / 12</p>
-  <p id="gearText" class="small">Gear: Watch · Glasses · Pen · Cufflinks · Bag (carried, no extra function)</p>
-  <p id="posText" class="small"></p>
+  <div class="bar"><i id="healthBar" style="width:100%"></i></div>
+  <div class="bar" id="detectBar"><i id="detectFill" style="width:0%"></i></div>
 </div>
 <div id="touchUI" aria-label="Touch controls">
-  <div id="joyLabel">MOVE — push to edge to sprint</div>
   <div id="joyBase"><div id="joyKnob"></div></div>
   <div id="actionGrid">
     <button class="tbtn" id="btnAim" type="button">AIM</button>
@@ -101,22 +87,7 @@
 </div>
 <div id="overlay"><div class="box">
   <h1>DOUBLE AGENT</h1>
-  <p class="small" id="touchNote" style="display:none">Mobile version: tap to start — no pointer lock. Left stick moves (edge = sprint), drag anywhere else to look, buttons on the right fire / aim / crouch / jump / reload / use / takedown / weapon / set.</p>
-  <p><b>Original stealth prototype.</b> No characters, story, music or assets from any existing game are used here. You are an unnamed operative infiltrating a generic facility courtyard. Get the intel, avoid the patrols and cameras, get out.</p>
-  <p><b>Silent start:</b> you begin alone in a walled alcove in the southwest corner, facing northeast into the courtyard. No guard patrol and no security camera is within 30 m of the spawn, so nothing can see or hear you at the start.</p>
-  <h2>Controls</h2>
-  <ul>
-    <li><b>W A S D</b> move &nbsp; <b>Mouse</b> look &nbsp; <b>Shift</b> sprint (loud) &nbsp; <b>C</b> crouch / sneak &nbsp; <b>Space</b> jump</li>
-    <li>Hold <b>Right-mouse</b> to aim.</li>
-    <li><b>Click</b> fire &nbsp; <b>R</b> reload &nbsp; <b>WEAPON</b> cycles Glock → Walther → Makarov → MP5K → AKS74U → RPG7 (same pistol 34 / rifle 50 damage) &nbsp; <b>1</b> Glock &nbsp; <b>2</b> MP5K &nbsp; <b>L</b> toggle player loadout (white / black set) &nbsp; <b>E</b> interact / pick up intel &nbsp; <b>F</b> silent takedown from behind an unaware guard</li>
-    <li><b>Gear:</b> suppressor is a visual muzzle attachment on the equipped weapon; watch and glasses are visual attachments on the player. Pen, cufflinks and bag are carried (shown in the HUD gear line) with no extra function — they are not wired to any new mechanic.</li>
-    <li><b>Q</b> punch &nbsp; <b>X</b> kick &nbsp; <b>G</b> wave &nbsp; <b>T</b> talk &nbsp; <b>N</b> talk on phone &nbsp; <b>V</b> male crouch pose (hold) &nbsp; <b>B</b> female crouch pose (hold) — animation keys, no existing key changed</li>
-    <li><b>Y</b> cycle weather (Clear → Cloudy → Rain → Fog) — on phones, the <b>WX</b> button below the minimap does the same. Weather is visual only and never changes guard vision, detection, or damage.</li>
-  </ul>
-  <p class="warn">Note on controls: the brief asked for both “F aim” and “F takedown”. This build resolves the clash by using right-mouse for aim and F only for takedown, so the two actions cannot conflict. See README for the full note.</p>
-  <p class="small">Models: guards use enemy-terror1–4.fbx, player weapons are the white_ / black_ sets (press L to toggle sets), and Agent_Kyle.fbx is your player model. The 62 Mixamo FBX clips in assets/animations/ now actually play on Agent_Kyle.fbx via the animation mixer (loops crossfade, actions are one-shots, crouch poses hold) — with a clean fallback to the procedural capsule if the rig or a clip fails.</p>
   <button id="startBtn">Click to infiltrate</button>
-  <p class="small">Click locks the mouse. Press Esc to release it. If you die or win, use the button on the end screen to restart.</p>
 </div></div>
 <script type="module">
 import * as THREE from 'three';
@@ -905,7 +876,7 @@ function hasLOS(from,to){
   const hits = ray.intersectObjects(losMeshes, false);
   return hits.length===0;
 }
-function showMsg(t,ms){ const el=document.getElementById('msg'); el.textContent=t; el.style.display='block'; setTimeout(()=>el.style.display='none', ms||2600); }
+function showMsg(t,ms){ /* HUD text removed: message banners are a visual no-op */ }
 
 // ---------- Bullet holes, blood, debris, casings, sparks (no external assets) ----------
 // Decals: small canvas-textured circles laid on the hit surface, offset
@@ -1373,7 +1344,7 @@ function tryInteract(){
   }
 }
 function updateObjectives(){
-  for (let i=0;i<3;i++){ const el=document.getElementById('obj'+(i+1)); el.textContent = (intelObjs[i].taken?'✓ ':'○ ')+'Collect intel '+(i+1)+' / 3'; if (intelObjs[i].taken) el.className='done'; }
+  for (let i=0;i<3;i++){ const el=document.getElementById('obj'+(i+1)); if(!el) continue; el.textContent = (intelObjs[i].taken?'✓ ':'○ ')+'Collect intel '+(i+1)+' / 3'; if (intelObjs[i].taken) el.className='done'; }
 }
 function endScreen(text){
   gameOver=true; document.exitPointerLock && document.exitPointerLock();
@@ -1566,12 +1537,12 @@ function animate(){
   document.getElementById('detectFill').style.width = Math.round(detection)+'%';
   document.getElementById('detectFill').style.background = detection>=100?'#ff2222':(detection>=30?'#ffcc00':'#57d977');
   const anyAlert = guards.some(g=>g.state==='ALERT');
-  document.getElementById('stateText').textContent = anyAlert?'ALERT':(detection>=30?'CAUTION':(detection>0?'SUSPICIOUS':'UNDETECTED'));
-  document.getElementById('weaponText').textContent = weaponVariant + ' (' + weapon + ') · ' + playerLoadout + ' set';
-  document.getElementById('ammoText').textContent = 'Ammo: '+ammoInMag+' / '+weapons[weapon].max + (now<reloadUntil?' (reloading)':'');
+  const _st=document.getElementById('stateText'); if(_st) _st.textContent = anyAlert?'ALERT':(detection>=30?'CAUTION':(detection>0?'SUSPICIOUS':'UNDETECTED'));
+  const _wt=document.getElementById('weaponText'); if(_wt) _wt.textContent = weaponVariant + ' (' + weapon + ') · ' + playerLoadout + ' set';
+  const _at=document.getElementById('ammoText'); if(_at) _at.textContent = 'Ammo: '+ammoInMag+' / '+weapons[weapon].max + (now<reloadUntil?' (reloading)':'');
   const _dispAnim = playerHeldPose || playerOneShotName || currentAnim;
-  document.getElementById('animText').textContent = 'Anim: '+_dispAnim+' ('+(fbxPlaying ? 'Agent_Kyle.fbx, FBX' : 'procedural capsule')+') — FBX: '+(ANIM_MAP[_dispAnim]||ANIM_MAP[currentAnim]||'—');
-  document.getElementById('posText').textContent = 'Intel: '+intel+'/3  •  X '+player.position.x.toFixed(0)+' Z '+player.position.z.toFixed(0);
+  const _ant=document.getElementById('animText'); if(_ant) _ant.textContent = 'Anim: '+_dispAnim+' ('+(fbxPlaying ? 'Agent_Kyle.fbx, FBX' : 'procedural capsule')+') — FBX: '+(ANIM_MAP[_dispAnim]||ANIM_MAP[currentAnim]||'—');
+  const _pt=document.getElementById('posText'); if(_pt) _pt.textContent = 'Intel: '+intel+'/3  •  X '+player.position.x.toFixed(0)+' Z '+player.position.z.toFixed(0);
   drawMinimap();
   updateSky(dt);
   renderer.render(scene,camera);
