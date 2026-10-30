@@ -53,6 +53,33 @@ Still missing:
 - Details: hazard stripes, signage / posters, floor markings, night / wet-look variants
 - Metal barrels (cover / prop texture, not yet supplied)
 
+## Textures — ballroom mission
+
+All environment surfaces only, for the ballroom hall in `ballroom.html` (flat-colour floor, dance floor, walls, bar, tables and chairs, chandeliers). None of these exist or are wired in — all are Still missing. Object, character, and weapon textures are baked into the models and are not listed here.
+
+- Polished wood ballroom floor
+- Dance floor — herringbone wood with marble border inlay
+- Wall panelling / wainscoting — dark wood
+- Ballroom wall upper — damask wallpaper
+- Ballroom carpet runner
+- Chandelier crystal / glass
+- Tablecloth linen — cream
+- Bar counter — wood and marble top
+- Curtains / drapes — velvet
+- Ceiling plaster / moulding
+- Chair upholstery — velvet brocade
+- Formal rug — ballroom centre
+- Entrance / exit door wood
+
+## Textures — courtyard (additional)
+
+Environment surfaces only, genuinely absent from `assets/textures/` (checked — none of the 12 obtained textures are re-listed here). All Still missing.
+
+- Facility door / EXFIL gate metal
+- Building window glass — tinted
+- Weathered concrete barrier
+- Ground tire marks / oil stains
+
 ## Audio missing entirely
 
 - Suppressed / unsuppressed gunshots
@@ -72,3 +99,6 @@ The ballroom mission (`ballroom.html`) currently uses procedural placeholders fo
 - Rochelle NPC model: formal ballroom look, distinct from Agent_Kyle (currently a recoloured capsule guest)
 - Real ballroom models: chandelier, round tables, chairs, bar (currently procedural)
 - Cat animations: walk, sit, idle, tail flick (currently cats wander with a simple sway; no cat clips are in the repo)
+- Cats running animation: Margo, Moxie, and Mabel running (currently cats only wander at walk speed; no cat running clip is in the repo) — Still missing, not wired in
+- Dancing animations: waltz-style couples dancing for ballroom guests (currently guests only wander and sway; no dance clips are in the repo) — Still missing, not wired in
+- Dancing animations: individual / social dancing for ballroom guests (currently guests only wander and sway; no dance clips are in the repo) — Still missing, not wired in
