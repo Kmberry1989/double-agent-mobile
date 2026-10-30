@@ -80,6 +80,7 @@
   <p>Health</p><div class="bar"><i id="healthBar" style="width:100%"></i></div>
   <p>Detection</p><div class="bar" id="detectBar"><i id="detectFill" style="width:0%"></i></div>
   <p id="ammoText">Ammo: 12 / 12</p>
+  <p id="gearText" class="small">Gear: Watch · Glasses · Pen · Cufflinks · Bag (carried, no extra function)</p>
   <p id="posText" class="small"></p>
 </div>
 <div id="touchUI" aria-label="Touch controls">
@@ -107,7 +108,8 @@
   <ul>
     <li><b>W A S D</b> move &nbsp; <b>Mouse</b> look &nbsp; <b>Shift</b> sprint (loud) &nbsp; <b>C</b> crouch / sneak &nbsp; <b>Space</b> jump</li>
     <li>Hold <b>Right-mouse</b> to aim.</li>
-    <li><b>Click</b> fire &nbsp; <b>R</b> reload &nbsp; <b>1</b> pistol &nbsp; <b>2</b> rifle &nbsp; <b>L</b> toggle player loadout (white / black set) &nbsp; <b>E</b> interact / pick up intel &nbsp; <b>F</b> silent takedown from behind an unaware guard</li>
+    <li><b>Click</b> fire &nbsp; <b>R</b> reload &nbsp; <b>WEAPON</b> cycles Glock → Walther → Makarov → MP5K → AKS74U → RPG7 (same pistol 34 / rifle 50 damage) &nbsp; <b>1</b> Glock &nbsp; <b>2</b> MP5K &nbsp; <b>L</b> toggle player loadout (white / black set) &nbsp; <b>E</b> interact / pick up intel &nbsp; <b>F</b> silent takedown from behind an unaware guard</li>
+    <li><b>Gear:</b> suppressor is a visual muzzle attachment on the equipped weapon; watch and glasses are visual attachments on the player. Pen, cufflinks and bag are carried (shown in the HUD gear line) with no extra function — they are not wired to any new mechanic.</li>
     <li><b>Q</b> punch &nbsp; <b>X</b> kick &nbsp; <b>G</b> wave &nbsp; <b>T</b> talk &nbsp; <b>N</b> talk on phone &nbsp; <b>V</b> male crouch pose (hold) &nbsp; <b>B</b> female crouch pose (hold) — animation keys, no existing key changed</li>
     <li><b>Y</b> cycle weather (Clear → Cloudy → Rain → Fog) — on phones, the <b>WX</b> button below the minimap does the same. Weather is visual only and never changes guard vision, detection, or damage.</li>
   </ul>
@@ -616,6 +618,7 @@ function loadPlayerModel(file){
     playerHandBone = findHandBone(obj);
     if (playerHandBone) { console.info('[double-agent] player hand bone:', playerHandBone.name); attachPlayerWeapons(); }
     else console.warn('[double-agent] player model has no right-hand bone — weapons stay on the group pivot');
+    attachAccessories();
     console.info('[double-agent] Player model loaded:', file);
   }, undefined, ()=>{
     if (file === 'Agent_Kyle.fbx') loadPlayerModel('Agent.fbx');
@@ -624,16 +627,60 @@ function loadPlayerModel(file){
 }
 loadPlayerModel('Agent_Kyle.fbx');
 let playerLoadout = 'white'; // 'white' | 'black' — two distinct player sets
+// WIRED WEAPONS (2026-10-30): every white_/black_ weapon GLB in assets/
+// is now wired. WEAPON cycles the full list; SET still toggles white/black.
+// Damage / fire-rate stay on the CLASS (pistol 34, rifle 50) — a variant
+// is a real visual + name change, not a new power level. RPG7 is a
+// rifle-class visual variant in this phase (no launcher / AoE behaviour).
+const WEAPON_CYCLE = [
+  { name: 'Glock', cls: 'pistol', len: 0.32 },
+  { name: 'Walther', cls: 'pistol', len: 0.32 },
+  { name: 'Makarov', cls: 'pistol', len: 0.32 },
+  { name: 'MP5K', cls: 'rifle', len: 0.60 },
+  { name: 'AKS74U', cls: 'rifle', len: 0.60 },
+  { name: 'RPG7', cls: 'rifle', len: 0.60 }
+];
+let weaponVariant = 'Glock'; // current variant name; `weapon` still holds its class
+function weaponVariantInfo(){ return WEAPON_CYCLE.find(v=>v.name===weaponVariant) || WEAPON_CYCLE[0]; }
+function setWeaponVariant(name){
+  const info = WEAPON_CYCLE.find(v=>v.name===name); if (!info) return;
+  weaponVariant = info.name; weapon = info.cls;
+  ammoInMag = info.cls === 'pistol' ? Math.min(ammoInMag, 12) : 30;
+  updateWeaponVisibility();
+}
+function cycleWeapon(){
+  const i = WEAPON_CYCLE.findIndex(v=>v.name===weaponVariant);
+  setWeaponVariant(WEAPON_CYCLE[(i + 1) % WEAPON_CYCLE.length].name);
+}
 const PLAYER_LOADOUTS = {
-  white: { pistol: 'white_glock.glb', rifle: 'white_mp5k.glb' },
-  black: { pistol: 'black_glock_threaded.glb', rifle: 'black_mp5k.glb' }
+  white: { Glock: 'white_glock.glb', Walther: 'white_walther.glb', Makarov: 'white_makarov.glb', MP5K: 'white_mp5k.glb', AKS74U: 'white_aks74u.glb', RPG7: 'white_RPG7.glb' },
+  black: { Glock: 'black_glock_threaded.glb', Walther: 'black_walther.glb', Makarov: 'black_makarov.glb', MP5K: 'black_mp5k.glb', AKS74U: 'black_aks74u.glb', RPG7: 'black_rpg.glb' }
 };
-const weaponPivots = { white: { pistol: null, rifle: null }, black: { pistol: null, rifle: null } };
+const weaponPivots = { white: { Glock: null, Walther: null, Makarov: null, MP5K: null, AKS74U: null, RPG7: null }, black: { Glock: null, Walther: null, Makarov: null, MP5K: null, AKS74U: null, RPG7: null } };
+// Suppressor + accessory groups (filled by loaders below; null until loaded).
+const suppressorGroups = { white: null, black: null };
+const accessoryGroups = { white: { glasses: null }, black: { glasses: null }, watch: null };
 function updateWeaponVisibility(){
   Object.values(weaponPivots).forEach((set)=>{ Object.values(set).forEach((p)=>{ if (p) p.visible = false; }); });
-  const pivot = weaponPivots[playerLoadout] ? weaponPivots[playerLoadout][weapon] : null;
+  const pivot = weaponPivots[playerLoadout] ? weaponPivots[playerLoadout][weaponVariant] : null;
   if (pivot) pivot.visible = true;
   gun.visible = !pivot;
+  // Suppressor: visual muzzle attachment on the equipped weapon only.
+  // It rides as a child of the active weapon pivot, so it follows the
+  // hand bone exactly like the weapon does. Hidden when no real weapon
+  // pivot is shown (box-gun fallback).
+  Object.values(suppressorGroups).forEach((g)=>{ if (g) g.visible = false; });
+  const sup = suppressorGroups[playerLoadout];
+  if (pivot && sup){
+    pivot.add(sup);
+    sup.position.set(0, 0, weaponVariantInfo().len / 2 + 0.05);
+    sup.visible = true;
+  }
+  // Glasses: show only the current set's pair, only if bone-attached.
+  Object.entries(accessoryGroups).forEach(([set, acc])=>{
+    if (acc && acc.glasses) acc.glasses.visible = (set === playerLoadout && !!acc.glasses.userData.boneAttached);
+  });
+  if (accessoryGroups.watch) accessoryGroups.watch.visible = !!accessoryGroups.watch.userData.boneAttached;
 }
 function loadPlayerWeapon(set, slot, file, targetLength){
   gltfLoader.load('assets/' + file, (gltf)=>{
@@ -651,10 +698,85 @@ function loadPlayerWeapon(set, slot, file, targetLength){
     updateWeaponVisibility();
   });
 }
-loadPlayerWeapon('white', 'pistol', PLAYER_LOADOUTS.white.pistol, 0.32);
-loadPlayerWeapon('white', 'rifle', PLAYER_LOADOUTS.white.rifle, 0.60);
-loadPlayerWeapon('black', 'pistol', PLAYER_LOADOUTS.black.pistol, 0.32);
-loadPlayerWeapon('black', 'rifle', PLAYER_LOADOUTS.black.rifle, 0.60);
+WEAPON_CYCLE.forEach((v)=>{
+  loadPlayerWeapon('white', v.name, PLAYER_LOADOUTS.white[v.name], v.len);
+  loadPlayerWeapon('black', v.name, PLAYER_LOADOUTS.black[v.name], v.len);
+});
+// ---------- Suppressor + visual accessories (wired, visual only) ----------
+// Suppressor GLBs exist per set; glasses exist per set; watch exists only
+// as black_watch.glb (shared across sets). Pen, cufflinks and bag have no
+// sensible bone anchor that would not clip the weapon hand, so they are
+// carried only (HUD gear line) and no GLB is loaded for them.
+function fitAccessory(obj, targetLength){
+  obj.traverse((o)=>{ if (o.isMesh) o.castShadow = true; });
+  let box = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); box.getSize(size);
+  const longest = Math.max(size.x, size.y, size.z);
+  if (!longest || longest <= 0) return false;
+  obj.scale.setScalar(targetLength / longest);
+  box = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); box.getCenter(c);
+  obj.position.set(-c.x, -c.y, -c.z);
+  return true;
+}
+function findBoneByKey(model, key){
+  let found = null;
+  model.traverse((o)=>{ if (!o.isBone || found) return; if (boneKey(o.name) === key || boneKey(o.name).indexOf(key) >= 0) found = o; });
+  return found;
+}
+function attachGroupToBone(group, bone, worldYaw, forwardDist){
+  if (!group || !bone || group.userData.boneAttached) return false;
+  try {
+    player.updateMatrixWorld(true);
+    const bp = new THREE.Vector3(); bone.getWorldPosition(bp);
+    const fwd = new THREE.Vector3(Math.sin(worldYaw), 0, Math.cos(worldYaw));
+    scene.attach(group);
+    group.position.copy(bp).addScaledVector(fwd, forwardDist);
+    group.quaternion.setFromEuler(new THREE.Euler(0, worldYaw, 0));
+    group.scale.setScalar(1);
+    bone.attach(group);
+    group.userData.boneAttached = true;
+    return true;
+  } catch (e) { console.warn('[double-agent] accessory bone attach failed:', e); return false; }
+}
+function attachAccessories(){
+  if (!agentModel) return;
+  const worldYaw = yaw + Math.PI;
+  const head = findBoneByKey(agentModel, 'head');
+  const forearm = findBoneByKey(agentModel, 'leftforearm') || findBoneByKey(agentModel, 'lefthand');
+  Object.values(accessoryGroups).forEach((acc)=>{
+    if (acc && acc.glasses && head) attachGroupToBone(acc.glasses, head, worldYaw, 0.10);
+  });
+  if (accessoryGroups.watch && forearm) attachGroupToBone(accessoryGroups.watch, forearm, worldYaw, 0);
+  updateWeaponVisibility();
+}
+function loadSuppressor(set, file){
+  gltfLoader.load('assets/' + file, (gltf)=>{
+    const g = new THREE.Group(); gltf.scene && g.add(gltf.scene);
+    if (!fitAccessory(gltf.scene, 0.14)) return;
+    g.visible = false; suppressorGroups[set] = g; updateWeaponVisibility();
+    console.info('[double-agent] suppressor loaded:', set, file);
+  }, undefined, ()=>{ console.warn('[double-agent] suppressor failed, weapon still works:', file); });
+}
+function loadAccessoryGlasses(set, file){
+  gltfLoader.load('assets/' + file, (gltf)=>{
+    const g = new THREE.Group(); gltf.scene && g.add(gltf.scene);
+    if (!fitAccessory(gltf.scene, 0.28)) return;
+    g.visible = false; accessoryGroups[set].glasses = g; player.add(g); attachAccessories();
+    console.info('[double-agent] glasses loaded:', set, file);
+  }, undefined, ()=>{ console.warn('[double-agent] glasses failed, gear line still lists them:', file); });
+}
+function loadAccessoryWatch(file){
+  gltfLoader.load('assets/' + file, (gltf)=>{
+    const g = new THREE.Group(); gltf.scene && g.add(gltf.scene);
+    if (!fitAccessory(gltf.scene, 0.09)) return;
+    g.visible = false; accessoryGroups.watch = g; player.add(g); attachAccessories();
+    console.info('[double-agent] watch loaded:', file);
+  }, undefined, ()=>{ console.warn('[double-agent] watch failed, gear line still lists it:', file); });
+}
+loadSuppressor('white', 'white_suppressor.glb');
+loadSuppressor('black', 'black_suppressor.glb');
+loadAccessoryGlasses('white', 'white_open_glasses.glb');
+loadAccessoryGlasses('black', 'black_glasses.glb');
+loadAccessoryWatch('black_watch.glb');
 updateWeaponVisibility();
 
 // ---------- Intel, exfil ----------
@@ -1039,8 +1161,8 @@ addEventListener('keydown', e=>{
   keys[e.code]=true;
   if (e.code==='KeyC') crouching = !crouching;
   if (e.code==='KeyY') cycleWeather();
-  if (e.code==='Digit1'){ weapon='pistol'; ammoInMag = Math.min(ammoInMag,12); if (ammoInMag>12) ammoInMag=12; updateWeaponVisibility(); }
-  if (e.code==='Digit2'){ weapon='rifle'; ammoInMag = 30; updateWeaponVisibility(); }
+  if (e.code==='Digit1'){ setWeaponVariant('Glock'); }
+  if (e.code==='Digit2'){ setWeaponVariant('MP5K'); }
   if (e.code==='KeyL'){ playerLoadout = playerLoadout==='white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
   if (e.code==='KeyR' && performance.now()>reloadUntil){ reloadUntil = performance.now()+1500; showMsg('Reloading…',1200); playPlayerOneShot(weapon==='rifle' ? 'reloadRifle' : 'reloadPistol'); }
   if (e.code==='KeyF') tryTakedown();
@@ -1134,11 +1256,7 @@ document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLo
     if (performance.now() > reloadUntil){ reloadUntil = performance.now() + 1500; showMsg('Reloading…', 1200); playPlayerOneShot(weapon === 'rifle' ? 'reloadRifle' : 'reloadPistol'); }
   }
   function doJump(){ if (grounded){ vy = 7.5; grounded = false; playPlayerOneShot('jump'); } }
-  function doWeapon(){
-    if (weapon === 'pistol'){ weapon = 'rifle'; ammoInMag = 30; }
-    else { weapon = 'pistol'; ammoInMag = Math.min(ammoInMag, 12); }
-    updateWeaponVisibility();
-  }
+  function doWeapon(){ cycleWeapon(); }
   function doLoadout(){ playerLoadout = playerLoadout === 'white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
   bindBtn('btnFire', ()=>{
     tryShoot();
@@ -1399,7 +1517,7 @@ function animate(){
     gun.position.set(aiming?0.22:0.35, aiming?1.45:1.35, 0.5);
     // Real weapon pivot (if loaded) replaces the box gun; otherwise the
     // box gun stays visible. Do not force gun.visible = true here.
-    const _pivot = weaponPivots[playerLoadout] ? weaponPivots[playerLoadout][weapon] : null;
+    const _pivot = weaponPivots[playerLoadout] ? weaponPivots[playerLoadout][weaponVariant] : null;
     if (_pivot){ _pivot.visible = true;
       // NEVER overwrite a hand-attached pivot's position here: it is a
       // bone-local offset now, and resetting it to group coordinates
@@ -1449,7 +1567,7 @@ function animate(){
   document.getElementById('detectFill').style.background = detection>=100?'#ff2222':(detection>=30?'#ffcc00':'#57d977');
   const anyAlert = guards.some(g=>g.state==='ALERT');
   document.getElementById('stateText').textContent = anyAlert?'ALERT':(detection>=30?'CAUTION':(detection>0?'SUSPICIOUS':'UNDETECTED'));
-  document.getElementById('weaponText').textContent = (weapon==='pistol'?'Pistol':'Rifle') + ' · ' + playerLoadout + ' set';
+  document.getElementById('weaponText').textContent = weaponVariant + ' (' + weapon + ') · ' + playerLoadout + ' set';
   document.getElementById('ammoText').textContent = 'Ammo: '+ammoInMag+' / '+weapons[weapon].max + (now<reloadUntil?' (reloading)':'');
   const _dispAnim = playerHeldPose || playerOneShotName || currentAnim;
   document.getElementById('animText').textContent = 'Anim: '+_dispAnim+' ('+(fbxPlaying ? 'Agent_Kyle.fbx, FBX' : 'procedural capsule')+') — FBX: '+(ANIM_MAP[_dispAnim]||ANIM_MAP[currentAnim]||'—');
