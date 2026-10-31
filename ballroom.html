@@ -34,6 +34,30 @@
 <script type="module">
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const gltfLoader = new GLTFLoader();
+// GLB prop helper: fit a loaded model to target W/H/D (non-uniform, so it
+// matches the footprint it replaces), centre it in a group, and return the
+// group. The caller places the group: base-anchored props sit at y = targetH/2
+// (so the model base is on the floor), centre-anchored props at the centre.
+// If a GLB fails to load, the caller keeps its procedural mesh — nothing
+// disappears, the room just keeps its old look.
+function fitPropGroup(obj, targetW, targetH, targetD){
+  obj.traverse((o)=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  let bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
+  if (!size.x || !size.y || !size.z) return null;
+  obj.scale.set(targetW / size.x, targetH / size.y, targetD / size.z);
+  bb = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); bb.getCenter(c);
+  obj.position.set(-c.x, -c.y, -c.z);
+  const g = new THREE.Group(); g.add(obj); return g;
+}
+function loadProp(path, x, y, z, targetW, targetH, targetD, rotY, hide){
+  gltfLoader.load(path, (gltf)=>{
+    const g = fitPropGroup(gltf.scene, targetW, targetH, targetD); if (!g) return;
+    g.position.set(x, y, z); if (rotY) g.rotation.y = rotY; scene.add(g);
+    (hide || []).forEach((m)=>{ if (m) m.visible = false; });
+  }, undefined, ()=>{ /* keep procedural fallback */ });
+}
 
 const HALL_X = 20, HALL_Z = 14;
 const scene = new THREE.Scene();
@@ -68,26 +92,58 @@ box(HALL_X + 0.5, 3, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22);
 const exitDoor = box(0, 1.5, -HALL_Z + 0.1, 3, 3, 0.3, 0x2e7d32);
 box(0, 1.5, HALL_Z - 0.1, 3, 3, 0.3, 0x3a2a18);
 // Chandeliers: warm glow spheres + point lights (capped for phones)
+// Real chandelier GLBs replace the spheres when loaded; lights stay.
+const chandelierProc = [];
 [[-10, -4], [0, -1], [10, -4]].forEach(([x, z]) => {
   const s = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.2 }));
-  s.position.set(x, 5.2, z); scene.add(s);
+  s.position.set(x, 5.2, z); scene.add(s); chandelierProc.push(s);
   const l = new THREE.PointLight(0xffc94d, 30, 22); l.position.set(x, 4.8, z); scene.add(l);
 });
-// Bar (east wall)
-box(17.5, 0.6, 6, 4, 1.2, 1.5, 0x4a2c14);
-box(17.5, 1.4, 6, 4, 0.15, 1.8, 0x7a4a22);
+gltfLoader.load('assets/models/ballroom_chandelier.glb', (gltf)=>{
+  [[-10, -4], [0, -1], [10, -4]].forEach(([x, z])=>{
+    const g = fitPropGroup(gltf.scene.clone(), 1.1, 1.4, 1.1); if (!g) return;
+    g.position.set(x, 5.2, z); scene.add(g);
+  });
+  chandelierProc.forEach((m)=>{ m.visible = false; });
+}, undefined, ()=>{});
+// Bar (east wall) — real bar + bar top GLBs replace the boxes when loaded.
+const barProc = [box(17.5, 0.6, 6, 4, 1.2, 1.5, 0x4a2c14), box(17.5, 1.4, 6, 4, 0.15, 1.8, 0x7a4a22)];
+loadProp('assets/models/ballroom_bar.glb', 17.5, 0.55, 6, 4, 1.1, 0.7, 0, [barProc[0]]);
+loadProp('assets/models/ballroom_bar_top.glb', 17.5, 1.15, 6, 4, 0.1, 0.9, 0, [barProc[1]]);
 // Round tables + chairs (colliders)
+// Real table/chair GLBs replace the procedural ones when loaded; colliders
+// are unchanged, so movement and talk radii do not change. Chairs move in
+// from 2.1 m (for the old 3 m tables) to 1.2 m (for the 1.8 m GLB tables).
 const tables = [[-13, 8], [-13, -9], [13, 9], [-6, 10], [7, -10], [14, -8]];
 const colliders = []; // {x,z,r}
+const tableProc = [], chairProc = [];
 tables.forEach(([x, z]) => {
-  cyl(x, 0.45, z, 1.5, 1.5, 0.12, 0xf5ead0);
-  cyl(x, 0.2, z, 0.15, 0.25, 0.4, 0x3a2a18);
+  tableProc.push(cyl(x, 0.45, z, 1.5, 1.5, 0.12, 0xf5ead0));
+  tableProc.push(cyl(x, 0.2, z, 0.15, 0.25, 0.4, 0x3a2a18));
   colliders.push({ x, z, r: 1.9 });
   for (let i = 0; i < 4; i++) {
     const a = i * Math.PI / 2 + 0.4;
-    box(x + Math.cos(a) * 2.1, 0.45, z + Math.sin(a) * 2.1, 0.5, 0.9, 0.5, 0x5a2f22);
+    chairProc.push(box(x + Math.cos(a) * 2.1, 0.45, z + Math.sin(a) * 2.1, 0.5, 0.9, 0.5, 0x5a2f22));
   }
 });
+gltfLoader.load('assets/models/ballroom_table.glb', (gltf)=>{
+  tables.forEach(([x, z])=>{
+    const g = fitPropGroup(gltf.scene.clone(), 1.8, 0.75, 1.8); if (!g) return;
+    g.position.set(x, 0.375, z); scene.add(g);
+  });
+  tableProc.forEach((m)=>{ m.visible = false; });
+}, undefined, ()=>{});
+gltfLoader.load('assets/models/ballroom_chair.glb', (gltf)=>{
+  tables.forEach(([x, z])=>{
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 + 0.4;
+      const cx = x + Math.cos(a) * 1.2, cz = z + Math.sin(a) * 1.2;
+      const g = fitPropGroup(gltf.scene.clone(), 0.57, 1.0, 0.6); if (!g) continue;
+      g.position.set(cx, 0.5, cz); g.rotation.y = Math.atan2(x - cx, z - cz); scene.add(g);
+    }
+  });
+  chairProc.forEach((m)=>{ m.visible = false; });
+}, undefined, ()=>{});
 colliders.push({ x: 17.5, z: 6, r: 2.6 });
 
 // ---- Player (Agent_Kyle, unarmed — no weapon is ever attached) ----
@@ -216,7 +272,7 @@ function makeCat(cat) {
   tail.position.set(0, 0.32, -0.55); tail.rotation.x = 0.4; g.add(tail);
   // Collar + glowing electronic ID tag
   const collar = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 8, 20), new THREE.MeshStandardMaterial({ color: 0x111111 }));
-  collar.position.set(0, 0.34, 0.32); collar.rotation.x = 0.5; g.add(collar);
+  collar.position.set(0, 0.34, 0.32); collar.rotation.x = 0.5; g.add(collar); cat.collarMesh = collar;
   const tag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.02), new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x00ffcc, emissiveIntensity: 1.4 }));
   tag.position.set(0, 0.22, 0.48); g.add(tag);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(cat.name + ' 🐱'), transparent: true }));
@@ -242,6 +298,20 @@ const CATS = [
 // wandering all work for them exactly like the guests. They have no
 // health, damage, or combat code anywhere — they cannot be fought.
 NPCS.push(...CATS);
+// Real cat collars replace the torus collars when loaded (the glowing tag
+// stays — it is the scannable part). Real scanner: the player carries it
+// at their right side, since it is the tool used to scan the tags.
+gltfLoader.load('assets/models/cat_collar.glb', (gltf)=>{
+  CATS.forEach((cat)=>{
+    const g = fitPropGroup(gltf.scene.clone(), 0.24, 0.06, 0.24); if (!g) return;
+    g.position.set(0, 0.34, 0.32); g.rotation.x = 0.5; cat.group.add(g);
+    if (cat.collarMesh) cat.collarMesh.visible = false;
+  });
+}, undefined, ()=>{});
+gltfLoader.load('assets/models/cat_scanner.glb', (gltf)=>{
+  const g = fitPropGroup(gltf.scene, 0.14, 0.3, 0.05); if (!g) return;
+  g.position.set(0.45, 1.3, 0.2); player.add(g);
+}, undefined, ()=>{});
 
 // ---- Goal state ----
 const clues = new Set(); let contactFound = false, won = false, talking = null, lineIdx = 0;
