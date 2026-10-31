@@ -162,8 +162,23 @@ const donald = makeGuest({ name: 'Donald', role: 'donald', color: 0x4a3a1a, skin
 ] });
 { // Drink in his hand, always — a small amber glass at his right side.
   const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0xd98a2a, transparent: true, opacity: 0.9 }));
-  glass.position.set(0.48, 1.28, 0.15); donald.group.add(glass);
+  glass.position.set(0.48, 1.28, 0.15); donald.group.add(glass); donald.glass = glass;
 }
+// Donald's real model, from the file Kyle sent (assets/Donald_tux.fbx):
+// a static Tripo mesh, no skeleton, so it is posed by the group itself —
+// stumble, sway and fall all move the whole model, exactly like the
+// capsule did. If the file fails to load, the capsule above stays.
+fbxLoader.load('assets/Donald_tux.fbx', (obj) => {
+  [...donald.group.children].forEach(ch => { if (ch !== donald.glass && ch.type !== 'Sprite') donald.group.remove(ch); });
+  const holder = new THREE.Group(); holder.add(obj);
+  let bb = new THREE.Box3().setFromObject(holder); const size = new THREE.Vector3(); bb.getSize(size);
+  if (size.z > size.y * 1.5) obj.rotation.x = -Math.PI / 2; // Z-up Blender export: lay it upright
+  bb = new THREE.Box3().setFromObject(holder); bb.getSize(size);
+  holder.scale.setScalar(1.8 / Math.max(size.y, 0.01));
+  bb = new THREE.Box3().setFromObject(holder); holder.position.y = -bb.min.y; // feet on the floor
+  holder.rotation.y = Math.PI; // Agent_Kyle facing convention
+  donald.group.add(holder);
+}, undefined, () => {});
 donald.fallTimer = 12 + Math.random() * 10; donald.falling = 0;
 NPCS.push(donald);
 // Donald's spill puddle, already on the floor when you arrive. Margo's
