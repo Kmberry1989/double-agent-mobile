@@ -233,10 +233,10 @@ const CATS = [
   // sticks to secluded corners/edges and pauses much longer between moves.
   makeCat({ name: 'Margo', role: 'cat', clue: 'velvet', color: 0x8a8a8a, patches: [0x555555, 0xb0b0b0, 0x666666], earColor: 0x555555, noseColor: 0x111111, shy: true, hidden: true, x: -17, z: 11, wps: [[-17, 11]], lines: ['*purr* — Tag scan: velvet. Collar ID registered.', 'Margo stretches and pads away.'] }),
   // Moxie: black and white, black ears, black nose. Easy to find, but she
-  // runs: chase her to enough different places and she tires and stops.
-  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0x111111, noseColor: 0x111111, chase: true, chaseCount: 0, tired: false, fleeing: false, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5], [-5, 9], [10, 2], [-3, 10]], lines: ['*purr* — Tag scan: midnight. Collar ID registered.', 'Moxie flicks her tail and sits down.'] }),
-  // Mabel: black and white, white ears, pink nose. Same chase rule as Moxie.
-  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0xffffff, noseColor: 0xff9eb0, chase: true, chaseCount: 0, tired: false, fleeing: false, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4], [-8, -8], [6, -3], [-6, 2]], lines: ['*purr* — Tag scan: waltz. Collar ID registered.', 'Mabel blinks slowly at you.'] }),
+  // runs from point to point — give her a treat at each stop to try a scan.
+  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0x111111, noseColor: 0x111111, chase: true, fed: false, fedTimer: 0, fleeing: false, treatsGiven: 0, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5], [-5, 9], [10, 2], [-3, 10]], lines: ['*purr* — Tag scan: midnight. Collar ID registered.', 'Moxie flicks her tail and sits down.'] }),
+  // Mabel: black and white, white ears, pink nose. Same treat rule as Moxie.
+  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0xffffff, noseColor: 0xff9eb0, chase: true, fed: false, fedTimer: 0, fleeing: false, treatsGiven: 0, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4], [-8, -8], [6, -3], [-6, 2]], lines: ['*purr* — Tag scan: waltz. Collar ID registered.', 'Mabel blinks slowly at you.'] }),
 ];
 // Cats join the talkable/wandering set, so E / USE, prompts, and
 // wandering all work for them exactly like the guests. They have no
@@ -245,13 +245,24 @@ NPCS.push(...CATS);
 
 // ---- Goal state ----
 const clues = new Set(); let contactFound = false, won = false, talking = null, lineIdx = 0;
-// ---- Cat chase + Margo reveal ----
-// Moxie/Mabel flee when approached or when you try to scan them too soon.
-// After 4 flees (4 different places) a cat tires, stops, and can be scanned.
+// ---- Cat chase + treats + Margo reveal ----
+// Taming loop, all three cats: a cat runs from point to point away from
+// you. At each stop, press E / USE once to give it a treat — it stays put
+// for a few seconds — then press E / USE again to scan its tag. If you
+// wait too long after the treat, it runs to the next point and you have
+// to give it another treat to try again. Treats are unlimited; there is
+// no treat pickup or inventory to manage.
+function setTreat(cat, on) {
+  if (!cat.group) return;
+  if (!cat.treatMesh) {
+    cat.treatMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a5a2e }));
+    cat.treatMesh.position.set(0, 0.06, 0.6); cat.group.add(cat.treatMesh);
+  }
+  cat.treatMesh.visible = on;
+}
 function fleeCat(cat) {
-  if (cat.tired) return;
-  cat.chaseCount++;
-  if (cat.chaseCount >= 4) { cat.tired = true; cat.fleeing = false; cat.pause = 0; return; }
+  cat.fed = false; cat.fedTimer = 0; setTreat(cat, false);
+  if (cat.hiding) return; // Margo stays in her hiding place; she does not flee
   cat.wp = (cat.wp + 1) % cat.wps.length; cat.fleeing = true; cat.pause = 0;
 }
 // Margo is hidden until both easy cats are caught. She then appears at one
@@ -289,11 +300,14 @@ function updateHUD() {
 updateHUD();
 function talkTo(npc) {
   talking = npc; lineIdx = 0;
-  // Trying to scan a chase cat before it tires just spooks it — it runs
-  // to another place instead, and no clue is collected.
-  if (npc.role === 'cat' && npc.chase && !npc.tired) { showLine(); fleeCat(npc); return; }
+  // A cat with no treat yet: this press gives it a treat, it stays put
+  // briefly, and no clue is collected. The next press scans it.
+  if (npc.role === 'cat' && !npc.fed) {
+    showLine(); npc.fed = true; npc.fedTimer = 12; npc.treatsGiven = (npc.treatsGiven || 0) + 1; setTreat(npc, true); return;
+  }
   showLine();
   if (npc.role === 'cat' && !clues.has(npc.clue)) {
+    npc.fed = false; npc.fedTimer = 0; setTreat(npc, false);
     clues.add(npc.clue);
     if (clues.has('midnight') && clues.has('waltz')) revealMargo();
   }
@@ -303,7 +317,7 @@ function talkTo(npc) {
 function showLine() {
   if (!talking) return;
   let line = talking.lines[lineIdx % talking.lines.length];
-  if (talking.role === 'cat' && talking.chase && !talking.tired) line = talking.name + ' darts away before you can scan her tag — keep chasing her around the hall until she tires and stops.';
+  if (talking.role === 'cat' && !talking.fed) line = 'You offer ' + talking.name + ' a treat. She sniffs it, eats it, and stays put — quick, press E / USE again to scan her tag before she changes her mind.';
   if (talking.role === 'contact' && clues.size < 3 && !contactFound) line = 'I can only trust someone who knows all three passphrase words. The cats carry them — scan the ID tags on Margo, Moxie, and Mabel.';
   if (talking.role === 'contact' && contactFound) line = 'Velvet, midnight, waltz — that is right. The north door is open. Go, quietly.';
   document.getElementById('dlgName').textContent = talking.name;
@@ -357,9 +371,9 @@ function nearestTalk() {
   let best = null, bd = 3.2;
   for (const n of NPCS) { if (!n.group.visible) continue; const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
   if (best) {
-    // A chase cat that tired out mid-conversation: a fresh press scans it,
-    // instead of just cycling to its second line and never collecting.
-    if (talking === best && best.role === 'cat' && best.chase && best.tired && !clues.has(best.clue)) talkTo(best);
+    // A cat fed mid-conversation: a fresh press scans it, instead of just
+    // cycling to its second line and never collecting.
+    if (talking === best && best.role === 'cat' && best.fed && !clues.has(best.clue)) talkTo(best);
     else if (talking === best) { lineIdx++; showLine(); } else talkTo(best);
   }
   else if (talking) endTalk();
@@ -402,7 +416,7 @@ function animate() {
     // The prompt element was removed with the HUD text, so prompt is null:
     // only end a conversation when nobody is nearby, not on every frame.
     // (Without this, dialogue closed one frame after opening.)
-    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.chase && !best.tired ? 'Chase ' + best.name : 'Scan ' + best.name + '\'s collar tag') : 'Talk to ' + best.name) + ' — press E / USE'; prompt.style.display = 'block'; } }
+    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — press E / USE'; prompt.style.display = 'block'; } }
     else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
       if (prompt) { prompt.textContent = contactFound ? 'North exit open — press E / USE to leave' : 'North exit is locked — find Rochelle first (gather 3 clues)'; prompt.style.display = 'block'; }
     } else { if (prompt) prompt.style.display = 'none'; if (talking) endTalk(); }
@@ -423,12 +437,22 @@ function animate() {
         else { const sp = 0.7 + 0.3 * Math.sin(t * 1.7 + n.phase); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); }
         continue;
       }
-      if (n.role === 'cat' && n.hiding) continue; // Margo stays put in her hiding place
-      if (n.role === 'cat' && n.tired) continue; // tired chase cat sits still, ready to scan
+      if (n.role === 'cat' && n.hiding) {
+        // Margo stays put in her hiding place, but a treat still expires:
+        // wait too long and you have to give her another one to scan.
+        if (n.fed) { n.fedTimer -= dt; if (n.fedTimer <= 0) { n.fed = false; setTreat(n, false); } }
+        continue;
+      }
+      if (n.role === 'cat' && n.fed) {
+        // Fed cat sits still, ready to scan — until the treat window runs out.
+        n.fedTimer -= dt;
+        if (n.fedTimer <= 0) { fleeCat(n); continue; }
+        continue;
+      }
       n.group.position.y = Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
       if (n.pause > 0) { n.pause -= dt; continue; }
-      // Getting close to an untired chase cat spooks it into running.
-      if (n.role === 'cat' && n.chase && !n.tired && !n.fleeing && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }
+      // Getting close to an unfed chase cat spooks it into running.
+      if (n.role === 'cat' && n.chase && !n.fed && !n.fleeing && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }
       const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
       if (d < 0.3) {
         if (n.fleeing) { n.fleeing = false; n.pause = 1.5; }
