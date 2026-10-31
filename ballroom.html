@@ -149,6 +149,28 @@ const NPCS = [
   makeGuest({ name: 'Eric', role: 'flavour', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
   makeGuest({ name: 'Kristen', role: 'flavour', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'If you are looking for Rochelle, try by the bar.'] }),
 ];
+// ---- Donald: always has a drink in hand, stumbles, falls over at times ----
+// He is friendly flavour only — talking to him never gives or blocks a clue.
+// His spill (see the puddle below) is what the wet paw trail leads from.
+const donald = makeGuest({ name: 'Donald', role: 'donald', color: 0x4a3a1a, skin: 0xe8b48a, x: 10, z: 4, wps: [[10, 4], [6, 6], [12, 8], [8, 2], [14, 5]], lines: [
+  'The chandeliers are listening, I swear it. They blinked at me.',
+  'I once danced with a lamp. Lovely lamp. Terrible dancer.',
+  'A cat — a cat tried to steal my drink! Whiskers and all, reaching for my glass!',
+  'I fell right over there and spilled my drink all over the floor. Oops. That puddle is mine.',
+  'Shhh. The punch knows things. It told me. It did not, actually. I made that up.',
+  'Have you seen my other shoe? It left me. I understand. I would leave me too.',
+] });
+{ // Drink in his hand, always — a small amber glass at his right side.
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0xd98a2a, transparent: true, opacity: 0.9 }));
+  glass.position.set(0.48, 1.28, 0.15); donald.group.add(glass);
+}
+donald.fallTimer = 12 + Math.random() * 10; donald.falling = 0;
+NPCS.push(donald);
+// Donald's spill puddle, already on the floor when you arrive. Margo's
+// wet paw trail runs from this puddle to wherever she is hiding.
+const puddle = new THREE.Mesh(new THREE.CircleGeometry(0.85, 24), new THREE.MeshStandardMaterial({ color: 0x2a3a44, transparent: true, opacity: 0.6, roughness: 0.1 }));
+puddle.rotation.x = -Math.PI / 2; puddle.position.set(9, 0.03, 4); scene.add(puddle);
+const PUDDLE = { x: 9, z: 4 };
 
 // ---- Cats: clue sources, friendly, never fightable/damageable ----
 // Each cat wears a collar with an electronic ID tag. Walking up and
@@ -186,16 +208,20 @@ function makeCat(cat) {
   sp.scale.set(2.2, 0.42, 1); sp.position.y = 0.85; g.add(sp);
   g.position.set(cat.x, 0, cat.z); scene.add(g);
   cat.group = g; cat.phase = Math.random() * 6.28; cat.wp = 0; cat.pause = 0;
+  // Margo starts hidden (see below) — she only appears once Moxie and
+  // Mabel have both been caught, so she is never wanderable before that.
+  if (cat.hidden) g.visible = false;
   return cat;
 }
 const CATS = [
   // Margo: tortoiseshell gray (mottled gray coat), harder to find — she
   // sticks to secluded corners/edges and pauses much longer between moves.
-  makeCat({ name: 'Margo', role: 'cat', clue: 'velvet', color: 0x8a8a8a, patches: [0x555555, 0xb0b0b0, 0x666666], earColor: 0x555555, noseColor: 0x111111, shy: true, x: -17, z: 11, wps: [[-17, 11], [-15, -10], [17, -11], [-18, -4]], lines: ['*purr* — Tag scan: velvet. Collar ID registered.', 'Margo stretches and pads away.'] }),
-  // Moxie: black and white, black ears, black nose.
-  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0x111111, noseColor: 0x111111, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5]], lines: ['*purr* — Tag scan: midnight. Collar ID registered.', 'Moxie flicks her tail and sits down.'] }),
-  // Mabel: black and white, white ears, pink nose.
-  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0xffffff, noseColor: 0xff9eb0, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4]], lines: ['*purr* — Tag scan: waltz. Collar ID registered.', 'Mabel blinks slowly at you.'] }),
+  makeCat({ name: 'Margo', role: 'cat', clue: 'velvet', color: 0x8a8a8a, patches: [0x555555, 0xb0b0b0, 0x666666], earColor: 0x555555, noseColor: 0x111111, shy: true, hidden: true, x: -17, z: 11, wps: [[-17, 11]], lines: ['*purr* — Tag scan: velvet. Collar ID registered.', 'Margo stretches and pads away.'] }),
+  // Moxie: black and white, black ears, black nose. Easy to find, but she
+  // runs: chase her to enough different places and she tires and stops.
+  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0x111111, noseColor: 0x111111, chase: true, chaseCount: 0, tired: false, fleeing: false, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5], [-5, 9], [10, 2], [-3, 10]], lines: ['*purr* — Tag scan: midnight. Collar ID registered.', 'Moxie flicks her tail and sits down.'] }),
+  // Mabel: black and white, white ears, pink nose. Same chase rule as Moxie.
+  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0xffffff, noseColor: 0xff9eb0, chase: true, chaseCount: 0, tired: false, fleeing: false, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4], [-8, -8], [6, -3], [-6, 2]], lines: ['*purr* — Tag scan: waltz. Collar ID registered.', 'Mabel blinks slowly at you.'] }),
 ];
 // Cats join the talkable/wandering set, so E / USE, prompts, and
 // wandering all work for them exactly like the guests. They have no
@@ -204,6 +230,41 @@ NPCS.push(...CATS);
 
 // ---- Goal state ----
 const clues = new Set(); let contactFound = false, won = false, talking = null, lineIdx = 0;
+// ---- Cat chase + Margo reveal ----
+// Moxie/Mabel flee when approached or when you try to scan them too soon.
+// After 4 flees (4 different places) a cat tires, stops, and can be scanned.
+function fleeCat(cat) {
+  if (cat.tired) return;
+  cat.chaseCount++;
+  if (cat.chaseCount >= 4) { cat.tired = true; cat.fleeing = false; cat.pause = 0; return; }
+  cat.wp = (cat.wp + 1) % cat.wps.length; cat.fleeing = true; cat.pause = 0;
+}
+// Margo is hidden until both easy cats are caught. She then appears at one
+// of a few hiding places, with a trail of wet paw marks from Donald's spill
+// puddle leading to her — follow the prints to find her.
+let margoRevealed = false, trailGroup = null;
+function revealMargo() {
+  if (margoRevealed) return;
+  const margo = CATS.find(c => c.name === 'Margo'); if (!margo) return;
+  const spots = [[18.8, 6], [-18, -11], [-17, 12]]; // behind bar, NW corner, SW corner
+  const spot = spots[Math.floor(Math.random() * spots.length)];
+  margo.group.position.set(spot[0], 0, spot[1]);
+  margo.wps = [[spot[0], spot[1]]]; margo.wp = 0; margo.hiding = true; margo.hidden = false;
+  margo.group.visible = true; margoRevealed = true;
+  if (trailGroup) { scene.remove(trailGroup); trailGroup = null; }
+  trailGroup = new THREE.Group();
+  const dx = spot[0] - PUDDLE.x, dz = spot[1] - PUDDLE.z, dist = Math.hypot(dx, dz);
+  const steps = Math.max(2, Math.floor(dist / 1.25));
+  const px = -dz / dist, pz = dx / dist; // perpendicular, for alternating paws
+  for (let i = 1; i <= steps; i++) {
+    const f = i / steps, side = (i % 2 === 0 ? 1 : -1) * 0.18;
+    const print = new THREE.Mesh(new THREE.CircleGeometry(0.12, 12), new THREE.MeshStandardMaterial({ color: 0x1a2a33, transparent: true, opacity: 0.7 }));
+    print.rotation.x = -Math.PI / 2;
+    print.position.set(PUDDLE.x + dx * f + px * side, 0.04, PUDDLE.z + dz * f + pz * side);
+    trailGroup.add(print);
+  }
+  scene.add(trailGroup);
+}
 const clueEl = document.getElementById('clueCount'), contactEl = document.getElementById('contactState');
 function updateHUD() {
   if(clueEl) clueEl.textContent = clues.size + '/3';
@@ -212,14 +273,22 @@ function updateHUD() {
 }
 updateHUD();
 function talkTo(npc) {
-  talking = npc; lineIdx = 0; showLine();
-  if (npc.role === 'cat' && !clues.has(npc.clue)) { clues.add(npc.clue); }
+  talking = npc; lineIdx = 0;
+  // Trying to scan a chase cat before it tires just spooks it — it runs
+  // to another place instead, and no clue is collected.
+  if (npc.role === 'cat' && npc.chase && !npc.tired) { showLine(); fleeCat(npc); return; }
+  showLine();
+  if (npc.role === 'cat' && !clues.has(npc.clue)) {
+    clues.add(npc.clue);
+    if (clues.has('midnight') && clues.has('waltz')) revealMargo();
+  }
   if (npc.role === 'contact' && clues.size === 3) { contactFound = true; }
   updateHUD();
 }
 function showLine() {
   if (!talking) return;
   let line = talking.lines[lineIdx % talking.lines.length];
+  if (talking.role === 'cat' && talking.chase && !talking.tired) line = talking.name + ' darts away before you can scan her tag — keep chasing her around the hall until she tires and stops.';
   if (talking.role === 'contact' && clues.size < 3 && !contactFound) line = 'I can only trust someone who knows all three passphrase words. The cats carry them — scan the ID tags on Margo, Moxie, and Mabel.';
   if (talking.role === 'contact' && contactFound) line = 'Velvet, midnight, waltz — that is right. The north door is open. Go, quietly.';
   document.getElementById('dlgName').textContent = talking.name;
@@ -271,8 +340,13 @@ document.getElementById('useBtn').onclick = () => { if (started) nearestTalk(); 
 
 function nearestTalk() {
   let best = null, bd = 3.2;
-  for (const n of NPCS) { const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
-  if (best) { if (talking === best) { lineIdx++; showLine(); } else talkTo(best); }
+  for (const n of NPCS) { if (!n.group.visible) continue; const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
+  if (best) {
+    // A chase cat that tired out mid-conversation: a fresh press scans it,
+    // instead of just cycling to its second line and never collecting.
+    if (talking === best && best.role === 'cat' && best.chase && best.tired && !clues.has(best.clue)) talkTo(best);
+    else if (talking === best) { lineIdx++; showLine(); } else talkTo(best);
+  }
   else if (talking) endTalk();
   else {
     // Near exit?
@@ -308,21 +382,44 @@ function animate() {
     if (mixer) { mixer.update(dt); if (!talking) playClip(ml > 0.1 ? 'walk' : 'idle'); }
     // Prompt / exit proximity
     let best = null, bd = 3.2;
-    for (const n of NPCS) { const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
+    for (const n of NPCS) { if (!n.group.visible) continue; const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
     const prompt = document.getElementById('prompt');
-    if (prompt && best) { prompt.textContent = (best.role === 'cat' ? 'Scan ' + best.name + '\'s collar tag' : 'Talk to ' + best.name) + ' — press E / USE'; prompt.style.display = 'block'; }
-    else if (prompt && Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
-      prompt.textContent = contactFound ? 'North exit open — press E / USE to leave' : 'North exit is locked — find Rochelle first (gather 3 clues)';
-      prompt.style.display = 'block';
+    // The prompt element was removed with the HUD text, so prompt is null:
+    // only end a conversation when nobody is nearby, not on every frame.
+    // (Without this, dialogue closed one frame after opening.)
+    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.chase && !best.tired ? 'Chase ' + best.name : 'Scan ' + best.name + '\'s collar tag') : 'Talk to ' + best.name) + ' — press E / USE'; prompt.style.display = 'block'; } }
+    else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
+      if (prompt) { prompt.textContent = contactFound ? 'North exit open — press E / USE to leave' : 'North exit is locked — find Rochelle first (gather 3 clues)'; prompt.style.display = 'block'; }
     } else { if (prompt) prompt.style.display = 'none'; if (talking) endTalk(); }
     // NPC wander + sway
     for (const n of NPCS) {
       if (n === talking) continue;
+      if (!n.group.visible) continue; // hidden Margo: not in the hall yet
+      if (n.role === 'donald') {
+        // Stumble walk: slow, wobbling, and every so often he falls down
+        // flat for a couple of seconds, drink still in hand, then gets up.
+        if (n.falling > 0) { n.falling -= dt; n.group.rotation.x = -1.35; if (n.falling <= 0) { n.group.rotation.x = 0; n.fallTimer = 14 + Math.random() * 14; } continue; }
+        n.fallTimer -= dt; if (n.fallTimer <= 0) { n.falling = 2.2; continue; }
+        n.group.rotation.z = Math.sin(t * 3 + n.phase) * 0.12;
+        n.group.position.y = Math.abs(Math.sin(t * 2 + n.phase)) * 0.04;
+        if (n.pause > 0) { n.pause -= dt; continue; }
+        const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
+        if (d < 0.3) { n.wp = (n.wp + 1) % n.wps.length; n.pause = 1 + Math.random() * 2; }
+        else { const sp = 0.7 + 0.3 * Math.sin(t * 1.7 + n.phase); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); }
+        continue;
+      }
+      if (n.role === 'cat' && n.hiding) continue; // Margo stays put in her hiding place
+      if (n.role === 'cat' && n.tired) continue; // tired chase cat sits still, ready to scan
       n.group.position.y = Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
       if (n.pause > 0) { n.pause -= dt; continue; }
+      // Getting close to an untired chase cat spooks it into running.
+      if (n.role === 'cat' && n.chase && !n.tired && !n.fleeing && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }
       const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
-      if (d < 0.3) { n.wp = (n.wp + 1) % n.wps.length; n.pause = n.shy ? 6 + Math.random() * 4 : 2 + Math.random() * 3; }
-      else { const sp = n.shy ? 0.5 : 0.8; n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); }
+      if (d < 0.3) {
+        if (n.fleeing) { n.fleeing = false; n.pause = 1.5; }
+        else { n.wp = (n.wp + 1) % n.wps.length; n.pause = n.shy ? 6 + Math.random() * 4 : 2 + Math.random() * 3; }
+      }
+      else { const sp = n.fleeing ? 2.6 : (n.shy ? 0.5 : 0.8); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); }
     }
   }
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
