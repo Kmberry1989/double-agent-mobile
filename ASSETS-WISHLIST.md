@@ -90,6 +90,18 @@ Environment surfaces only, genuinely absent from `assets/textures/` (checked —
 - Ambient
 - Stealth / alert music loops
 
+## Audio — ballroom cinematic (added 2026-11-01, Rochelle photographer scene, all Still missing)
+
+- Ballroom waltz song — piano / drums / bass trio, distance-based volume, the particular song everyone dances to for the Moxie photo window (original waltz, no named track, no vocals)
+- Piano crash — Mabel runs across the piano keys, song stops dead
+- Camera shutter click — each collar photo
+- Cat treat eating and purr — cat still while eating, photo window
+- Cat running paws — Mabel / Margo darting across the floor and out to the yard
+- Drink spill and light tumble thud — Donald spills his drink on the dance floor and falls
+- Ballroom crowd murmur and bar drinks clinking — guests dancing, then getting drinks when the music stops, then checking on Donald
+- Yard ambience — quiet outside the ballroom for the Margo photo
+- Door unlock chime — passcode moon, note, rose accepted on the north door
+
 ## Ballroom mission
 
 The ballroom mission (`ballroom.html`) currently uses procedural placeholders for these — the real assets it still needs are:
