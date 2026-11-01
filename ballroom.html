@@ -196,25 +196,45 @@ gltfLoader.load('assets/models/ballroom_chair.glb', (gltf)=>{
 }, undefined, ()=>{});
 colliders.push({ x: 17.5, z: 6, r: 2.6 });
 
-// ---- Player (Agent_Kyle, unarmed — no weapon is ever attached) ----
+// ---- ActionForge characters: real GLB models + baked clips ----
+// The 6 ActionForge GLBs share one 71-joint skeleton, so one set of baked
+// clips (Mixamo idle/walk/talk/wave retargeted in Blender, world-space
+// delta method, in-place, scale 1.667) drives all of them. The baked GLBs
+// also contain the original Mixamo action — only the *_af clip is used.
+// If a model GLB fails, its capsule stays; if a clip fails, that character
+// just stands in its rest pose — nothing disappears.
+const afClips = {};
+[['idle', 'Standing_Idle_af'], ['walk', 'Walking_af'], ['talk', 'Talking_af'], ['wave', 'Waving_af']].forEach(([key, file]) => {
+  gltfLoader.load('assets/animations_af/' + file + '.glb', (g) => {
+    const c = g.animations.find(a => a.name.endsWith('_af'));
+    if (c) afClips[key] = c;
+  }, undefined, () => {});
+});
+function fitCharacter(obj, height) {
+  obj.traverse((o)=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  let bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
+  if (!size.y) return;
+  obj.scale.setScalar(height / size.y);
+  bb = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); bb.getCenter(c);
+  obj.position.set(-c.x, -bb.min.y, -c.z);
+}
+function playCharClip(char, key) {
+  if (!char.mixer || !afClips[key]) return;
+  const act = char.mixer.clipAction(afClips[key]);
+  if (char._cur === act && act.isRunning()) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset().fadeIn(0.15).play(); char._cur = act;
+}
+// ---- Player (Kyle_tux, unarmed — no weapon is ever attached) ----
 const player = new THREE.Group(); player.position.set(0, 0, 12); scene.add(player);
 let playerModel = null, mixer = null;
-const clips = {};
 const fbxLoader = new FBXLoader();
-fbxLoader.load('assets/Agent_Kyle.fbx', (obj) => {
-  const bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
-  const s = 1.8 / Math.max(size.y, 0.01); obj.scale.setScalar(s);
-  obj.rotation.y = Math.PI; player.add(obj); playerModel = obj;
-  mixer = new THREE.AnimationMixer(obj);
-  [['idle', 'Standing_Idle'], ['walk', 'Walking'], ['talk', 'Talking'], ['wave', 'Waving']].forEach(([key, file]) => {
-    fbxLoader.load('assets/animations/' + file + '.fbx', (a) => {
-      if (a.animations && a.animations[0]) {
-        const c = a.animations[0];
-        c.tracks = c.tracks.filter(t => !t.name.endsWith('.position') || t.name.toLowerCase().includes('hips'));
-        clips[key] = c;
-      }
-    }, undefined, () => {});
-  });
+gltfLoader.load('assets/models/Kyle_tux.glb', (gltf) => {
+  const obj = gltf.scene;
+  fitCharacter(obj, 1.8);
+  obj.rotation.y = Math.PI; // same facing convention as the old FBX player
+  player.add(obj); playerModel = obj;
+  mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
 }, undefined, () => {
   // Capsule fallback, still unarmed
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
@@ -223,10 +243,11 @@ fbxLoader.load('assets/Agent_Kyle.fbx', (obj) => {
   head.position.y = 1.95; player.add(head); playerModel = body;
 });
 function playClip(key) {
-  if (!mixer || !clips[key]) return;
-  const act = mixer.clipAction(clips[key]);
-  if (mixer._cur && mixer._cur !== act) mixer._cur.fadeOut(0.15);
-  act.reset().fadeIn(0.15).play(); mixer._cur = act;
+  // Player uses the shared baked clips; the guard in playCharClip stops a
+  // running clip being reset every frame (that would freeze walk/idle).
+  if (!player.mixer) return;
+  playCharClip(player, key);
+  mixer = player.mixer;
 }
 
 // ---- NPCs: original names/lines, friendly only ----
@@ -242,23 +263,36 @@ function makeGuest(npc) {
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 1.05, 4, 12), new THREE.MeshStandardMaterial({ color: npc.color }));
   body.position.y = 1.0; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), new THREE.MeshStandardMaterial({ color: npc.skin }));
-  head.position.y = 1.92; g.add(head);
+  head.position.y = 1.92; g.add(head); npc.capsuleParts = [body, head];
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(npc.name), transparent: true }));
   sp.scale.set(2.2, 0.42, 1); sp.position.y = 2.45; g.add(sp);
   g.position.set(npc.x, 0, npc.z); scene.add(g);
   npc.group = g; npc.phase = Math.random() * 6.28; npc.wp = 0; npc.pause = 0;
   return npc;
 }
+// Real ActionForge model for a guest/contact: fits to 1.8 m, feet on the
+// floor, facing +Z (ActionForge left hand is +X, so no PI turn is needed,
+// unlike the old FBX Donald). Capsule + head hide on success only.
+function loadGuestModel(npc, path) {
+  gltfLoader.load(path, (gltf) => {
+    const obj = gltf.scene;
+    fitCharacter(obj, 1.8);
+    npc.group.add(obj); npc.model = obj;
+    npc.mixer = new THREE.AnimationMixer(obj); npc._cur = null;
+    (npc.capsuleParts || []).forEach((m)=>{ m.visible = false; });
+    if (npc.role === 'donald' && npc.glass) npc.glass.position.set(-0.55, 1.35, 0.1);
+  }, undefined, () => {});
+}
 const NPCS = [
-  makeGuest({ name: 'Rochelle', role: 'contact', color: 0x0e5a3a, skin: 0xe8b48a, x: 15, z: 6, wps: [[15, 6], [12, 4], [16, 2]], lines: ['You found me. So — do you know the three words?', 'Come back when you have all three. The cats carry them on their collars.'] }),
-  makeGuest({ name: 'Vickie', role: 'flavour', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Rochelle is near the bar, in green. She is the one to find.'] }),
-  makeGuest({ name: 'Eric', role: 'flavour', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
-  makeGuest({ name: 'Kristen', role: 'flavour', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'If you are looking for Rochelle, try by the bar.'] }),
+  makeGuest({ name: 'Rochelle', role: 'contact', model: 'assets/models/Rochelle_gown.glb', color: 0x0e5a3a, skin: 0xe8b48a, x: 15, z: 6, wps: [[15, 6], [12, 4], [16, 2]], lines: ['You found me. So — do you know the three words?', 'Come back when you have all three. The cats carry them on their collars.'] }),
+  makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/models/Vickie_gown.glb', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Rochelle is near the bar, in green. She is the one to find.'] }),
+  makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/models/Eric_tux.glb', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
+  makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/models/Kristen_gown.glb', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'If you are looking for Rochelle, try by the bar.'] }),
 ];
 // ---- Donald: always has a drink in hand, stumbles, falls over at times ----
 // He is friendly flavour only — talking to him never gives or blocks a clue.
 // His spill (see the puddle below) is what the wet paw trail leads from.
-const donald = makeGuest({ name: 'Donald', role: 'donald', color: 0x4a3a1a, skin: 0xe8b48a, x: 10, z: 4, wps: [[10, 4], [6, 6], [12, 8], [8, 2], [14, 5]], lines: [
+const donald = makeGuest({ name: 'Donald', role: 'donald', model: 'assets/models/Donald_tux.glb', color: 0x4a3a1a, skin: 0xe8b48a, x: 10, z: 4, wps: [[10, 4], [6, 6], [12, 8], [8, 2], [14, 5]], lines: [
   'The chandeliers are listening, I swear it. They blinked at me.',
   'I once danced with a lamp. Lovely lamp. Terrible dancer.',
   'A cat — a cat tried to steal my drink! Whiskers and all, reaching for my glass!',
@@ -270,23 +304,11 @@ const donald = makeGuest({ name: 'Donald', role: 'donald', color: 0x4a3a1a, skin
   const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0xd98a2a, transparent: true, opacity: 0.9 }));
   glass.position.set(0.48, 1.28, 0.15); donald.group.add(glass); donald.glass = glass;
 }
-// Donald's real model, from the file Kyle sent (assets/Donald_tux.fbx):
-// a static Tripo mesh, no skeleton, so it is posed by the group itself —
-// stumble, sway and fall all move the whole model, exactly like the
-// capsule did. If the file fails to load, the capsule above stays.
-fbxLoader.load('assets/Donald_tux.fbx', (obj) => {
-  [...donald.group.children].forEach(ch => { if (ch !== donald.glass && ch.type !== 'Sprite') donald.group.remove(ch); });
-  const holder = new THREE.Group(); holder.add(obj);
-  let bb = new THREE.Box3().setFromObject(holder); const size = new THREE.Vector3(); bb.getSize(size);
-  if (size.z > size.y * 1.5) obj.rotation.x = -Math.PI / 2; // Z-up Blender export: lay it upright
-  bb = new THREE.Box3().setFromObject(holder); bb.getSize(size);
-  holder.scale.setScalar(1.8 / Math.max(size.y, 0.01));
-  bb = new THREE.Box3().setFromObject(holder); holder.position.y = -bb.min.y; // feet on the floor
-  holder.rotation.y = Math.PI; // Agent_Kyle facing convention
-  donald.group.add(holder);
-}, undefined, () => {});
+// Donald's model is now the ActionForge GLB (see loadGuestModel above);
+// the old static Donald_tux.fbx load is removed — it would strip the GLB.
 donald.fallTimer = 12 + Math.random() * 10; donald.falling = 0;
 NPCS.push(donald);
+NPCS.forEach((n)=>{ if (n.model) loadGuestModel(n, n.model); });
 // Donald's spill puddle, already on the floor when you arrive. Margo's
 // wet paw trail runs from this puddle to wherever she is hiding.
 const puddle = new THREE.Mesh(new THREE.CircleGeometry(0.85, 24), new THREE.MeshStandardMaterial({ color: 0x2a3a44, transparent: true, opacity: 0.6, roughness: 0.1 }));
@@ -444,6 +466,7 @@ function showLine() {
   document.getElementById('dlgLine').textContent = line;
   document.getElementById('dialog').style.display = 'block';
   playClip('talk');
+  if (talking.mixer) playCharClip(talking, 'talk');
 }
 function endTalk() { talking = null; document.getElementById('dialog').style.display = 'none'; }
 
@@ -529,6 +552,14 @@ function animate() {
     }
     player.rotation.y = yaw;
     if (mixer) { mixer.update(dt); if (!talking) playClip(ml > 0.1 ? 'walk' : 'idle'); }
+    // Guest/contact bone animation: talk while talking, walk while moving, else idle.
+    for (const n of NPCS) {
+      if (!n.mixer || n.role === 'cat') continue;
+      n.mixer.update(dt);
+      if (talking === n) playCharClip(n, 'talk');
+      else if (n.moving) playCharClip(n, 'walk');
+      else playCharClip(n, 'idle');
+    }
     // Prompt / exit proximity
     let best = null, bd = 3.2;
     for (const n of NPCS) { if (!n.group.visible) continue; const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
@@ -547,14 +578,14 @@ function animate() {
       if (n.role === 'donald') {
         // Stumble walk: slow, wobbling, and every so often he falls down
         // flat for a couple of seconds, drink still in hand, then gets up.
-        if (n.falling > 0) { n.falling -= dt; n.group.rotation.x = -1.35; if (n.falling <= 0) { n.group.rotation.x = 0; n.fallTimer = 14 + Math.random() * 14; } continue; }
+        if (n.falling > 0) { n.falling -= dt; n.moving = false; n.group.rotation.x = -1.35; if (n.falling <= 0) { n.group.rotation.x = 0; n.fallTimer = 14 + Math.random() * 14; } continue; }
         n.fallTimer -= dt; if (n.fallTimer <= 0) { n.falling = 2.2; continue; }
         n.group.rotation.z = Math.sin(t * 3 + n.phase) * 0.12;
         n.group.position.y = Math.abs(Math.sin(t * 2 + n.phase)) * 0.04;
-        if (n.pause > 0) { n.pause -= dt; continue; }
+        if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
         const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
-        if (d < 0.3) { n.wp = (n.wp + 1) % n.wps.length; n.pause = 1 + Math.random() * 2; }
-        else { const sp = 0.7 + 0.3 * Math.sin(t * 1.7 + n.phase); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); }
+        if (d < 0.3) { n.wp = (n.wp + 1) % n.wps.length; n.pause = 1 + Math.random() * 2; n.moving = false; }
+        else { const sp = 0.7 + 0.3 * Math.sin(t * 1.7 + n.phase); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); n.moving = true; }
         continue;
       }
       if (n.role === 'cat' && n.hiding) {
@@ -570,15 +601,16 @@ function animate() {
         continue;
       }
       n.group.position.y = Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
-      if (n.pause > 0) { n.pause -= dt; continue; }
+      if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
       // Getting close to an unfed chase cat spooks it into running.
       if (n.role === 'cat' && n.chase && !n.fed && !n.fleeing && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }
       const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
       if (d < 0.3) {
+        n.moving = false;
         if (n.fleeing) { n.fleeing = false; n.pause = 1.5; }
         else { n.wp = (n.wp + 1) % n.wps.length; n.pause = n.shy ? 6 + Math.random() * 4 : 2 + Math.random() * 3; }
       }
-      else { const sp = n.fleeing ? 2.6 : (n.shy ? 0.5 : 0.8); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); }
+      else { const sp = n.fleeing ? 2.6 : (n.shy ? 0.5 : 0.8); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); n.moving = true; }
     }
   }
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
