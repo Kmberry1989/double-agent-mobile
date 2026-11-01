@@ -454,14 +454,14 @@ function box(x,z,w,d,h,color,y,opts){
     material: opts.material || 'concrete', destructible: !!opts.destructible, hp: opts.hp || 0, maxHp: opts.hp || 0, baseColor: color, textured: !!opts.texture };
   obstacles.push(o); losMeshes.push(m); return o;
 }
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(90,90), texturedMat(0x6f7d5a, 'assets/textures/concrete-slabs.jpg', 12, 12));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(90,90), texturedMat(0x6f7d5a, 'assets/textures/ground_concrete_slab_1024.webp', 12, 12));
 ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 // Perimeter + courtyard structures. Coordinates are in metres, centre is (0,0).
-box(0,-42,90,2,4,0x555a55,undefined,{texture:'assets/textures/corrugated-metal.jpg',texRepeat:[12,1]}); box(0,42,90,2,4,0x555a55,undefined,{texture:'assets/textures/corrugated-metal.jpg',texRepeat:[12,1]}); box(-42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/corrugated-metal.jpg',texRepeat:[12,1]}); box(42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/corrugated-metal.jpg',texRepeat:[12,1]});
-box(-20,-18,14,2,3,0x8a7a5a,undefined,{texture:'assets/textures/brick.jpg',texRepeat:[3,1]}); box(18,-12,2,16,3,0x8a7a5a,undefined,{texture:'assets/textures/brick.jpg',texRepeat:[3,1]}); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/sandbags-1.jpg',texRepeat:[5,1]});
-box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/sandbags-2.jpg',texRepeat:[5,1]}); box(-28,24,2,12,3,0x8a7a5a,undefined,{texture:'assets/textures/brick.jpg',texRepeat:[3,1]}); box(8,-26,18,2,3,0x777777,undefined,{texture:'assets/textures/brick.jpg',texRepeat:[4,1]});
-box(-14,0,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-1.jpg',texRepeat:[1,1]}); box(-10,2,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-2.jpg',texRepeat:[1,1]}); box(12,6,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-1.jpg',texRepeat:[1,1]});
-box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-2.jpg',texRepeat:[1,1]}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/wood-planks-1.jpg',texRepeat:[1,1]}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-blue.jpg',texRepeat:[2,1]});
+box(0,-42,90,2,4,0x555a55,undefined,{texture:'assets/textures/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(0,42,90,2,4,0x555a55,undefined,{texture:'assets/textures/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(-42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]});
+box(-20,-18,14,2,3,0x8a7a5a,undefined,{texture:'assets/textures/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(18,-12,2,16,3,0x8a7a5a,undefined,{texture:'assets/textures/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/prop_sandbag_wall_hessian_1024.webp',texRepeat:[5,1]});
+box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/prop_sandbag_wall_sagging_spill_1024.webp',texRepeat:[5,1]}); box(-28,24,2,12,3,0x8a7a5a,undefined,{texture:'assets/textures/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(8,-26,18,2,3,0x777777,undefined,{texture:'assets/textures/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[4,1]});
+box(-14,0,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(-10,2,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(12,6,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]});
+box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-blue.jpg',texRepeat:[2,1]});
 box(-32,8,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-red.jpg',texRepeat:[2,1]}); box(34,28,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-olive.jpg',texRepeat:[2,1]});
 // SILENT START: a walled alcove in the southwest corner. The player spawns here,
 // alone — no guard patrol waypoint and no security camera is within 30 m of it.
@@ -551,15 +551,25 @@ const filing = box(8, -29, 0.8, 0.5, 1.2, 0x777777, undefined, { material: 'meta
 addGLBToObstacle(filing, 'assets/models/filing_cabinet.glb', 0.8, 1.2, 0.5);
 // Visual-only ground patches (no collision, no LOS, no shooting — see groundPatch).
 // They sit on open ground, clear of walls, crates, and buildings.
-groundPatch(0, 36, 40, 3, 0x8a7a5a, 'assets/textures/dirt-path.jpg', 10, 1);      // south dirt path
-groundPatch(31, -32, 14, 12, 0x6f7d5a, 'assets/textures/grass.jpg', 3, 3);         // NE grass
-groundPatch(-31, -31, 14, 14, 0x8a857a, 'assets/textures/gravel.jpg', 4, 4);       // NW gravel
-groundPatch(8, -14, 16, 12, 0x333333, 'assets/textures/asphalt.jpg', 4, 3);       // central asphalt pad
+groundPatch(0, 36, 40, 3, 0x8a7a5a, 'assets/textures/ground_dirt_path_1024.webp', 10, 1);      // south dirt path
+groundPatch(31, -32, 14, 12, 0x6f7d5a, 'assets/textures/ground_grass_1024.webp', 3, 3);         // NE grass
+groundPatch(-31, -31, 14, 14, 0x8a857a, 'assets/textures/ground_gravel_1024.webp', 4, 4);       // NW gravel
+groundPatch(8, -14, 16, 12, 0x333333, 'assets/textures/ground_asphalt_1024.webp', 4, 3);       // central asphalt pad
 // Vent grille: flat panel on the south face of the blue building (0,-34; face z=-31).
 (function ventPanel(){
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), texturedMat(0x888888, 'assets/textures/vent-grille.jpg', 1, 1));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), texturedMat(0x888888, 'assets/textures/wall_metal_vent_grille_dark_louvre_1024.webp', 1, 1));
   m.position.set(0, 1.5, -30.98); scene.add(m);
 })();
+// Tinted window on the same face, tire marks on the asphalt pad, and two
+// small lights over the new office cluster and the EXFIL gate. The courtyard
+// is already sun-lit, so these are accent lights, not a relight.
+(function courtyardExtras(){
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(3, 2), texturedMat(0x334455, 'assets/textures/facility_window_tinted_smoky_grey_blue_mullions_1024.webp', 1, 1));
+  win.position.set(4, 2, -30.98); scene.add(win);
+  const officeLight = new THREE.PointLight(0xffe6b0, 20, 14); officeLight.position.set(0, 3, -28); scene.add(officeLight);
+  const exfilLight = new THREE.PointLight(0x88ffaa, 20, 14); exfilLight.position.set(38, 3, -38); scene.add(exfilLight);
+})();
+groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground_asphalt_tire_marks_oil_stains_1024.webp', 1, 1);
 // Chain-link fence: see-through panel mounted flush on the east face of the
 // red building (-32,8; face x=-28), so the building behind it already blocks
 // movement. The panel itself is in NO list: it blocks nothing — no movement
