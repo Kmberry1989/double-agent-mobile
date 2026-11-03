@@ -473,10 +473,9 @@ function missionTarget() { return CATS.find(c => c.name === PHOTOS[photoIdx].cat
 // Kyle "Miss me?", Rochelle "I was just getting started without you."
 // Press E / USE to advance each line. After the last line, the camera
 // pans to the south doorway, Donald stumbles through it and falls flat,
-// then the camera pans back to the pair. The cats-mission discussion
-// lines are NOT wired yet — they are presented as options first, then
-// inserted between the Donald beat and the switch. Until then, after
-// the Donald beat, E / USE takes over as Rochelle.
+// then the camera pans back to the pair for the cats-mission discussion
+// (user-picked 2026-11-03, verbatim, cats only — no moon/note/rose code,
+// which the pair do not know yet), then E / USE takes over as Rochelle.
 // Dancing: user-uploaded salsa clips (see SALSA_KEYS below) drive the
 // pair in a close hold, orbiting their midpoint and facing each other.
 // Both dance the same file at the same time, switching files every
@@ -487,7 +486,18 @@ const HANDOFF_LINES = [
   ['Kyle', 'Miss me?'],
   ['Rochelle', 'I was just getting started without you.'],
 ];
-let handoffLineIdx = 0, handoffPhase = 'dialogue', handoffMid = null, handoffPairCam = null;
+let handoffLineIdx = 0, handoffPhase = 'dialogue', handoffMid = null, handoffPairCam = null, handoffDanceT = 0;
+const DISCUSSION_LINES = [
+  ['Kyle', 'Moxie and Mabel both look black and white at a glance.'],
+  ['Rochelle', 'So what gives them away?'],
+  ['Kyle', 'Ears and nose. Moxie is black on black, Mabel has white ears and a pink nose. Margo\'s the gray mottled one.'],
+];
+let discussionIdx = 0;
+function showDiscussionLine() {
+  document.getElementById('dlgName').textContent = DISCUSSION_LINES[discussionIdx][0];
+  document.getElementById('dlgLine').textContent = DISCUSSION_LINES[discussionIdx][1];
+  document.getElementById('dialog').style.display = 'block';
+}
 function showHandoffLine() {
   document.getElementById('dlgName').textContent = HANDOFF_LINES[handoffLineIdx][0];
   document.getElementById('dlgLine').textContent = HANDOFF_LINES[handoffLineIdx][1];
@@ -513,6 +523,10 @@ function advanceHandoffLine() {
     handoffLineIdx++; startDonaldBeat(); return;
   }
   if (handoffPhase === 'donald') return; // Donald beat is timed; E does not skip it
+  if (handoffPhase === 'discussion') {
+    if (discussionIdx < DISCUSSION_LINES.length - 1) { discussionIdx++; showDiscussionLine(); return; }
+    discussionIdx++; handoffPhase = 'done'; updateMissionHUD(); return;
+  }
   if (handoffPhase === 'done') endHandoffCine();
 }
 function startHandoff() {
@@ -523,7 +537,7 @@ function startHandoff() {
   handoffCine = { t: 0, dur: 5, fromPos: camera.position.clone(), fromLook: new THREE.Vector3(player.position.x - Math.sin(yaw) * 3, 1.6, player.position.z - Math.cos(yaw) * 3), toPos: handoffPairCam, toLook: handoffMid.clone() };
   document.getElementById('barTop').style.height = '8vh';
   document.getElementById('barBottom').style.height = '8vh';
-  handoffLineIdx = 0; handoffPhase = 'dialogue'; salsaBucket = -1; showHandoffLine();
+  handoffLineIdx = 0; discussionIdx = 0; handoffPhase = 'dialogue'; handoffDanceT = 0; salsaBucket = -1; showHandoffLine();
   missionStage = 'handoffCine'; updateMissionHUD();
 }
 function endHandoffCine() {
@@ -567,7 +581,7 @@ function updateMissionHUD() {
   else if (cinematic) st.textContent = 'Cinematic — watch the room.';
   else if (windowOpen) st.textContent = 'Photo window open (' + Math.ceil(windowTimer) + 's) — guests are looking away. Treat ' + PHOTOS[photoIdx].cat + ', then photograph her collar.';
   else if (missionStage === 'handoff') st.textContent = 'Walk to Rochelle on the dance floor and press E / USE to rendezvous.';
-  else if (missionStage === 'handoffCine') st.textContent = handoffPhase === 'donald' ? 'Donald stumbles through the doorway…' : handoffPhase === 'done' ? 'Rendezvous done — press E / USE to take over as Rochelle.' : 'Rendezvous — press E / USE to continue the conversation.';
+  else if (missionStage === 'handoffCine') st.textContent = handoffPhase === 'donald' ? 'Donald stumbles through the doorway…' : handoffPhase === 'discussion' ? 'Cats talk — press E / USE to continue.' : handoffPhase === 'done' ? 'Rendezvous done — press E / USE to take over as Rochelle.' : 'Rendezvous — press E / USE to continue the conversation.';
   else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — press E / USE to continue.';
   else st.textContent = 'Next photo chance coming up — ' + PHOTOS[photoIdx].cat + ' (' + PHOTOS[photoIdx].symbol + ').';
   exitDoor.material.color.set(photos.length === 3 ? 0x2e7d32 : 0x7a2020);
@@ -788,7 +802,7 @@ function animate() {
     if (handoffPhase === 'donald' && handoffCine.t >= handoffCine.dur) {
       // Donald beat done: he falls flat in the hall, camera pans back.
       donald.falling = 2.2; donald.group.position.set(0, 0, 8);
-      handoffPhase = 'done';
+      handoffPhase = 'discussion'; discussionIdx = 0; showDiscussionLine();
       handoffCine.fromPos = camera.position.clone(); handoffCine.fromLook = new THREE.Vector3(0, 1.2, 12.5);
       handoffCine.toPos = handoffPairCam; handoffCine.toLook = handoffMid.clone();
       handoffCine.t = 0; handoffCine.dur = 2; updateMissionHUD();
@@ -899,7 +913,7 @@ function animate() {
       else { const sp = n.fleeing ? 2.6 : (n.shy ? 0.5 : 0.8); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); n.moving = true; }
     }
   }
-  if (handoffCine && handoffPhase === 'dialogue' && handoffMid) {
+  if (handoffCine && (handoffPhase === 'dialogue' || handoffPhase === 'discussion') && handoffMid) {
     // Salsa dance in a close hold: the pair orbit their midpoint,
     // facing each other, on the salsa clips. Each time the orbit angle
     // changes by 60 degrees, the salsa file switches to the next one
@@ -907,7 +921,7 @@ function animate() {
     // file has not loaded yet, the previous clip keeps running.
     // Both partners dance the same file at the same time — this is a
     // synchronized single-person salsa clip, not a lead/follow pair.
-    const ang = handoffCine.t * 0.35, r = 0.6;
+    handoffDanceT += dt; const ang = handoffDanceT * 0.35, r = 0.6;
     player.position.set(handoffMid.x + Math.cos(ang) * r, 0, handoffMid.z + Math.sin(ang) * r);
     rochelleNPC.group.position.set(handoffMid.x - Math.cos(ang) * r, 0, handoffMid.z - Math.sin(ang) * r);
     player.rotation.y = Math.atan2(rochelleNPC.group.position.x - player.position.x, rochelleNPC.group.position.z - player.position.z);
