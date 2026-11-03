@@ -274,6 +274,29 @@ const SALSA_KEYS = ['salsa1', 'salsa4', 'salsa5', 'salsa6', 'salsa7'];
   }, undefined, () => {});
 });
 let salsaBucket = -1;
+// Rumba, user-uploaded 2026-11-03, verified on disk: animation-only
+// Mixamo, 338,992 B, 2.37 s, 34 bones (same set as the salsa clips),
+// hips travel tiny (-0.08..0.09, -0.01..0.02) — essentially in place.
+// This is the pair's talking dance; the salsa files are now solo cuts.
+fbxLoader.load('assets/animations/Rumba_Dancing.fbx', (obj) => {
+  const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+  if (raw) mxClips['rumba'] = stripRootTravel(raw);
+}, undefined, () => {});
+// Solo cutaways: short solo salsa shots, alternating characters, shown
+// between dialogue lines (every 2nd line advance, not every line).
+// E / USE during a cut skips it and shows the next line.
+let cutaway = null, cutawayCount = 0, cutawaySalsaIdx = 0, cutawayNext = null, cutawayChar = 'kyle';
+function startCutaway(nextFn) {
+  cutawayNext = nextFn;
+  const salsaKey = SALSA_KEYS[cutawaySalsaIdx % SALSA_KEYS.length]; cutawaySalsaIdx++;
+  const who = cutawayChar; cutawayChar = (who === 'kyle') ? 'rochelle' : 'kyle';
+  cutaway = { t: 0, dur: 2.5, who, salsaKey };
+  document.getElementById('dialog').style.display = 'none';
+}
+function endCutaway() {
+  const fn = cutawayNext; cutaway = null; cutawayNext = null;
+  if (fn) fn();
+}
 function playMxCharClip(char, key) {
   if (!char.mixer || !mxClips[key]) return;
   const act = char.mixer.clipAction(mxClips[key]);
@@ -490,7 +513,7 @@ let handoffLineIdx = 0, handoffPhase = 'dialogue', handoffMid = null, handoffPai
 const DISCUSSION_LINES = [
   ['Kyle', 'Moxie and Mabel both look black and white at a glance.'],
   ['Rochelle', 'So what gives them away?'],
-  ['Kyle', 'Ears and nose. Moxie is black on black, Mabel has white ears and a pink nose. Margo\'s the gray mottled one.'],
+  ['Kyle', 'Ears and nose. Moxie is black on black, Mabel has white ears and a pink nose. Margo\'s the gray mottled one, and Margo likes to hide.'],
 ];
 let discussionIdx = 0;
 function showDiscussionLine() {
@@ -518,13 +541,24 @@ function startDonaldBeat() {
 }
 function advanceHandoffLine() {
   if (!handoffCine) return;
+  if (cutaway) { endCutaway(); return; } // E skips the solo cut
   if (handoffPhase === 'dialogue') {
-    if (handoffLineIdx < HANDOFF_LINES.length - 1) { handoffLineIdx++; showHandoffLine(); return; }
+    if (handoffLineIdx < HANDOFF_LINES.length - 1) {
+      const next = () => { handoffLineIdx++; showHandoffLine(); };
+      cutawayCount++;
+      if (cutawayCount % 2 === 0) startCutaway(next); else next();
+      return;
+    }
     handoffLineIdx++; startDonaldBeat(); return;
   }
   if (handoffPhase === 'donald') return; // Donald beat is timed; E does not skip it
   if (handoffPhase === 'discussion') {
-    if (discussionIdx < DISCUSSION_LINES.length - 1) { discussionIdx++; showDiscussionLine(); return; }
+    if (discussionIdx < DISCUSSION_LINES.length - 1) {
+      const next = () => { discussionIdx++; showDiscussionLine(); };
+      cutawayCount++;
+      if (cutawayCount % 2 === 0) startCutaway(next); else next();
+      return;
+    }
     discussionIdx++; handoffPhase = 'done'; updateMissionHUD(); return;
   }
   if (handoffPhase === 'done') endHandoffCine();
@@ -537,7 +571,7 @@ function startHandoff() {
   handoffCine = { t: 0, dur: 5, fromPos: camera.position.clone(), fromLook: new THREE.Vector3(player.position.x - Math.sin(yaw) * 3, 1.6, player.position.z - Math.cos(yaw) * 3), toPos: handoffPairCam, toLook: handoffMid.clone() };
   document.getElementById('barTop').style.height = '8vh';
   document.getElementById('barBottom').style.height = '8vh';
-  handoffLineIdx = 0; discussionIdx = 0; handoffPhase = 'dialogue'; handoffDanceT = 0; salsaBucket = -1; showHandoffLine();
+  handoffLineIdx = 0; discussionIdx = 0; handoffPhase = 'dialogue'; handoffDanceT = 0; salsaBucket = -1; cutaway = null; cutawayCount = 0; cutawaySalsaIdx = 0; cutawayChar = 'kyle'; showHandoffLine();
   missionStage = 'handoffCine'; updateMissionHUD();
 }
 function endHandoffCine() {
@@ -914,26 +948,29 @@ function animate() {
     }
   }
   if (handoffCine && (handoffPhase === 'dialogue' || handoffPhase === 'discussion') && handoffMid) {
-    // Salsa dance in a close hold: the pair orbit their midpoint,
-    // facing each other, on the salsa clips. Each time the orbit angle
-    // changes by 60 degrees, the salsa file switches to the next one
-    // in SALSA_KEYS (crossfaded 0.15 s by playMxCharClip). If a salsa
-    // file has not loaded yet, the previous clip keeps running.
-    // Both partners dance the same file at the same time — this is a
-    // synchronized single-person salsa clip, not a lead/follow pair.
-    handoffDanceT += dt; const ang = handoffDanceT * 0.35, r = 0.6;
-    player.position.set(handoffMid.x + Math.cos(ang) * r, 0, handoffMid.z + Math.sin(ang) * r);
-    rochelleNPC.group.position.set(handoffMid.x - Math.cos(ang) * r, 0, handoffMid.z - Math.sin(ang) * r);
-    player.rotation.y = Math.atan2(rochelleNPC.group.position.x - player.position.x, rochelleNPC.group.position.z - player.position.z);
-    rochelleNPC.group.rotation.y = Math.atan2(player.position.x - rochelleNPC.group.position.x, player.position.z - rochelleNPC.group.position.z);
-    const bucket = Math.floor(ang / (Math.PI / 3));
-    if (bucket !== salsaBucket) {
-      salsaBucket = bucket;
-      const salsaKey = SALSA_KEYS[((bucket % SALSA_KEYS.length) + SALSA_KEYS.length) % SALSA_KEYS.length];
-      if (mxClips[salsaKey]) { playClip(salsaKey); playMxCharClip(rochelleNPC, salsaKey); }
+    if (cutaway) {
+      // Solo cut: the orbit pauses, the camera (below) frames one
+      // character alone doing a salsa clip for 2.5 s, then the next
+      // dialogue line shows. The other character keeps the Rumba.
+      cutaway.t += dt;
+      if (cutaway.who === 'kyle') { if (mxClips[cutaway.salsaKey]) playClip(cutaway.salsaKey); if (mxClips['rumba']) playMxCharClip(rochelleNPC, 'rumba'); }
+      else { if (mxClips[cutaway.salsaKey]) playMxCharClip(rochelleNPC, cutaway.salsaKey); if (mxClips['rumba']) playClip('rumba'); }
+      if (mixer) mixer.update(dt);
+      if (rochelleNPC.mixer) rochelleNPC.mixer.update(dt);
+      if (cutaway.t >= cutaway.dur) endCutaway();
+    } else {
+      // Talking dance in a close hold: the pair orbit their midpoint,
+      // facing each other, on the Rumba clip (looping 2.37 s). If it
+      // has not loaded yet, the previous clip keeps running.
+      handoffDanceT += dt; const ang = handoffDanceT * 0.35, r = 0.6;
+      player.position.set(handoffMid.x + Math.cos(ang) * r, 0, handoffMid.z + Math.sin(ang) * r);
+      rochelleNPC.group.position.set(handoffMid.x - Math.cos(ang) * r, 0, handoffMid.z - Math.sin(ang) * r);
+      player.rotation.y = Math.atan2(rochelleNPC.group.position.x - player.position.x, rochelleNPC.group.position.z - player.position.z);
+      rochelleNPC.group.rotation.y = Math.atan2(player.position.x - rochelleNPC.group.position.x, player.position.z - rochelleNPC.group.position.z);
+      if (mxClips['rumba']) { playClip('rumba'); playMxCharClip(rochelleNPC, 'rumba'); }
+      if (mixer) mixer.update(dt);
+      if (rochelleNPC.mixer) rochelleNPC.mixer.update(dt);
     }
-    if (mixer) mixer.update(dt);
-    if (rochelleNPC.mixer) rochelleNPC.mixer.update(dt);
   }
   if (handoffCine && handoffPhase === 'donald') {
     // Donald stumbles in from the doorway: slow wobbling walk north,
@@ -956,6 +993,14 @@ function animate() {
     else k = 1; // hold on the pair until E takes over as Rochelle
     camera.position.lerpVectors(c.fromPos, c.toPos, k);
     camera.lookAt(new THREE.Vector3().lerpVectors(c.fromLook, c.toLook, k));
+    if (cutaway) {
+      // Frame the solo dancer alone, in front of them.
+      const soloPos = cutaway.who === 'kyle' ? player.position : rochelleNPC.group.position;
+      const soloYaw = cutaway.who === 'kyle' ? player.rotation.y : rochelleNPC.group.rotation.y;
+      const fx = Math.sin(soloYaw), fz = Math.cos(soloYaw);
+      camera.position.set(soloPos.x + fx * 2.2, 1.9, soloPos.z + fz * 2.2);
+      camera.lookAt(soloPos.x, 1.4, soloPos.z);
+    }
   }
   if (cinematic) {
     const c = cinematic, ph = Math.min(c.t / c.dur, 1);
