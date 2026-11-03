@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Double Agent — Rochelle's Photo Mission</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#1a120b;font-family:system-ui,sans-serif;color:#fff;touch-action:none}
+  canvas{display:block}
+  #hud{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5}
+  #hud b{color:#ffd97a}
+  #prompt{position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);padding:8px 14px;border-radius:20px;font-size:14px;display:none;z-index:5}
+  #dialog{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);width:min(560px,92vw);background:rgba(20,14,8,.92);border:1px solid #8a6b3a;border-radius:12px;padding:14px 16px;display:none;z-index:6}
+  #dialog .name{color:#ffd97a;font-weight:700;margin-bottom:4px}
+  #dialog .line{font-size:16px;line-height:1.45}
+  #dialog .hint{font-size:12px;color:#bbb;margin-top:8px}
+  #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
+  #win{display:none}
+  button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
+  #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5}
+  #knob{position:absolute;left:37px;top:37px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.45)}
+  #useBtn{position:fixed;right:18px;bottom:90px;width:76px;height:76px;border-radius:50%;background:#c9a227;color:#111;font-weight:800;font-size:15px;display:none;z-index:5;border:0}
+  body.touch #joy,body.touch #useBtn{display:block}
+  a{color:#ffd97a}
+  #mission{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5;max-width:min(480px,92vw)}
+  #mission b{color:#ffd97a}
+  #barTop,#barBottom{position:fixed;left:0;right:0;height:0;background:#000;z-index:9;transition:height .6s}
+  #barTop{top:0} #barBottom{bottom:0}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div></div>
+<div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span><div id="missionStatus">Kyle is on your earpiece.</div></div>
+<div id="barTop"></div><div id="barBottom"></div>
+<div id="overlay"><h1>Rochelle's Photo Mission</h1><p>Photographer first, agent second. Kyle is on your earpiece.</p><button id="startBtn">Enter as Rochelle</button><p><a href="ballroom.html">Back to the Kyle-player ballroom</a></p></div>
+<div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
+<div id="joy"><div id="knob"></div></div>
+<button id="useBtn">USE</button>
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const gltfLoader = new GLTFLoader();
+// GLB prop helper: fit a loaded model to target W/H/D (non-uniform, so it
+// matches the footprint it replaces), centre it in a group, and return the
+// group. The caller places the group: base-anchored props sit at y = targetH/2
+// (so the model base is on the floor), centre-anchored props at the centre.
+// If a GLB fails to load, the caller keeps its procedural mesh — nothing
+// disappears, the room just keeps its old look.
+function fitPropGroup(obj, targetW, targetH, targetD){
+  obj.traverse((o)=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  let bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
+  if (!size.x || !size.y || !size.z) return null;
+  obj.scale.set(targetW / size.x, targetH / size.y, targetD / size.z);
+  bb = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); bb.getCenter(c);
+  obj.position.set(-c.x, -c.y, -c.z);
+  const g = new THREE.Group(); g.add(obj); return g;
+}
+function loadProp(path, x, y, z, targetW, targetH, targetD, rotY, hide){
+  gltfLoader.load(path, (gltf)=>{
+    const g = fitPropGroup(gltf.scene, targetW, targetH, targetD); if (!g) return;
+    g.position.set(x, y, z); if (rotY) g.rotation.y = rotY; scene.add(g);
+    (hide || []).forEach((m)=>{ if (m) m.visible = false; });
+  }, undefined, ()=>{ /* keep procedural fallback */ });
+}
+
+const HALL_X = 20, HALL_Z = 14;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x201409);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+scene.add(new THREE.AmbientLight(0xffe6b0, 0.85));
+scene.add(new THREE.HemisphereLight(0xffe6b0, 0x3a2410, 0.6));
+// Ballroom textures (user uploads, assets/textures/): flat colour stays
+// until the texture arrives, and stays forever if it fails to load.
+const texLoader = new THREE.TextureLoader();
+function applyTex(mesh, path, rx, ry){
+  texLoader.load(path, (tex)=>{
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(rx, ry); tex.colorSpace = THREE.SRGBColorSpace;
+    mesh.material.map = tex; mesh.material.color.setHex(0xffffff); mesh.material.needsUpdate = true;
+  }, undefined, ()=>{});
+}
+function applyTexToGroup(group, path){
+  texLoader.load(path, (tex)=>{
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(1, 1); tex.colorSpace = THREE.SRGBColorSpace;
+    group.traverse((o)=>{ if (o.isMesh){ o.material.map = tex; o.material.color.setHex(0xffffff); o.material.needsUpdate = true; } });
+  }, undefined, ()=>{});
+}
+function flatPlane(x, y, z, w, d, color, path, rx, ry, rotX){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color }));
+  m.rotation.x = rotX === undefined ? -Math.PI / 2 : rotX; m.position.set(x, y, z); m.receiveShadow = true; scene.add(m);
+  if (path) applyTex(m, path, rx, ry); return m;
+}
+
+// ---- Ballroom ----
+function box(x, y, z, w, h, d, color) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color }));
+  m.position.set(x, y, z); scene.add(m); return m;
+}
+function cyl(x, y, z, rTop, rBot, h, color) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 24), new THREE.MeshStandardMaterial({ color }));
+  m.position.set(x, y, z); scene.add(m); return m;
+}
+// Floor + dance floor + walls, with the new ballroom textures.
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(HALL_X * 2, HALL_Z * 2), new THREE.MeshStandardMaterial({ color: 0x6b4a26 }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+applyTex(floor, 'assets/textures/ballroom_floor_polished_wood_honey_brown_1024.webp', 8, 6);
+const dance = new THREE.Mesh(new THREE.PlaneGeometry(13, 9), new THREE.MeshStandardMaterial({ color: 0x8a5a2e }));
+dance.rotation.x = -Math.PI / 2; dance.position.set(0, 0.02, -1); scene.add(dance);
+applyTex(dance, 'assets/textures/ballroom_floor_herringbone_marble_border_1024.webp', 1, 1);
+const walls = [
+  box(0, 3, -HALL_Z - 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // north wall
+  box(0, 3, HALL_Z + 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // south wall (entrance side)
+  box(-HALL_X - 0.5, 3, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
+  box(HALL_X + 0.5, 3, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
+];
+walls.forEach((w)=>applyTex(w, 'assets/textures/ballroom_wall_damask_burgundy_gold_1024.webp', 8, 2));
+// Wood wainscoting strip along the lower walls (player clamp is ±19/±13,
+// the strips sit at ±19.9/±13.9, so they are never walked into).
+[[0, -13.9, 40, 0.2], [0, 13.9, 40, 0.2], [-19.9, 0, 0.2, 28], [19.9, 0, 0.2, 28]].forEach(([x, z, w, d])=>{
+  const m = box(x, 0.6, z, w, 1.2, d, 0x3a2410); applyTex(m, 'assets/textures/ballroom_wall_wood_wainscoting_dark_1024.webp', 8, 1);
+});
+// Ceiling (was open) with plaster/moulding, plus curtains on the north wall.
+flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroom_ceiling_plaster_moulding_1024.webp', 6, 4, Math.PI / 2);
+[-12, -4, 4, 12].forEach((x)=>{
+  const c = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 3.5), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
+  c.position.set(x, 2.75, -13.9); scene.add(c); applyTex(c, 'assets/textures/ballroom_curtain_velvet_1024.webp', 1, 1);
+});
+// Carpet runner (entrance to dance floor) and a rug in front of the bar.
+flatPlane(0, 0.03, 7.5, 2.5, 11, 0x7a1a1a, 'assets/textures/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4);
+flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom_rug_medallion_large_1024.webp', 1, 1);
+// Exit door (north) + entrance (south), mahogany.
+const exitDoor = box(0, 1.5, -HALL_Z + 0.1, 3, 3, 0.3, 0x2e7d32);
+applyTex(exitDoor, 'assets/textures/ballroom_door_entrance_mahogany_1024.webp', 1, 1);
+const entranceDoor = box(0, 1.5, HALL_Z - 0.1, 3, 3, 0.3, 0x3a2a18);
+applyTex(entranceDoor, 'assets/textures/ballroom_door_entrance_mahogany_1024.webp', 1, 1);
+// Chandeliers: 6 now (3 north + 3 south, so the entrance side is no longer
+// dark), brighter — point lights 30 -> 80, distance 22 -> 30. Real
+// chandelier GLBs replace the spheres when loaded; lights stay.
+const CHANDELIERS = [[-10, -4], [0, -1], [10, -4], [-10, 8], [0, 10], [10, 8]];
+const chandelierProc = [];
+CHANDELIERS.forEach(([x, z]) => {
+  const s = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.2 }));
+  s.position.set(x, 5.2, z); scene.add(s); chandelierProc.push(s);
+  const l = new THREE.PointLight(0xffc94d, 80, 30); l.position.set(x, 4.8, z); scene.add(l);
+});
+gltfLoader.load('assets/models/ballroom_chandelier.glb', (gltf)=>{
+  CHANDELIERS.forEach(([x, z])=>{
+    const g = fitPropGroup(gltf.scene.clone(), 1.1, 1.4, 1.1); if (!g) return;
+    g.position.set(x, 5.2, z); scene.add(g); applyTexToGroup(g, 'assets/textures/ballroom_chandelier_crystal_glass_1024.webp');
+  });
+  chandelierProc.forEach((m)=>{ m.visible = false; });
+}, undefined, ()=>{});
+// Bar (east wall) — real bar + bar top GLBs replace the boxes when loaded.
+const barProc = [box(17.5, 0.6, 6, 4, 1.2, 1.5, 0x4a2c14), box(17.5, 1.4, 6, 4, 0.15, 1.8, 0x7a4a22)];
+loadProp('assets/models/ballroom_bar.glb', 17.5, 0.55, 6, 4, 1.1, 0.7, 0, [barProc[0]]);
+loadProp('assets/models/ballroom_bar_top.glb', 17.5, 1.15, 6, 4, 0.1, 0.9, 0, [barProc[1]]);
+// Bar counter texture as a thin top surface over the GLB bar top. If the
+// GLB fails, this plane sits inside the procedural bar top box and is hidden.
+flatPlane(17.5, 1.21, 6, 4, 0.9, 0x6a4a2a, 'assets/textures/ballroom_bar_counter_wood_marble_1024.webp', 1, 1);
+// Round tables + chairs (colliders)
+// Real table/chair GLBs replace the procedural ones when loaded; colliders
+// are unchanged, so movement and talk radii do not change. Chairs move in
+// from 2.1 m (for the old 3 m tables) to 1.2 m (for the 1.8 m GLB tables).
+const tables = [[-13, 8], [-13, -9], [13, 9], [-6, 10], [7, -10], [14, -8]];
+const colliders = []; // {x,z,r}
+const tableProc = [], chairProc = [];
+tables.forEach(([x, z]) => {
+  tableProc.push(cyl(x, 0.45, z, 1.5, 1.5, 0.12, 0xf5ead0));
+  tableProc.push(cyl(x, 0.2, z, 0.15, 0.25, 0.4, 0x3a2a18));
+  colliders.push({ x, z, r: 1.9 });
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2 + 0.4;
+    chairProc.push(box(x + Math.cos(a) * 2.1, 0.45, z + Math.sin(a) * 2.1, 0.5, 0.9, 0.5, 0x5a2f22));
+  }
+});
+gltfLoader.load('assets/models/ballroom_table.glb', (gltf)=>{
+  tables.forEach(([x, z])=>{
+    const g = fitPropGroup(gltf.scene.clone(), 1.8, 0.75, 1.8); if (!g) return;
+    g.position.set(x, 0.375, z); scene.add(g);
+    // Linen tablecloth disc on top of the GLB table (top is at 0.75 m).
+    const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.02, 24), new THREE.MeshStandardMaterial({ color: 0xf5ead0 }));
+    cloth.position.set(x, 0.76, z); scene.add(cloth); applyTex(cloth, 'assets/textures/ballroom_tablecloth_linen_cream_1024.webp', 1, 1);
+  });
+  tableProc.forEach((m)=>{ m.visible = false; });
+}, undefined, ()=>{});
+gltfLoader.load('assets/models/ballroom_chair.glb', (gltf)=>{
+  tables.forEach(([x, z])=>{
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 + 0.4;
+      const cx = x + Math.cos(a) * 1.2, cz = z + Math.sin(a) * 1.2;
+      const g = fitPropGroup(gltf.scene.clone(), 0.57, 1.0, 0.6); if (!g) continue;
+      g.position.set(cx, 0.5, cz); g.rotation.y = Math.atan2(x - cx, z - cz); scene.add(g);
+      applyTexToGroup(g, 'assets/textures/ballroom_chair_upholstery_velvet_brocade_1024.webp');
+    }
+  });
+  chairProc.forEach((m)=>{ m.visible = false; });
+}, undefined, ()=>{});
+colliders.push({ x: 17.5, z: 6, r: 2.6 });
+
+// ---- ActionForge characters: real GLB models + baked clips ----
+// The 6 ActionForge GLBs share one 71-joint skeleton, so one set of baked
+// clips (Mixamo idle/walk/talk/wave retargeted in Blender, world-space
+// delta method, in-place, scale 1.667) drives all of them. The baked GLBs
+// also contain the original Mixamo action — only the *_af clip is used.
+// If a model GLB fails, its capsule stays; if a clip fails, that character
+// just stands in its rest pose — nothing disappears.
+const afClips = {};
+[['idle', 'Standing_Idle_af'], ['walk', 'Walking_af'], ['talk', 'Talking_af'], ['wave', 'Waving_af']].forEach(([key, file]) => {
+  gltfLoader.load('assets/animations_af/' + file + '.glb', (g) => {
+    const c = g.animations.find(a => a.name.endsWith('_af'));
+    if (c) afClips[key] = c;
+  }, undefined, () => {});
+});
+function fitCharacter(obj, height) {
+  obj.traverse((o)=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+  let bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
+  if (!size.y) return;
+  obj.scale.setScalar(height / size.y);
+  bb = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); bb.getCenter(c);
+  obj.position.set(-c.x, -bb.min.y, -c.z);
+}
+function playCharClip(char, key) {
+  if (!char.mixer || !afClips[key]) return;
+  const act = char.mixer.clipAction(afClips[key]);
+  if (char._cur === act && act.isRunning()) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset().fadeIn(0.15).play(); char._cur = act;
+}
+// ---- Player (Rochelle_gown, unarmed — no weapon is ever attached) ----
+const player = new THREE.Group(); player.position.set(0, 0, 12); scene.add(player);
+let playerModel = null, mixer = null;
+const fbxLoader = new FBXLoader();
+gltfLoader.load('assets/models/Rochelle_gown.glb', (gltf) => {
+  const obj = gltf.scene;
+  fitCharacter(obj, 1.8);
+  player.add(obj); playerModel = obj;
+  mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
+}, undefined, () => {
+  // Capsule fallback, still unarmed
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+  body.position.y = 1.0; player.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
+  head.position.y = 1.95; player.add(head); playerModel = body;
+});
+function playClip(key) {
+  // Player uses the shared baked clips; the guard in playCharClip stops a
+  // running clip being reset every frame (that would freeze walk/idle).
+  if (!player.mixer) return;
+  playCharClip(player, key);
+  mixer = player.mixer;
+}
+
+// ---- NPCs: original names/lines, friendly only ----
+function nameSprite(text) {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 48;
+  const ctx = cv.getContext('2d'); ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, 256, 48);
+  ctx.fillStyle = '#ffd97a'; ctx.fillText(text, 128, 33);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function makeGuest(npc) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 1.05, 4, 12), new THREE.MeshStandardMaterial({ color: npc.color }));
+  body.position.y = 1.0; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), new THREE.MeshStandardMaterial({ color: npc.skin }));
+  head.position.y = 1.92; g.add(head); npc.capsuleParts = [body, head];
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(npc.name), transparent: true }));
+  sp.scale.set(2.2, 0.42, 1); sp.position.y = 2.45; g.add(sp);
+  g.position.set(npc.x, 0, npc.z); scene.add(g);
+  npc.group = g; npc.phase = Math.random() * 6.28; npc.wp = 0; npc.pause = 0;
+  return npc;
+}
+// Real ActionForge model for a guest/contact: fits to 1.8 m, feet on the
+// floor, facing +Z (ActionForge left hand is +X, so no PI turn is needed,
+// unlike the old FBX Donald). Capsule + head hide on success only.
+function loadGuestModel(npc, path) {
+  gltfLoader.load(path, (gltf) => {
+    const obj = gltf.scene;
+    fitCharacter(obj, 1.8);
+    npc.group.add(obj); npc.model = obj;
+    npc.mixer = new THREE.AnimationMixer(obj); npc._cur = null;
+    (npc.capsuleParts || []).forEach((m)=>{ m.visible = false; });
+    if (npc.role === 'donald' && npc.glass) npc.glass.position.set(-0.55, 1.35, 0.1);
+  }, undefined, () => {});
+}
+const NPCS = [
+  makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/models/Vickie_gown.glb', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Enjoy the music — and keep an eye on the cats.'] }),
+  makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/models/Eric_tux.glb', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
+  makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/models/Kristen_gown.glb', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'Have you seen the cats? They run the place, really.'] }),
+];
+// ---- Donald: always has a drink in hand, stumbles, falls over at times ----
+// He is friendly flavour only — talking to him never gives or blocks a clue.
+// His spill (see the puddle below) is what the wet paw trail leads from.
+const donald = makeGuest({ name: 'Donald', role: 'donald', model: 'assets/models/Donald_tux.glb', color: 0x4a3a1a, skin: 0xe8b48a, x: 10, z: 4, wps: [[10, 4], [6, 6], [12, 8], [8, 2], [14, 5]], lines: [
+  'The chandeliers are listening, I swear it. They blinked at me.',
+  'I once danced with a lamp. Lovely lamp. Terrible dancer.',
+  'A cat — a cat tried to steal my drink! Whiskers and all, reaching for my glass!',
+  'I fell right over there and spilled my drink all over the floor. Oops. That puddle is mine.',
+  'Shhh. The punch knows things. It told me. It did not, actually. I made that up.',
+  'Have you seen my other shoe? It left me. I understand. I would leave me too.',
+] });
+{ // Drink in his hand, always — a small amber glass at his right side.
+  const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0xd98a2a, transparent: true, opacity: 0.9 }));
+  glass.position.set(0.48, 1.28, 0.15); donald.group.add(glass); donald.glass = glass;
+}
+// Donald's model is now the ActionForge GLB (see loadGuestModel above);
+// the old static Donald_tux.fbx load is removed — it would strip the GLB.
+donald.fallTimer = 12 + Math.random() * 10; donald.falling = 0;
+NPCS.push(donald);
+NPCS.forEach((n)=>{ if (n.model) loadGuestModel(n, n.model); });
+// Donald's spill puddle, already on the floor when you arrive. Margo's
+// wet paw trail runs from this puddle to wherever she is hiding.
+const puddle = new THREE.Mesh(new THREE.CircleGeometry(0.85, 24), new THREE.MeshStandardMaterial({ color: 0x2a3a44, transparent: true, opacity: 0.6, roughness: 0.1 }));
+puddle.rotation.x = -Math.PI / 2; puddle.position.set(9, 0.03, 4); scene.add(puddle);
+const PUDDLE = { x: 9, z: 4 };
+
+// ---- Cats: clue sources, friendly, never fightable/damageable ----
+// Each cat wears a collar with an electronic ID tag. Walking up and
+// pressing E / USE scans the tag and collects that cat's clue word.
+function makeCat(cat) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 12), new THREE.MeshStandardMaterial({ color: cat.color }));
+  body.scale.set(1, 0.72, 1.5); body.position.y = 0.26; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), new THREE.MeshStandardMaterial({ color: cat.color }));
+  head.position.set(0, 0.38, 0.42); g.add(head);
+  // Mottled coat patches (tortoiseshell gray) or black-and-white patches:
+  // small flattened blobs on the body so the coat reads as mixed, not solid.
+  (cat.patches || []).forEach((p, i) => {
+    const patch = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshStandardMaterial({ color: p }));
+    patch.scale.set(1, 0.4, 1.4);
+    patch.position.set(i % 2 === 0 ? -0.2 : 0.2, 0.42, i < 2 ? 0.12 : -0.28);
+    g.add(patch);
+  });
+  const earGeo = new THREE.ConeGeometry(0.07, 0.14, 4);
+  // Ears are their own colour on purpose: Moxie black ears, Mabel white ears.
+  const earMat = new THREE.MeshStandardMaterial({ color: cat.earColor !== undefined ? cat.earColor : cat.color });
+  const earL = new THREE.Mesh(earGeo, earMat); earL.position.set(-0.1, 0.55, 0.42); g.add(earL);
+  const earR = new THREE.Mesh(earGeo, earMat); earR.position.set(0.1, 0.55, 0.42); g.add(earR);
+  // Nose is its own colour on purpose: Moxie black nose, Mabel pink nose.
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshStandardMaterial({ color: cat.noseColor !== undefined ? cat.noseColor : 0x111111 }));
+  nose.position.set(0, 0.36, 0.62); g.add(nose);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.45), new THREE.MeshStandardMaterial({ color: cat.color }));
+  tail.position.set(0, 0.32, -0.55); tail.rotation.x = 0.4; g.add(tail);
+  // Collar + glowing electronic ID tag
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 8, 20), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+  collar.position.set(0, 0.34, 0.32); collar.rotation.x = 0.5; g.add(collar); cat.collarMesh = collar;
+  const tag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.02), new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x00ffcc, emissiveIntensity: 1.4 }));
+  tag.position.set(0, 0.22, 0.48); g.add(tag);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(cat.name + ' 🐱'), transparent: true }));
+  sp.scale.set(2.2, 0.42, 1); sp.position.y = 0.85; g.add(sp);
+  g.position.set(cat.x, 0, cat.z); scene.add(g);
+  cat.group = g; cat.phase = Math.random() * 6.28; cat.wp = 0; cat.pause = 0;
+  // Margo starts hidden (see below) — she only appears once Moxie and
+  // Mabel have both been caught, so she is never wanderable before that.
+  if (cat.hidden) g.visible = false;
+  return cat;
+}
+const CATS = [
+  // Margo: tortoiseshell gray (mottled gray coat), harder to find — she
+  // sticks to secluded corners/edges and pauses much longer between moves.
+  makeCat({ name: 'Margo', role: 'cat', clue: 'velvet', color: 0x8a8a8a, patches: [0x555555, 0xb0b0b0, 0x666666], earColor: 0x555555, noseColor: 0x111111, shy: true, hidden: true, x: -17, z: 11, wps: [[-17, 11]], lines: ['*purr* — Tag scan: velvet. Collar ID registered.', 'Margo stretches and pads away.'] }),
+  // Moxie: black and white, black ears, black nose. Easy to find, but she
+  // runs from point to point — give her a treat at each stop to try a scan.
+  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0x111111, noseColor: 0x111111, chase: true, fed: false, fedTimer: 0, fleeing: false, treatsGiven: 0, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5], [-5, 9], [10, 2], [-3, 10]], lines: ['*purr* — Tag scan: midnight. Collar ID registered.', 'Moxie flicks her tail and sits down.'] }),
+  // Mabel: black and white, white ears, pink nose. Same treat rule as Moxie.
+  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0xffffff, noseColor: 0xff9eb0, chase: true, fed: false, fedTimer: 0, fleeing: false, treatsGiven: 0, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4], [-8, -8], [6, -3], [-6, 2]], lines: ['*purr* — Tag scan: waltz. Collar ID registered.', 'Mabel blinks slowly at you.'] }),
+];
+// Cats join the talkable/wandering set, so E / USE, prompts, and
+// wandering all work for them exactly like the guests. They have no
+// health, damage, or combat code anywhere — they cannot be fought.
+NPCS.push(...CATS);
+// Real cat collars replace the torus collars when loaded (the glowing tag
+// stays — it is the scannable part). Real scanner: the player carries it
+// at their right side, since it is the tool used to scan the tags.
+gltfLoader.load('assets/models/cat_collar.glb', (gltf)=>{
+  CATS.forEach((cat)=>{
+    const g = fitPropGroup(gltf.scene.clone(), 0.24, 0.06, 0.24); if (!g) return;
+    g.position.set(0, 0.34, 0.32); g.rotation.x = 0.5; cat.group.add(g);
+    if (cat.collarMesh) cat.collarMesh.visible = false;
+  });
+}, undefined, ()=>{});
+gltfLoader.load('assets/models/cat_scanner.glb', (gltf)=>{
+  const g = fitPropGroup(gltf.scene, 0.14, 0.3, 0.05); if (!g) return;
+  g.position.set(0.45, 1.3, 0.2); player.add(g);
+}, undefined, ()=>{});
+
+// ---- Goal state: Rochelle's photo mission ----
+// Kyle is off-screen on her earpiece; Rochelle is the player character.
+// Photos must be taken in order — moon (Moxie), note (Mabel), rose (Margo)
+// — each only while its photo window is open (guests looking away), after
+// a treat holds the cat still. The north door opens on the third photo.
+let won = false, talking = null, lineIdx = 0;
+const PHOTOS = [
+  { cat: 'Moxie', symbol: 'moon', label: 'crescent moon' },
+  { cat: 'Mabel', symbol: 'note', label: 'musical note' },
+  { cat: 'Margo', symbol: 'rose', label: 'velvet rose' },
+];
+const photos = [];
+let photoIdx = 0, windowOpen = false, windowTimer = 0, cinematic = null, missionStage = 'intro', introIdx = 0, nextCineAt = 0, lastWinSec = -1;
+const INTRO = [
+  ['Kyle (earpiece)', "Rochelle, you're in. Camera out, photographer first, agent second."],
+  ['Rochelle', "Got it. Ball, chandeliers, everybody dancing. Nobody's looking at the photographer. Yet."],
+  ['Kyle (earpiece)', "The passcode isn't on paper. It's on the cats. Three collars, three symbols. Too small to read from across the room. I need photos, clear ones."],
+  ['Rochelle', 'Photos of cats. At a ball. Without anyone noticing. Sure. Why not.'],
+  ['Kyle (earpiece)', "If a guest looks your way, shoot the dance floor. Shoot a chandelier. Shoot anything that isn't a cat."],
+  ['Rochelle', 'And if the cat runs?'],
+  ['Kyle (earpiece)', 'It will. Every time. Treat first. Photo second. Treats are your tripod.'],
+];
+function missionTarget() { return CATS.find(c => c.name === PHOTOS[photoIdx].cat); }
+function updateMissionHUD() {
+  const slots = document.getElementById('photoSlots');
+  if (slots) slots.textContent = PHOTOS.map((p, i) => i < photos.length ? p.symbol : '—').join(' ');
+  const st = document.getElementById('missionStatus'); if (!st) return;
+  if (photos.length === 3) st.textContent = 'Moon, note, rose — north door open. Walk to it and press E / USE.';
+  else if (cinematic) st.textContent = 'Cinematic — watch the room.';
+  else if (windowOpen) st.textContent = 'Photo window open (' + Math.ceil(windowTimer) + 's) — guests are looking away. Treat ' + PHOTOS[photoIdx].cat + ', then photograph her collar.';
+  else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — press E / USE to continue.';
+  else st.textContent = 'Next photo chance coming up — ' + PHOTOS[photoIdx].cat + ' (' + PHOTOS[photoIdx].symbol + ').';
+  exitDoor.material.color.set(photos.length === 3 ? 0x2e7d32 : 0x7a2020);
+}
+function showIntroLine() {
+  document.getElementById('dlgName').textContent = INTRO[introIdx][0];
+  document.getElementById('dlgLine').textContent = INTRO[introIdx][1];
+  document.getElementById('dialog').style.display = 'block';
+}
+function showPhotoLine(name, line) {
+  document.getElementById('dlgName').textContent = name;
+  document.getElementById('dlgLine').textContent = line;
+  document.getElementById('dialog').style.display = 'block';
+}
+function startCinematic(idx) {
+  const p = PHOTOS[idx], target = missionTarget();
+  if (idx === 2) revealMargo();
+  if (talking) endTalk();
+  const camPos = camera.position.clone();
+  const camLook = new THREE.Vector3(player.position.x - Math.sin(yaw) * 3, 1.6, player.position.z - Math.cos(yaw) * 3);
+  let toPos;
+  if (idx === 0) toPos = new THREE.Vector3(0, 2.2, -1); // dance floor, the song
+  else if (idx === 1) toPos = new THREE.Vector3(target.group.position.x, 1.6, target.group.position.z); // Mabel at the piano side
+  else toPos = new THREE.Vector3(donald.group.position.x, 1.6, donald.group.position.z); // Donald's spill
+  cinematic = { t: 0, dur: 6.2, fromPos: camPos, fromLook: camLook, toPos, toLook: toPos.clone() };
+  document.getElementById('barTop').style.height = '8vh';
+  document.getElementById('barBottom').style.height = '8vh';
+  if (idx === 2) donald.falling = 2.2; // Donald spills and tumbles as the camera finds him
+  missionStage = 'cinematic';
+  updateMissionHUD();
+}
+function endCinematic() {
+  cinematic = null;
+  document.getElementById('barTop').style.height = '0';
+  document.getElementById('barBottom').style.height = '0';
+  windowOpen = true; windowTimer = 60; lastWinSec = -1;
+  missionStage = 'window';
+  updateMissionHUD();
+}
+function closeWindow() {
+  const target = missionTarget();
+  windowOpen = false; windowTimer = 0;
+  if (target && target.fed) fleeCat(target); // missed window: the cat runs
+  missionStage = 'waiting'; nextCineAt = clock.elapsedTime + 5;
+  updateMissionHUD();
+}
+// ---- Cat chase + treats + Margo reveal ----
+// Taming loop, all three cats: a cat runs from point to point away from
+// you. At each stop, press E / USE once to give it a treat — it stays put
+// for a few seconds — then press E / USE again to scan its tag. If you
+// wait too long after the treat, it runs to the next point and you have
+// to give it another treat to try again. Treats are unlimited; there is
+// no treat pickup or inventory to manage.
+function setTreat(cat, on) {
+  if (!cat.group) return;
+  if (!cat.treatMesh) {
+    cat.treatMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a5a2e }));
+    cat.treatMesh.position.set(0, 0.06, 0.6); cat.group.add(cat.treatMesh);
+  }
+  cat.treatMesh.visible = on;
+}
+function fleeCat(cat) {
+  cat.fed = false; cat.fedTimer = 0; setTreat(cat, false);
+  if (cat.hiding) return; // Margo stays in her hiding place; she does not flee
+  cat.wp = (cat.wp + 1) % cat.wps.length; cat.fleeing = true; cat.pause = 0;
+}
+// Margo is hidden until both easy cats are caught. She then appears at one
+// of a few hiding places, with a trail of wet paw marks from Donald's spill
+// puddle leading to her — follow the prints to find her.
+let margoRevealed = false, trailGroup = null;
+function revealMargo() {
+  if (margoRevealed) return;
+  const margo = CATS.find(c => c.name === 'Margo'); if (!margo) return;
+  const spots = [[18.8, 6], [-18, -11], [-17, 12]]; // behind bar, NW corner, SW corner
+  const spot = spots[Math.floor(Math.random() * spots.length)];
+  margo.group.position.set(spot[0], 0, spot[1]);
+  margo.wps = [[spot[0], spot[1]]]; margo.wp = 0; margo.hiding = true; margo.hidden = false;
+  margo.group.visible = true; margoRevealed = true;
+  if (trailGroup) { scene.remove(trailGroup); trailGroup = null; }
+  trailGroup = new THREE.Group();
+  const dx = spot[0] - PUDDLE.x, dz = spot[1] - PUDDLE.z, dist = Math.hypot(dx, dz);
+  const steps = Math.max(2, Math.floor(dist / 1.25));
+  const px = -dz / dist, pz = dx / dist; // perpendicular, for alternating paws
+  for (let i = 1; i <= steps; i++) {
+    const f = i / steps, side = (i % 2 === 0 ? 1 : -1) * 0.18;
+    const print = new THREE.Mesh(new THREE.CircleGeometry(0.12, 12), new THREE.MeshStandardMaterial({ color: 0x1a2a33, transparent: true, opacity: 0.7 }));
+    print.rotation.x = -Math.PI / 2;
+    print.position.set(PUDDLE.x + dx * f + px * side, 0.04, PUDDLE.z + dz * f + pz * side);
+    trailGroup.add(print);
+  }
+  scene.add(trailGroup);
+}
+updateMissionHUD();
+function talkTo(npc) {
+  talking = npc; lineIdx = 0;
+  if (npc.role === 'cat') {
+    const p = PHOTOS[photoIdx];
+    const already = PHOTOS.find(q => q.cat === npc.name && photos.includes(q.symbol));
+    if (already) { showPhotoLine(npc.name, 'Already photographed — ' + already.label + ' is in the set.'); return; }
+    if (npc.name !== p.cat) { showPhotoLine(npc.name, 'Not this one yet — ' + p.cat + ' first. The photos go moon, note, rose, in that order.'); return; }
+    if (!windowOpen) { showPhotoLine('Kyle (earpiece)', 'Guests are watching. Wait for your photo window — the room has to look away first.'); return; }
+    // A cat with no treat yet: this press gives it a treat, it stays put
+    // briefly, and no photo is taken. The next press photographs it.
+    if (!npc.fed) {
+      showLine(); npc.fed = true; npc.fedTimer = 12; npc.treatsGiven = (npc.treatsGiven || 0) + 1; setTreat(npc, true); return;
+    }
+    // Fed, window open, right cat, right order: the photo.
+    npc.fed = false; npc.fedTimer = 0; setTreat(npc, false);
+    photos.push(p.symbol); photoIdx++;
+    windowOpen = false; windowTimer = 0;
+    if (photos.length === 3) {
+      showPhotoLine('Rochelle', 'Moon. Note. Rose. The north door is open — and I still look like just the photographer.');
+    } else {
+      showPhotoLine('Rochelle', 'Got it — ' + p.label + '. That is ' + photos.length + ' of 3.');
+      missionStage = 'waiting'; nextCineAt = clock.elapsedTime + 3;
+    }
+    if (photos.length === 2) revealMargo();
+    updateMissionHUD(); return;
+  }
+  showLine();
+  updateMissionHUD();
+}
+function showLine() {
+  if (!talking) return;
+  let line = talking.lines[lineIdx % talking.lines.length];
+  if (talking.role === 'cat' && !talking.fed) line = 'You offer ' + talking.name + ' a treat. She sniffs it, eats it, and stays put — quick, press E / USE again to scan her tag before she changes her mind.';
+  document.getElementById('dlgName').textContent = talking.name;
+  document.getElementById('dlgLine').textContent = line;
+  document.getElementById('dialog').style.display = 'block';
+  playClip('talk');
+  if (talking.mixer) playCharClip(talking, 'talk');
+}
+function endTalk() { talking = null; document.getElementById('dialog').style.display = 'none'; }
+
+// ---- Input: keyboard + touch (no combat controls anywhere) ----
+const keys = {};
+let yaw = Math.PI, pitch = 0.15, started = false, joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+if (isTouch) document.body.classList.add('touch');
+document.getElementById('startBtn').onclick = () => {
+  document.getElementById('overlay').style.display = 'none'; started = true;
+  introIdx = 0; showIntroLine(); updateMissionHUD();
+  if (!isTouch) renderer.domElement.requestPointerLock();
+};
+addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === 'e' && started) nearestTalk();
+});
+addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+addEventListener('mousemove', (e) => {
+  if (document.pointerLockElement && started) { yaw -= e.movementX * 0.003; pitch = Math.max(-0.4, Math.min(0.5, pitch - e.movementY * 0.003)); }
+});
+const joy = document.getElementById('joy'), knob = document.getElementById('knob');
+joy.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; joyId = t.identifier; moveJoy(t); e.preventDefault(); }, { passive: false });
+joy.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (t.identifier === joyId) moveJoy(t); e.preventDefault(); }, { passive: false });
+function endJoy(e) { for (const t of e.changedTouches) if (t.identifier === joyId) { joyId = null; joyX = joyY = 0; knob.style.left = '37px'; knob.style.top = '37px'; } }
+joy.addEventListener('touchend', endJoy); joy.addEventListener('touchcancel', endJoy);
+function moveJoy(t) {
+  const r = joy.getBoundingClientRect(); const dx = (t.clientX - (r.left + 65)) / 50, dy = (t.clientY - (r.top + 65)) / 50;
+  const m = Math.min(1, Math.hypot(dx, dy)) || 1; joyX = dx / Math.max(1, Math.hypot(dx, dy)) * m; joyY = dy / Math.max(1, Math.hypot(dx, dy)) * m;
+  knob.style.left = (37 + joyX * 35) + 'px'; knob.style.top = (37 + joyY * 35) + 'px';
+}
+renderer.domElement.addEventListener('touchstart', (e) => {
+  if (!started) return;
+  for (const t of e.changedTouches) { if (t.identifier !== joyId) { lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY; } }
+}, { passive: true });
+renderer.domElement.addEventListener('touchmove', (e) => {
+  for (const t of e.changedTouches) if (t.identifier === lookId) {
+    yaw -= (t.clientX - lastLX) * 0.005; pitch = Math.max(-0.4, Math.min(0.5, pitch - (t.clientY - lastLY) * 0.005));
+    lastLX = t.clientX; lastLY = t.clientY;
+  }
+}, { passive: true });
+renderer.domElement.addEventListener('touchend', (e) => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; });
+document.getElementById('useBtn').onclick = () => { if (started) nearestTalk(); };
+
+function nearestTalk() {
+  if (missionStage === 'intro') {
+    introIdx++;
+    if (introIdx < INTRO.length) { showIntroLine(); return; }
+    document.getElementById('dialog').style.display = 'none';
+    missionStage = 'waiting'; nextCineAt = clock.elapsedTime + 1.5; updateMissionHUD(); return;
+  }
+  if (cinematic) return;
+  let best = null, bd = 3.2;
+  for (const n of NPCS) { if (!n.group.visible) continue; const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
+  if (best) {
+    // Cats always go through the photo logic (treat, then photo); guests
+    // just cycle their flavour lines.
+    if (best.role === 'cat') talkTo(best);
+    else if (talking === best) { lineIdx++; showLine(); } else talkTo(best);
+  }
+  else if (talking) endTalk();
+  else {
+    // Near exit?
+    if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
+      if (photos.length === 3 && !won) { won = true; document.getElementById('winText').textContent = 'You photographed all 3 cat collars — moon, note, rose, in that order — while the guests looked away, and slipped out the north door. Still just the photographer.'; document.getElementById('win').style.display = 'flex'; }
+    }
+  }
+}
+
+// ---- Loop ----
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
+  if (cinematic) {
+    cinematic.t += dt;
+    const c = cinematic, ph = c.t / c.dur;
+    const ease = (x) => x * x * (3 - 2 * x);
+    if (ph >= 1) endCinematic();
+  }
+  if (missionStage === 'waiting' && photoIdx < 3 && clock.elapsedTime >= nextCineAt && nextCineAt > 0) {
+    nextCineAt = 0; startCinematic(photoIdx);
+  }
+  if (windowOpen) {
+    windowTimer -= dt;
+    const sec = Math.ceil(windowTimer);
+    if (sec !== lastWinSec) { lastWinSec = sec; updateMissionHUD(); }
+    if (windowTimer <= 0) closeWindow();
+  }
+  if (started && !won && !cinematic) {
+    let fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
+    let fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
+    if (joyId !== null) { fx += joyX; fz += -joyY; }
+    const ml = Math.hypot(fx, fz);
+    if (ml > 1) { fx /= ml; fz /= ml; }
+    // Camera-forward movement (same fix as the courtyard game: forward = -sin/-cos)
+    const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);
+    const dz = -fx * Math.sin(yaw) - fz * Math.cos(yaw);
+    const speed = (keys['shift'] ? 5.5 : 4) * dt;
+    player.position.x += dx * speed; player.position.z += dz * speed;
+    player.position.x = Math.max(-HALL_X + 1, Math.min(HALL_X - 1, player.position.x));
+    player.position.z = Math.max(-HALL_Z + 1, Math.min(HALL_Z - 1, player.position.z));
+    for (const c of colliders) {
+      const ddx = player.position.x - c.x, ddz = player.position.z - c.z, d = Math.hypot(ddx, ddz);
+      if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
+    }
+    player.rotation.y = yaw;
+    if (mixer) { mixer.update(dt); if (!talking) playClip(ml > 0.1 ? 'walk' : 'idle'); }
+    // Guest/contact bone animation: talk while talking, walk while moving, else idle.
+    for (const n of NPCS) {
+      if (!n.mixer || n.role === 'cat') continue;
+      n.mixer.update(dt);
+      if (talking === n) playCharClip(n, 'talk');
+      else if (n.moving) playCharClip(n, 'walk');
+      else playCharClip(n, 'idle');
+    }
+    // Prompt / exit proximity
+    let best = null, bd = 3.2;
+    for (const n of NPCS) { if (!n.group.visible) continue; const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
+    const prompt = document.getElementById('prompt');
+    // The prompt element was removed with the HUD text, so prompt is null:
+    // only end a conversation when nobody is nearby, not on every frame.
+    // (Without this, dialogue closed one frame after opening.)
+    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — press E / USE'; prompt.style.display = 'block'; } }
+    else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
+      if (prompt) { prompt.textContent = photos.length === 3 ? 'North exit open — press E / USE to leave' : 'North exit is locked — photograph all 3 collars first (moon, note, rose)'; prompt.style.display = 'block'; }
+    } else { if (prompt) prompt.style.display = 'none'; if (talking) endTalk(); }
+    // NPC wander + sway
+    for (const n of NPCS) {
+      if (n === talking) continue;
+      if (windowOpen && n.role !== 'cat') {
+        // Everybody's back is turned: dancing, at the bar, or checking on
+        // Donald. Nobody is watching Rochelle or the cat.
+        n.group.rotation.y = Math.atan2(n.group.position.x - player.position.x, n.group.position.z - player.position.z);
+        n.moving = false; continue;
+      }
+      if (!n.group.visible) continue; // hidden Margo: not in the hall yet
+      if (n.role === 'donald') {
+        // Stumble walk: slow, wobbling, and every so often he falls down
+        // flat for a couple of seconds, drink still in hand, then gets up.
+        if (n.falling > 0) { n.falling -= dt; n.moving = false; n.group.rotation.x = -1.35; if (n.falling <= 0) { n.group.rotation.x = 0; n.fallTimer = 14 + Math.random() * 14; } continue; }
+        n.fallTimer -= dt; if (n.fallTimer <= 0) { n.falling = 2.2; continue; }
+        n.group.rotation.z = Math.sin(t * 3 + n.phase) * 0.12;
+        n.group.position.y = Math.abs(Math.sin(t * 2 + n.phase)) * 0.04;
+        if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
+        const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
+        if (d < 0.3) { n.wp = (n.wp + 1) % n.wps.length; n.pause = 1 + Math.random() * 2; n.moving = false; }
+        else { const sp = 0.7 + 0.3 * Math.sin(t * 1.7 + n.phase); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); n.moving = true; }
+        continue;
+      }
+      if (n.role === 'cat' && n.hiding) {
+        // Margo stays put in her hiding place, but a treat still expires:
+        // wait too long and you have to give her another one to scan.
+        if (n.fed) { n.fedTimer -= dt; if (n.fedTimer <= 0) { n.fed = false; setTreat(n, false); } }
+        continue;
+      }
+      if (n.role === 'cat' && n.fed) {
+        // Fed cat sits still, ready to scan — until the treat window runs out.
+        n.fedTimer -= dt;
+        if (n.fedTimer <= 0) { fleeCat(n); continue; }
+        continue;
+      }
+      n.group.position.y = Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
+      if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
+      // Getting close to an unfed chase cat spooks it into running.
+      if (n.role === 'cat' && n.chase && !n.fed && !n.fleeing && !(windowOpen && n === missionTarget()) && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }
+      const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
+      if (d < 0.3) {
+        n.moving = false;
+        if (n.fleeing) { n.fleeing = false; n.pause = 1.5; }
+        else { n.wp = (n.wp + 1) % n.wps.length; n.pause = n.shy ? 6 + Math.random() * 4 : 2 + Math.random() * 3; }
+      }
+      else { const sp = n.fleeing ? 2.6 : (n.shy ? 0.5 : 0.8); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); n.moving = true; }
+    }
+  }
+  const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  camera.position.set(player.position.x + back.x * 5, 2.6, player.position.z + back.z * 5);
+  camera.lookAt(player.position.x - back.x * 3, 1.6, player.position.z - back.z * 3);
+  if (cinematic) {
+    const c = cinematic, ph = Math.min(c.t / c.dur, 1);
+    const ease = (x) => x * x * (3 - 2 * x);
+    let k;
+    if (ph < 0.2) k = ease(ph / 0.2); // pan out to the event
+    else if (ph < 0.68) k = 1; // hold on the event
+    else k = 1 - ease((ph - 0.68) / 0.32); // pan back to Rochelle
+    camera.position.lerpVectors(c.fromPos, c.toPos, k);
+    const look = new THREE.Vector3().lerpVectors(c.fromLook, c.toLook, k);
+    camera.lookAt(look);
+  }
+  renderer.render(scene, camera);
+}
+if (new URLSearchParams(location.search).has('test')) {
+  window.__mission = { player, NPCS, CATS, PHOTOS, get photos() { return [...photos]; }, get photoIdx() { return photoIdx; }, get windowOpen() { return windowOpen; }, get missionStage() { return missionStage; }, get cinematic() { return cinematic; }, missionTarget, nearestTalk, startCinematic, updateMissionHUD, get won() { return won; } };
+}
+animate();
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+</script>
+</body>
+</html>
