@@ -239,7 +239,7 @@ function applyBasecolor(obj, texPath) {
 function loadGuestModelMixamo(npc, path, texPath) {
   fbxLoader.load(path, (obj) => {
     fitCharacter(obj, 1.8);
-    obj.rotation.y = Math.PI;
+    obj.rotation.y = (npc.turn || 0);
     applyBasecolor(obj, texPath);
     npc.group.add(obj); npc.model = obj;
     npc.mixer = new THREE.AnimationMixer(obj); npc._cur = null;
@@ -392,7 +392,7 @@ const NPCS = [
   // Rochelle, waiting on the dance floor for the rendezvous. She is a
   // Mixamo-rigged GLB (retextured 2026-11-03), so she animates on mxClips,
   // not afClips, and she never wanders away from her rendezvous spot.
-  makeGuest({ name: 'Rochelle', role: 'rochelle', model: 'assets/models/Rochelle_undercover_textured.glb', color: 0x0e5a3a, skin: 0xe8b48a, x: 8, z: 2, wps: [[8, 2]], lines: [] }),
+  makeGuest({ name: 'Rochelle', role: 'rochelle', model: 'assets/models/Rochelle_undercover.fbx', texture: 'assets/models/textures/Rochelle_basecolor.jpg', turn: -Math.PI / 2, color: 0x0e5a3a, skin: 0xe8b48a, x: 8, z: 2, wps: [[8, 2]], lines: [] }),
 ];
 const rochelleNPC = NPCS.find((n) => n.role === 'rochelle');
 // ---- Donald: always has a drink in hand, stumbles, falls over at times ----

@@ -239,7 +239,7 @@ function applyBasecolor(obj, texPath) {
 function loadGuestModelMixamo(npc, path, texPath) {
   fbxLoader.load(path, (obj) => {
     fitCharacter(obj, 1.8);
-    obj.rotation.y = Math.PI;
+    obj.rotation.y = (npc.turn || 0);
     applyBasecolor(obj, texPath);
     npc.group.add(obj); npc.model = obj;
     npc.mixer = new THREE.AnimationMixer(obj); npc._cur = null;
@@ -291,9 +291,12 @@ function playMxCharClip(char, key) {
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset().fadeIn(0.15).play(); char._cur = act;
 }
-gltfLoader.load('assets/models/Rochelle_undercover_textured.glb', (gltf) => {
-  const obj = gltf.scene;
+fbxLoader.load('assets/models/Rochelle_undercover.fbx', (obj) => {
   fitCharacter(obj, 1.8);
+  // Rochelle's FBX faces +X, not +Z: +PI/2 turns it to face forward
+  // for a player (camera yaw), where +Z in group space is toward camera.
+  obj.rotation.y = Math.PI / 2;
+  applyBasecolor(obj, 'assets/models/textures/Rochelle_basecolor.jpg');
   player.add(obj); playerModel = obj;
   mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
 }, undefined, () => {
