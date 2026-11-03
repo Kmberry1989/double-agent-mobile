@@ -196,11 +196,12 @@ gltfLoader.load('assets/models/ballroom_chair.glb', (gltf)=>{
 }, undefined, ()=>{});
 colliders.push({ x: 17.5, z: 6, r: 2.6 });
 
-// ---- ActionForge characters: real GLB models + baked clips ----
-// The 6 ActionForge GLBs share one 71-joint skeleton, so one set of baked
-// clips (Mixamo idle/walk/talk/wave retargeted in Blender, world-space
-// delta method, in-place, scale 1.667) drives all of them. The baked GLBs
-// also contain the original Mixamo action — only the *_af clip is used.
+// ---- ActionForge characters: real GLB models + baked clips (guests only) ----
+// The 5 guest/contact ActionForge GLBs share one 71-joint skeleton, so one
+// set of baked clips (Mixamo idle/walk/talk/wave retargeted in Blender,
+// world-space delta method, in-place, scale 1.667) drives all of them.
+// The baked GLBs also contain the original Mixamo action — only the *_af
+// clip is used. The player no longer uses these (see Kyle_undercover above).
 // If a model GLB fails, its capsule stays; if a clip fails, that character
 // just stands in its rest pose — nothing disappears.
 const afClips = {};
@@ -225,12 +226,44 @@ function playCharClip(char, key) {
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset().fadeIn(0.15).play(); char._cur = act;
 }
-// ---- Player (Kyle_tux, unarmed — no weapon is ever attached) ----
+// ---- Player (Kyle_undercover, Mixamo rig — unarmed, no weapon ever attached) ----
+// The player is the Mixamo-rigged Kyle_undercover.fbx (verified 2026-11-03:
+// same tux mesh/rig/texture as Agent_Kyle.fbx, 65 mixamorig bones), so it
+// runs on the ORIGINAL Mixamo clips in assets/animations/, NOT the baked
+// *_af clips. Guests/contacts stay on the ActionForge GLBs + *_af clips
+// below — each character uses only its own skeleton's clips, never mixed.
+// Root XZ travel is stripped from the player clips (game code moves the
+// player), Y bob is kept, so walk stays in place under the player group.
 const player = new THREE.Group(); player.position.set(0, 0, 12); scene.add(player);
 let playerModel = null, mixer = null;
 const fbxLoader = new FBXLoader();
-gltfLoader.load('assets/models/Kyle_tux.glb', (gltf) => {
-  const obj = gltf.scene;
+const mxClips = {};
+function stripRootTravel(clip) {
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') >= 0 && t.name.endsWith('.position') && nt.values && nt.values.length >= 3) {
+      const x0 = nt.values[0], z0 = nt.values[2];
+      for (let i = 0; i + 2 < nt.values.length; i += 3) { nt.values[i] = x0; nt.values[i + 2] = z0; }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx']].forEach(([key, file]) => {
+  fbxLoader.load('assets/animations/' + file, (obj) => {
+    const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+    if (raw) mxClips[key] = stripRootTravel(raw);
+  }, undefined, () => {});
+});
+function playMxClip(key) {
+  if (!player.mixer || !mxClips[key]) return;
+  const act = player.mixer.clipAction(mxClips[key]);
+  if (player._cur === act && act.isRunning()) return;
+  if (player._cur && player._cur !== act) player._cur.fadeOut(0.15);
+  act.reset().fadeIn(0.15).play(); player._cur = act;
+}
+fbxLoader.load('assets/models/Kyle_undercover.fbx', (obj) => {
   fitCharacter(obj, 1.8);
   obj.rotation.y = Math.PI; // same facing convention as the old FBX player
   player.add(obj); playerModel = obj;
@@ -243,10 +276,10 @@ gltfLoader.load('assets/models/Kyle_tux.glb', (gltf) => {
   head.position.y = 1.95; player.add(head); playerModel = body;
 });
 function playClip(key) {
-  // Player uses the shared baked clips; the guard in playCharClip stops a
+  // Player uses the original Mixamo clips; the guard in playMxClip stops a
   // running clip being reset every frame (that would freeze walk/idle).
   if (!player.mixer) return;
-  playCharClip(player, key);
+  playMxClip(key);
   mixer = player.mixer;
 }
 
