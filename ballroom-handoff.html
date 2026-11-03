@@ -224,6 +224,33 @@ function fitCharacter(obj, height) {
   bb = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); bb.getCenter(c);
   obj.position.set(-c.x, -bb.min.y, -c.z);
 }
+
+// Mixamo guest loader (2026-11-03, single-texture rule): the four guests
+// arrive as Mixamo FBXs with a __DEFAULT gray material and no maps, so
+// the game applies their single basecolor PNG at load time (runtime
+// reapply, not a Blender GLB — no Blender is available in this VM).
+// FBX facing needs the PI turn, like the Kyle player / old FBX Donald.
+function applyBasecolor(obj, texPath) {
+  if (!texPath) return;
+  const tex = texLoader.load(texPath);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  obj.traverse((o)=>{ if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach((m)=>{ m.map = tex; m.color.set(0xffffff); m.needsUpdate = true; }); } });
+}
+function loadGuestModelMixamo(npc, path, texPath) {
+  fbxLoader.load(path, (obj) => {
+    fitCharacter(obj, 1.8);
+    obj.rotation.y = Math.PI;
+    applyBasecolor(obj, texPath);
+    npc.group.add(obj); npc.model = obj;
+    npc.mixer = new THREE.AnimationMixer(obj); npc._cur = null;
+    (npc.capsuleParts || []).forEach((m)=>{ m.visible = false; });
+    if (npc.role === 'donald' && npc.glass) npc.glass.position.set(-0.55, 1.35, 0.1);
+  }, undefined, () => {});
+}
+function loadGuestModelDispatch(npc, path, texPath) {
+  if (path.endsWith('.fbx')) loadGuestModelMixamo(npc, path, texPath);
+  else loadGuestModel(npc, path);
+}
 function playCharClip(char, key) {
   if (!char.mixer || !afClips[key]) return;
   const act = char.mixer.clipAction(afClips[key]);
@@ -359,9 +386,9 @@ function loadGuestModel(npc, path) {
   }, undefined, () => {});
 }
 const NPCS = [
-  makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/models/Vickie_gown.glb', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Enjoy the music — and keep an eye on the cats.'] }),
-  makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/models/Eric_tux.glb', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
-  makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/models/Kristen_gown.glb', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'Have you seen the cats? They run the place, really.'] }),
+  makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/models/Vickie.fbx', texture: 'assets/models/textures/Vickie_basecolor.png', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Enjoy the music — and keep an eye on the cats.'] }),
+  makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/models/Eric.fbx', texture: 'assets/models/textures/Eric_basecolor.png', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
+  makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/models/Kristen.fbx', texture: 'assets/models/textures/Kristen_basecolor.png', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'Have you seen the cats? They run the place, really.'] }),
   // Rochelle, waiting on the dance floor for the rendezvous. She is a
   // Mixamo-rigged GLB (retextured 2026-11-03), so she animates on mxClips,
   // not afClips, and she never wanders away from her rendezvous spot.
@@ -371,7 +398,7 @@ const rochelleNPC = NPCS.find((n) => n.role === 'rochelle');
 // ---- Donald: always has a drink in hand, stumbles, falls over at times ----
 // He is friendly flavour only — talking to him never gives or blocks a clue.
 // His spill (see the puddle below) is what the wet paw trail leads from.
-const donald = makeGuest({ name: 'Donald', role: 'donald', model: 'assets/models/Donald_tux.glb', color: 0x4a3a1a, skin: 0xe8b48a, x: 10, z: 4, wps: [[10, 4], [6, 6], [12, 8], [8, 2], [14, 5]], lines: [
+const donald = makeGuest({ name: 'Donald', role: 'donald', model: 'assets/models/Donald.fbx', texture: 'assets/models/textures/Donald_basecolor.png', color: 0x4a3a1a, skin: 0xe8b48a, x: 10, z: 4, wps: [[10, 4], [6, 6], [12, 8], [8, 2], [14, 5]], lines: [
   'The chandeliers are listening, I swear it. They blinked at me.',
   'I once danced with a lamp. Lovely lamp. Terrible dancer.',
   'A cat — a cat tried to steal my drink! Whiskers and all, reaching for my glass!',
@@ -383,11 +410,10 @@ const donald = makeGuest({ name: 'Donald', role: 'donald', model: 'assets/models
   const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.16, 10), new THREE.MeshStandardMaterial({ color: 0xd98a2a, transparent: true, opacity: 0.9 }));
   glass.position.set(0.48, 1.28, 0.15); donald.group.add(glass); donald.glass = glass;
 }
-// Donald's model is now the ActionForge GLB (see loadGuestModel above);
-// the old static Donald_tux.fbx load is removed — it would strip the GLB.
+// Donald's model is now the Mixamo FBX with single basecolor (see loadGuestModelMixamo above).
 donald.fallTimer = 12 + Math.random() * 10; donald.falling = 0;
 NPCS.push(donald);
-NPCS.forEach((n)=>{ if (n.model) loadGuestModel(n, n.model); });
+NPCS.forEach((n)=>{ if (n.model) loadGuestModelDispatch(n, n.model, n.texture); });
 // Donald's spill puddle, already on the floor when you arrive. Margo's
 // wet paw trail runs from this puddle to wherever she is hiding.
 const puddle = new THREE.Mesh(new THREE.CircleGeometry(0.85, 24), new THREE.MeshStandardMaterial({ color: 0x2a3a44, transparent: true, opacity: 0.6, roughness: 0.1 }));
@@ -746,7 +772,7 @@ function showLine() {
   document.getElementById('dlgLine').textContent = line;
   document.getElementById('dialog').style.display = 'block';
   playClip('talk');
-  if (talking.mixer) playCharClip(talking, 'talk');
+  if (talking.mixer) playMxCharClip(talking, 'talk');
 }
 function endTalk() { talking = null; document.getElementById('dialog').style.display = 'none'; }
 
@@ -882,10 +908,9 @@ function animate() {
     for (const n of NPCS) {
       if (!n.mixer || n.role === 'cat') continue;
       n.mixer.update(dt);
-      if (n.role === 'rochelle') { playMxCharClip(n, 'idle'); continue; }
-      if (talking === n) playCharClip(n, 'talk');
-      else if (n.moving) playCharClip(n, 'walk');
-      else playCharClip(n, 'idle');
+      if (talking === n) playMxCharClip(n, 'talk');
+      else if (n.moving) playMxCharClip(n, 'walk');
+      else playMxCharClip(n, 'idle');
     }
     if (kyleNPCMixer && mxClips['idle']) { kyleNPCMixer.update(dt); const a = kyleNPCMixer.clipAction(mxClips['idle']); if (a && !a.isRunning()) a.play(); }
     // Prompt / exit proximity
