@@ -197,7 +197,7 @@ gltfLoader.load('assets/models/ballroom_chair.glb', (gltf)=>{
 colliders.push({ x: 17.5, z: 6, r: 2.6 });
 
 // ---- ActionForge characters: real GLB models + baked clips (guests only) ----
-// The 5 guest/contact ActionForge GLBs share one 71-joint skeleton, so one
+// The 4 remaining ActionForge guest GLBs share one 71-joint skeleton, so one
 // set of baked clips (Mixamo idle/walk/talk/wave retargeted in Blender,
 // world-space delta method, in-place, scale 1.667) drives all of them.
 // The baked GLBs also contain the original Mixamo action — only the *_af
@@ -231,7 +231,8 @@ function playCharClip(char, key) {
 // same tux mesh/rig/texture as Agent_Kyle.fbx, 65 mixamorig bones), so it
 // runs on the ORIGINAL Mixamo clips in assets/animations/, NOT the baked
 // *_af clips. Guests/contacts stay on the ActionForge GLBs + *_af clips
-// below — each character uses only its own skeleton's clips, never mixed.
+// below — Rochelle (contact) is now Mixamo, like the player, and uses mxClips.
+// Each character uses only its own skeleton's clips, never mixed.
 // Root XZ travel is stripped from the player clips (game code moves the
 // player), Y bob is kept, so walk stays in place under the player group.
 const player = new THREE.Group(); player.position.set(0, 0, 12); scene.add(player);
@@ -282,6 +283,18 @@ function playClip(key) {
   playMxClip(key);
   mixer = player.mixer;
 }
+function playMxCharClip(char, key) {
+  // Same as playMxClip, but for a Mixamo-rigged NPC (Rochelle contact).
+  if (!char.mixer || !mxClips[key]) return;
+  const act = char.mixer.clipAction(mxClips[key]);
+  if (char._cur === act && act.isRunning()) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset().fadeIn(0.15).play(); char._cur = act;
+}
+function playGuestClip(npc, key) {
+  // Rochelle (contact) is Mixamo; the other guests are still ActionForge.
+  if (npc.role === 'contact') playMxCharClip(npc, key); else playCharClip(npc, key);
+}
 
 // ---- NPCs: original names/lines, friendly only ----
 function nameSprite(text) {
@@ -317,7 +330,7 @@ function loadGuestModel(npc, path) {
   }, undefined, () => {});
 }
 const NPCS = [
-  makeGuest({ name: 'Rochelle', role: 'contact', model: 'assets/models/Rochelle_gown.glb', color: 0x0e5a3a, skin: 0xe8b48a, x: 15, z: 6, wps: [[15, 6], [12, 4], [16, 2]], lines: ['You found me. So — do you know the three words?', 'Come back when you have all three. The cats carry them on their collars.'] }),
+  makeGuest({ name: 'Rochelle', role: 'contact', model: 'assets/models/Rochelle_undercover_textured.glb', color: 0x0e5a3a, skin: 0xe8b48a, x: 15, z: 6, wps: [[15, 6], [12, 4], [16, 2]], lines: ['You found me. So — do you know the three words?', 'Come back when you have all three. The cats carry them on their collars.'] }),
   makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/models/Vickie_gown.glb', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Rochelle is near the bar, in green. She is the one to find.'] }),
   makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/models/Eric_tux.glb', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
   makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/models/Kristen_gown.glb', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'If you are looking for Rochelle, try by the bar.'] }),
@@ -499,7 +512,7 @@ function showLine() {
   document.getElementById('dlgLine').textContent = line;
   document.getElementById('dialog').style.display = 'block';
   playClip('talk');
-  if (talking.mixer) playCharClip(talking, 'talk');
+  if (talking.mixer) playGuestClip(talking, 'talk');
 }
 function endTalk() { talking = null; document.getElementById('dialog').style.display = 'none'; }
 
@@ -589,9 +602,9 @@ function animate() {
     for (const n of NPCS) {
       if (!n.mixer || n.role === 'cat') continue;
       n.mixer.update(dt);
-      if (talking === n) playCharClip(n, 'talk');
-      else if (n.moving) playCharClip(n, 'walk');
-      else playCharClip(n, 'idle');
+      if (talking === n) playGuestClip(n, 'talk');
+      else if (n.moving) playGuestClip(n, 'walk');
+      else playGuestClip(n, 'idle');
     }
     // Prompt / exit proximity
     let best = null, bd = 3.2;

@@ -203,7 +203,7 @@ gltfLoader.load('assets/models/ballroom_chair.glb', (gltf)=>{
 colliders.push({ x: 17.5, z: 6, r: 2.6 });
 
 // ---- ActionForge characters: real GLB models + baked clips ----
-// The 6 ActionForge GLBs share one 71-joint skeleton, so one set of baked
+// The 5 remaining ActionForge guest GLBs share one 71-joint skeleton, so one set of baked
 // clips (Mixamo idle/walk/talk/wave retargeted in Blender, world-space
 // delta method, in-place, scale 1.667) drives all of them. The baked GLBs
 // also contain the original Mixamo action — only the *_af clip is used.
@@ -231,11 +231,40 @@ function playCharClip(char, key) {
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset().fadeIn(0.15).play(); char._cur = act;
 }
-// ---- Player (Rochelle_gown, unarmed — no weapon is ever attached) ----
+// ---- Player (Rochelle_undercover, Mixamo — no weapon is ever attached) ----
 const player = new THREE.Group(); player.position.set(0, 0, 12); scene.add(player);
 let playerModel = null, mixer = null;
 const fbxLoader = new FBXLoader();
-gltfLoader.load('assets/models/Rochelle_gown.glb', (gltf) => {
+// Player Rochelle is now Mixamo (Rochelle_undercover_textured.glb), so
+// she runs on the ORIGINAL Mixamo clips, not the baked *_af clips.
+// Guests stay ActionForge and keep playCharClip/afClips below.
+const mxClips = {};
+function stripRootTravel(clip) {
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') >= 0 && t.name.endsWith('.position') && nt.values && nt.values.length >= 3) {
+      const x0 = nt.values[0], z0 = nt.values[2];
+      for (let i = 0; i + 2 < nt.values.length; i += 3) { nt.values[i] = x0; nt.values[i + 2] = z0; }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx']].forEach(([key, file]) => {
+  fbxLoader.load('assets/animations/' + file, (obj) => {
+    const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+    if (raw) mxClips[key] = stripRootTravel(raw);
+  }, undefined, () => {});
+});
+function playMxCharClip(char, key) {
+  if (!char.mixer || !mxClips[key]) return;
+  const act = char.mixer.clipAction(mxClips[key]);
+  if (char._cur === act && act.isRunning()) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset().fadeIn(0.15).play(); char._cur = act;
+}
+gltfLoader.load('assets/models/Rochelle_undercover_textured.glb', (gltf) => {
   const obj = gltf.scene;
   fitCharacter(obj, 1.8);
   player.add(obj); playerModel = obj;
@@ -248,10 +277,11 @@ gltfLoader.load('assets/models/Rochelle_gown.glb', (gltf) => {
   head.position.y = 1.95; player.add(head); playerModel = body;
 });
 function playClip(key) {
-  // Player uses the shared baked clips; the guard in playCharClip stops a
-  // running clip being reset every frame (that would freeze walk/idle).
+  // Player uses the original Mixamo clips; the guard in playMxCharClip
+  // stops a running clip being reset every frame (that would freeze
+  // walk/idle). Guests keep playCharClip/afClips.
   if (!player.mixer) return;
-  playCharClip(player, key);
+  playMxCharClip(player, key);
   mixer = player.mixer;
 }
 
