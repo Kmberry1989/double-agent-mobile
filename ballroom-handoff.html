@@ -904,7 +904,7 @@ function animate() {
     player.rotation.y = yaw;
     if (mixer) { mixer.update(dt); if (!talking) playClip(ml > 0.1 ? 'walk' : 'idle'); }
     // Guest/contact bone animation: talk while talking, walk while moving, else idle.
-    // Rochelle is Mixamo-rigged, so she uses mxClips; the other guests use afClips.
+    // All ballroom characters are now Mixamo-rigged, so all use mxClips.
     for (const n of NPCS) {
       if (!n.mixer || n.role === 'cat') continue;
       n.mixer.update(dt);
