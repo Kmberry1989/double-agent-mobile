@@ -452,12 +452,28 @@ const INTRO = [
 function missionTarget() { return CATS.find(c => c.name === PHOTOS[photoIdx].cat); }
 // ---- Handoff: Kyle -> Rochelle ----
 // No dialogue lines are wired here yet — the flirt lines are chosen by
-// Kyle from options first, then added as dialogue steps in this cinematic.
-// This build does the camera + control switch silently: bars in, camera
-// pans to Kyle and Rochelle together, holds, bars out, control switches.
-// After the switch, Kyle stands in the room as a silent NPC (Mixamo idle),
-// Rochelle is the player, and the photo mission runs as in the
-// Rochelle-only version (moon, note, rose, north door).
+// Rendezvous dialogue, user-picked 2026-11-03 (verbatim, no other lines
+// added here): Kyle "Miss me?" then Rochelle "I was just getting
+// started without you." Press E / USE to advance each line; after the
+// last line, the camera pans back and control switches.
+// Before that pick, this cinematic ran silently — that state is gone.
+const HANDOFF_LINES = [
+  ['Kyle', 'Miss me?'],
+  ['Rochelle', 'I was just getting started without you.'],
+];
+let handoffLineIdx = 0;
+function showHandoffLine() {
+  document.getElementById('dlgName').textContent = HANDOFF_LINES[handoffLineIdx][0];
+  document.getElementById('dlgLine').textContent = HANDOFF_LINES[handoffLineIdx][1];
+  document.getElementById('dialog').style.display = 'block';
+}
+function advanceHandoffLine() {
+  if (!handoffCine || handoffLineIdx >= HANDOFF_LINES.length) return;
+  if (handoffLineIdx < HANDOFF_LINES.length - 1) { handoffLineIdx++; showHandoffLine(); return; }
+  // Last line shown: mark dialogue done and start the pan-back phase.
+  handoffLineIdx++;
+  handoffCine.t = handoffCine.dur * 0.75;
+}
 function startHandoff() {
   if (handedOff || handoffCine) return;
   if (talking) endTalk();
@@ -465,12 +481,14 @@ function startHandoff() {
   handoffCine = { t: 0, dur: 5, fromPos: camera.position.clone(), fromLook: new THREE.Vector3(player.position.x - Math.sin(yaw) * 3, 1.6, player.position.z - Math.cos(yaw) * 3), toPos: mid, toLook: mid.clone() };
   document.getElementById('barTop').style.height = '8vh';
   document.getElementById('barBottom').style.height = '8vh';
+  handoffLineIdx = 0; showHandoffLine();
   missionStage = 'handoffCine'; updateMissionHUD();
 }
 function endHandoffCine() {
   handoffCine = null;
   document.getElementById('barTop').style.height = '0';
   document.getElementById('barBottom').style.height = '0';
+  document.getElementById('dialog').style.display = 'none';
   switchControl();
 }
 function switchControl() {
@@ -503,7 +521,7 @@ function updateMissionHUD() {
   else if (cinematic) st.textContent = 'Cinematic — watch the room.';
   else if (windowOpen) st.textContent = 'Photo window open (' + Math.ceil(windowTimer) + 's) — guests are looking away. Treat ' + PHOTOS[photoIdx].cat + ', then photograph her collar.';
   else if (missionStage === 'handoff') st.textContent = 'Walk to Rochelle on the dance floor and press E / USE to rendezvous.';
-  else if (missionStage === 'handoffCine') st.textContent = 'Rendezvous — watch the room.';
+  else if (missionStage === 'handoffCine') st.textContent = 'Rendezvous — press E / USE to continue the conversation.';
   else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — press E / USE to continue.';
   else st.textContent = 'Next photo chance coming up — ' + PHOTOS[photoIdx].cat + ' (' + PHOTOS[photoIdx].symbol + ').';
   exitDoor.material.color.set(photos.length === 3 ? 0x2e7d32 : 0x7a2020);
@@ -680,7 +698,7 @@ renderer.domElement.addEventListener('touchend', (e) => { for (const t of e.chan
 document.getElementById('useBtn').onclick = () => { if (started) nearestTalk(); };
 
 function nearestTalk() {
-  if (handoffCine) return;
+  if (handoffCine) { advanceHandoffLine(); return; }
   if (missionStage === 'handoff') {
     // Before the rendezvous, only Rochelle starts the handoff; guests
     // talk normally, cats are left alone until Rochelle takes over.
@@ -721,7 +739,9 @@ function animate() {
   const dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
   if (handoffCine) {
     handoffCine.t += dt;
-    if (handoffCine.t >= handoffCine.dur) endHandoffCine();
+    // Do not end while dialogue is still waiting: hold at the midpoint
+    // until the player has advanced past the last line, then pan back.
+    if (handoffCine.t >= handoffCine.dur && handoffLineIdx >= HANDOFF_LINES.length) endHandoffCine();
   }
   if (cinematic) {
     cinematic.t += dt;
@@ -836,7 +856,8 @@ function animate() {
     let k;
     if (ph < 0.25) k = ease(ph / 0.25);
     else if (ph < 0.75) k = 1;
-    else k = 1 - ease((ph - 0.75) / 0.25);
+    else if (handoffLineIdx < HANDOFF_LINES.length) k = 1; // hold on the pair while dialogue waits for E
+    else k = 1 - ease((ph - 0.75) / 0.25); // pan back, then switch
     camera.position.lerpVectors(c.fromPos, c.toPos, k);
     camera.lookAt(new THREE.Vector3().lerpVectors(c.fromLook, c.toLook, k));
   }
