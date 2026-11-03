@@ -258,6 +258,22 @@ function stripRootTravel(clip) {
     if (raw) mxClips[key] = stripRootTravel(raw);
   }, undefined, () => {});
 });
+// Salsa dance set, user-uploaded 2026-11-03, verified on disk first:
+// all 10 are animation-only Mixamo clips, 34 bones (main body + thumb
+// and index fingers only, matching Rochelle's finger set; Kyle's extra
+// middle/ring/pinky tracks simply have no salsa track and stay put).
+// Wired subset (5 of 10, user said "use some"): __1 (4.5 s), __4
+// (28.1 s), __5 (18.8 s), __6 (12.0 s), __7 (19.0 s). The 2-second
+// snippets (__2, __3, __8, __9) and the 21.6 s base file are not wired.
+// Root XZ travel is stripped, same as walk, so the dance stays in place.
+const SALSA_KEYS = ['salsa1', 'salsa4', 'salsa5', 'salsa6', 'salsa7'];
+[['salsa1', 'Salsa_Dancing__1.fbx'], ['salsa4', 'Salsa_Dancing__4.fbx'], ['salsa5', 'Salsa_Dancing__5.fbx'], ['salsa6', 'Salsa_Dancing__6.fbx'], ['salsa7', 'Salsa_Dancing__7.fbx']].forEach(([key, file]) => {
+  fbxLoader.load('assets/animations/' + file, (obj) => {
+    const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+    if (raw) mxClips[key] = stripRootTravel(raw);
+  }, undefined, () => {});
+});
+let salsaBucket = -1;
 function playMxCharClip(char, key) {
   if (!char.mixer || !mxClips[key]) return;
   const act = char.mixer.clipAction(mxClips[key]);
@@ -461,11 +477,11 @@ function missionTarget() { return CATS.find(c => c.name === PHOTOS[photoIdx].cat
 // lines are NOT wired yet — they are presented as options first, then
 // inserted between the Donald beat and the switch. Until then, after
 // the Donald beat, E / USE takes over as Rochelle.
-// Dancing: no waltz/dance clip exists in the repo, so this is a slow
-// turn in a close hold (the pair orbit their midpoint, facing each
-// other), not a real dance clip and not a true hand-grab pose — the
-// idle clips keep their arms at their sides. A real hand-grab/dance
-// clip, if Kyle supplies one, replaces this turn.
+// Dancing: user-uploaded salsa clips (see SALSA_KEYS below) drive the
+// pair in a close hold, orbiting their midpoint and facing each other.
+// Both dance the same file at the same time, switching files every
+// 60 degrees of orbit — a synchronized salsa, not a lead/follow pair
+// and still not a true hand-grab pose.
 const HANDOFF_LINES = [
   ['Rochelle', 'Look what the cat dragged in…'],
   ['Kyle', 'Miss me?'],
@@ -507,7 +523,7 @@ function startHandoff() {
   handoffCine = { t: 0, dur: 5, fromPos: camera.position.clone(), fromLook: new THREE.Vector3(player.position.x - Math.sin(yaw) * 3, 1.6, player.position.z - Math.cos(yaw) * 3), toPos: handoffPairCam, toLook: handoffMid.clone() };
   document.getElementById('barTop').style.height = '8vh';
   document.getElementById('barBottom').style.height = '8vh';
-  handoffLineIdx = 0; handoffPhase = 'dialogue'; showHandoffLine();
+  handoffLineIdx = 0; handoffPhase = 'dialogue'; salsaBucket = -1; showHandoffLine();
   missionStage = 'handoffCine'; updateMissionHUD();
 }
 function endHandoffCine() {
@@ -884,15 +900,26 @@ function animate() {
     }
   }
   if (handoffCine && handoffPhase === 'dialogue' && handoffMid) {
-    // Slow dance turn in a close hold: the pair orbit their midpoint,
-    // facing each other, on their idle clips. No dance clip exists yet.
+    // Salsa dance in a close hold: the pair orbit their midpoint,
+    // facing each other, on the salsa clips. Each time the orbit angle
+    // changes by 60 degrees, the salsa file switches to the next one
+    // in SALSA_KEYS (crossfaded 0.15 s by playMxCharClip). If a salsa
+    // file has not loaded yet, the previous clip keeps running.
+    // Both partners dance the same file at the same time — this is a
+    // synchronized single-person salsa clip, not a lead/follow pair.
     const ang = handoffCine.t * 0.35, r = 0.6;
     player.position.set(handoffMid.x + Math.cos(ang) * r, 0, handoffMid.z + Math.sin(ang) * r);
     rochelleNPC.group.position.set(handoffMid.x - Math.cos(ang) * r, 0, handoffMid.z - Math.sin(ang) * r);
     player.rotation.y = Math.atan2(rochelleNPC.group.position.x - player.position.x, rochelleNPC.group.position.z - player.position.z);
     rochelleNPC.group.rotation.y = Math.atan2(player.position.x - rochelleNPC.group.position.x, player.position.z - rochelleNPC.group.position.z);
-    if (mixer) { mixer.update(dt); playClip('idle'); }
-    if (rochelleNPC.mixer) { rochelleNPC.mixer.update(dt); playMxCharClip(rochelleNPC, 'idle'); }
+    const bucket = Math.floor(ang / (Math.PI / 3));
+    if (bucket !== salsaBucket) {
+      salsaBucket = bucket;
+      const salsaKey = SALSA_KEYS[((bucket % SALSA_KEYS.length) + SALSA_KEYS.length) % SALSA_KEYS.length];
+      if (mxClips[salsaKey]) { playClip(salsaKey); playMxCharClip(rochelleNPC, salsaKey); }
+    }
+    if (mixer) mixer.update(dt);
+    if (rochelleNPC.mixer) rochelleNPC.mixer.update(dt);
   }
   if (handoffCine && handoffPhase === 'donald') {
     // Donald stumbles in from the doorway: slow wobbling walk north,
