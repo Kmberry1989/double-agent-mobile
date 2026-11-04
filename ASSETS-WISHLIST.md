@@ -1,138 +1,102 @@
-# Double Agent — Assets Wishlist
+# Double Agent — New Asset Wishlist
+Checked against the mobile repo on 2026-11-04. Items already in the repo and wired are NOT re-listed as missing.
 
-## Already in repo, but not wired
+## Removed from the old wishlist — now obtained
+- Cats: Mabel, Margo, Moxie GLBs, wired, with 30 pooled animation actions
+- Rochelle: Mixamo FBX, wired as contact and as player in the handoff
+- Guests: Vickie, Eric, Kristen, Donald as Mixamo FBXs, wired
+- Ballroom props: chandelier, bar, bar top, table, chair — wired
+- Ballroom textures: 56 textures in assets/textures/, ballroom set wired
+- Player weapons: all 12 white/black GLBs — wired
+- Talking dance: Rumba (pair) + Salsa solo cuts — wired
+- White Lamborghini model: assets/white_lambo.glb, now parked in the mansion drive — model obtained, driving gameplay still missing (see Courtyard)
 
-- white/black Walther, Makarov, AKS74U, RPG7
-- Suppressors
-- Throwable knife / grenade
-- Placeable C4 / claymore
-- Lockpicks
-- Watch / glasses / pen / cufflinks / bag
-- White Lambo driving gameplay
+## 1. Mansion exterior — real models to replace today's procedural build
+Today's exterior (handoff page, commit f752714) is procedural: round drive, bushes, mansion wings, columns, portico, and 6 steps are geometry, not supplied models.
+- Bush / hedge GLB — rounded mansion-style bushes, to replace procedural spheres around the drive, facade, and island
+- Mansion facade GLB — stone front, windows, and portico, to replace procedural wings and columns
+- Stone steps GLB — a flight of steps, to replace the 6 procedural step boxes
+- Driveway and lawn textures — asphalt drive, grass, stone, for the exterior ground and drive
+- North yard and road — no yard or road exists outside the north exit yet. Needed for the end cinematic escape, separate from the south drive
 
-## Animations missing
+## 2. End cinematic
+- Boarding and drive-off animation set — cats and agents getting onto / into the vehicle and driving off. Vehicle model itself is NOT missing (White Lambo is in the repo).
+- Open decision, not an asset: the Lambo is parked in the south drive, the escape exit is the north door. Whether the escape uses the south Lambo, a north vehicle, or the Lambo moves north is still open.
+- Cat tail flick clip — not separately labeled in the pooled cat actions (see 5a).
 
-- Pistol Crouch Walk
-- Pistol Crouch Fire
-- Checking Watch
-- Driving Turn
-- Motorcycle riding
+## 3. Ballroom band and bartender — still missing
+Characters, Mixamo rigs only (per the Mixamo-for-everyone direction):
+- Bartender model — Mixamo, in bartender outfit with apron, distinct from Kyle and the guests
+- Band trio models — Mixamo piano player, drummer, and bass player
 
-## Animations that would complete stealth
+Props:
+- Grand piano — black, lid open, keys, bench
+- Drum kit — small jazz kit: kick, snare, hi-hat, ride cymbal
+- Double bass — upright, with bow
+- Cake table — round, white cloth, tiered cake, knife, plates
 
-- Prone crawl
-- Lean / peek
-- Drag / hide body
-- Disguise change
-- Interrogate
-- Climb wall
-- Slide under
-- Swim
+Bar props:
+- Wine glasses, whiskey tumblers, cocktail and champagne glasses
+- Bar bottles — wine, whiskey, liquor, champagne, no readable brand text
+- Bar stools, back bar shelving and mirror, pendant lights over the bar
+- Cocktail shaker, ice bucket and bar tools, wine rack and decanter
+- Bar mats, coasters, napkins, garnish tray and extra glassware
 
-## Models missing
+Animations:
+- Bartender pour, shake, wipe, serve — distinct clips. Bartending.fbx is on disk and unwired (see section 6), it does not cover all four.
+- Drinking sip, hold-and-gesture, toast — distinct clips. Drinking.fbx is on disk and unwired (see section 6).
 
-- Motorcycle
-- Drivable car rig
-- Civilian / scientist / boss characters
-- Female agent variant
-
-## Environments missing
-
-- Enterable interior office / server / warehouse
-- Opening doors
-- Vents
-- Camera-disable security office
-- Real cover models
-
-## Textures — environment only
-
-Obtained from user (now wired into the courtyard, in `assets/textures/`): ground concrete slabs (main) plus dirt path, grass, gravel, and asphalt patches; brick interior walls; corrugated boundary walls; painted metal blue / red / olive buildings; sandbags cover walls; wood-plank crates; vent grille panel; transparent chain-link fence panel. Object, character, and weapon textures are already baked into the model files (Agent_Kyle, terror guards, weapon GLBs), so they are not listed here.
-
-Still missing:
-
-- Details: hazard stripes, signage / posters, floor markings, night / wet-look variants
-- Metal barrels (cover / prop texture, not yet supplied)
-
-## Textures — ballroom mission
-
-All environment surfaces only, for the ballroom hall in `ballroom.html` (flat-colour floor, dance floor, walls, bar, tables and chairs, chandeliers). None of these exist or are wired in — all are Still missing. Object, character, and weapon textures are baked into the models and are not listed here.
-
-- Polished wood ballroom floor
-- Dance floor — herringbone wood with marble border inlay
-- Wall panelling / wainscoting — dark wood
-- Ballroom wall upper — damask wallpaper
-- Ballroom carpet runner
-- Chandelier crystal / glass
-- Tablecloth linen — cream
-- Bar counter — wood and marble top
-- Curtains / drapes — velvet
-- Ceiling plaster / moulding
-- Chair upholstery — velvet brocade
-- Formal rug — ballroom centre
-- Entrance / exit door wood
-
-## Textures — courtyard (additional)
-
-Environment surfaces only, genuinely absent from `assets/textures/` (checked — none of the 12 obtained textures are re-listed here). All Still missing.
-
-- Facility door / EXFIL gate metal
-- Building window glass — tinted
-- Weathered concrete barrier
-- Ground tire marks / oil stains
-
-## Audio missing entirely
-
-- Suppressed / unsuppressed gunshots
-- Footsteps
-- Reload clicks
-- Alert / caution stingers
-- Guard barks
-- Ambient
-- Stealth / alert music loops
-
-## Audio — ballroom cinematic (added 2026-11-01, Rochelle photographer scene, all Still missing)
-
-- Ballroom waltz song — piano / drums / bass trio, distance-based volume, the particular song everyone dances to for the Moxie photo window (original waltz, no named track, no vocals)
+## 4. Audio — still zero audio files in the repo
+Ballroom cinematic (all still missing):
+- Waltz song — original, piano / drums / bass trio, distance-based volume, no named track
 - Piano crash — Mabel runs across the piano keys, song stops dead
 - Camera shutter click — each collar photo
-- Cat treat eating and purr — cat still while eating, photo window
-- Cat running paws — Mabel / Margo darting across the floor and out to the yard
-- Drink spill and light tumble thud — Donald spills his drink on the dance floor and falls
-- Ballroom crowd murmur and bar drinks clinking — guests dancing, then getting drinks when the music stops, then checking on Donald
-- Yard ambience — quiet outside the ballroom for the Margo photo
-- Door unlock chime — passcode moon, note, rose accepted on the north door
+- Cat treat eating and purr
+- Cat running paws
+- Drink spill and light tumble thud — Donald
+- Ballroom crowd murmur and bar drinks clinking
+- Yard ambience — outside the ballroom
+- Door unlock chime — passcode moon, note, rose accepted
 
-## Ballroom mission
+Courtyard stealth:
+- Suppressed and unsuppressed gunshots, footsteps, reload clicks
+- Alert and caution stingers, guard barks
+- Ambient loops, stealth and alert music loops
 
-The ballroom mission (`ballroom.html`) currently uses procedural placeholders for these — the real assets it still needs are:
+## 5. Courtyard stealth — still missing
+Characters, Mixamo rigs only:
+- Civilian, scientist, boss, female agent variant
 
-- Cat character models: Margo (tortoiseshell gray, mottled gray coat, harder to find), Moxie (black and white, black ears, black nose), and Mabel (black and white, white ears, pink nose) — currently simple procedural cats in those looks
-- Cat collar + electronic ID tag models (currently a procedural collar and glowing tag box)
-- Rochelle NPC model: formal ballroom look, distinct from Agent_Kyle (currently a recoloured capsule guest)
-- Real ballroom models: chandelier, round tables, chairs, bar (currently procedural)
-- Cat animations: walk, sit, idle, tail flick (currently cats wander with a simple sway; no cat clips are in the repo)
-- Cats running animation: Margo, Moxie, and Mabel running (currently cats only wander at walk speed; no cat running clip is in the repo) — Still missing, not wired in
-- Dancing animations: waltz-style couples dancing for ballroom guests (currently guests only wander and sway; no dance clips are in the repo) — Still missing, not wired in
-- Dancing animations: individual / social dancing for ballroom guests (currently guests only wander and sway; no dance clips are in the repo) — Still missing, not wired in
+Vehicles and driving:
+- Motorcycle model, motorcycle riding animation
+- Drivable car rig, Driving Turn animation
+- White Lambo driving gameplay — system, not model. Model is obtained.
 
-## Ballroom bar props (added 2026-10-31)
+Animations:
+- Pistol Crouch Walk, Pistol Crouch Fire, Checking Watch
+- Prone crawl, lean / peek, drag / hide body, disguise change, interrogate, climb wall, slide under, swim
 
-The ballroom bar in `ballroom.html` currently has a bar, bar top, and a drink glass in Donald's hand only. The real assets it still needs are:
+Systems, not models:
+- Throwable knife / grenade, placeable C4 / claymore, lockpicks
 
-- Wine glasses: 3D model prompt: realistic game-ready 3D models of wine glasses for a ballroom bar, clean topology, PBR glass textures, no background, no people, no text: a set of red wine glasses with a wide bowl, white wine glasses with a narrower bowl, and champagne flutes, each on a thin stem, sized for a bar counter and a guest's hand.
-- Whiskey glasses (tumblers): 3D model prompt: realistic game-ready 3D models of whiskey tumblers for a ballroom bar, clean topology, PBR glass textures, no background, no people, no text: short heavy-based rocks glasses, some empty, some with amber liquid and a single ice cube, sized for a bar counter and a guest's hand.
-- Cocktail and champagne glasses: 3D model prompt: realistic game-ready 3D models of cocktail glasses for a ballroom bar, clean topology, PBR glass textures, no background, no people, no text: martini coupes, champagne coupes, and highball glasses, empty and with a light-coloured drink, sized for a bar counter.
-- Bar bottles — wine, whiskey, and liquor: 3D model prompt: realistic game-ready 3D models of bar bottles for a ballroom bar back shelf, clean topology, PBR textures, no background, no people, no readable brand text: wine bottles in dark green glass, whiskey bottles in amber glass with a square shoulder, clear liquor bottles, and champagne bottles with a foil top, in a row sized for a bar shelf.
-- Bar stools: 3D model prompt: realistic game-ready 3D model of bar stools for a ballroom bar, clean topology, PBR textures, no background, no people, no text: tall stools with a round padded seat in dark velvet, a brass footrest ring, and four slim legs, sized to tuck under a 1.1 metre bar counter.
-- Back bar shelving and bar mirror: 3D model prompt: realistic game-ready 3D models of back bar shelving for a ballroom bar, clean topology, PBR textures, no background, no people, no text: a two-tier dark wood shelf unit with a brass rail and a large framed mirror behind it, sized to stand behind a 4 metre bar counter.
-- Cocktail shaker, ice bucket, and bar tools: 3D model prompt: realistic game-ready 3D models of bar tools for a ballroom bar, clean topology, PBR metal textures, no background, no people, no text: a stainless cocktail shaker, a silver ice bucket with tongs, a bottle opener, a corkscrew, and a jigger, sized for a bar counter.
-- Wine rack and decanter: 3D model prompt: realistic game-ready 3D models of a wine rack and a decanter for a ballroom bar, clean topology, PBR textures, no background, no people, no text: a small dark wood wine rack holding six bottles on their sides, and a wide glass decanter, sized for a bar corner.
-- Bar mats, coasters, and napkins: 3D model prompt: realistic game-ready 3D models of bar mats, coasters, and napkins for a ballroom bar, clean topology, PBR textures, no background, no people, no text: black rubber bar mats, round cream coasters, and folded white napkins in a small holder, sized for a bar counter.
-- Garnish tray and glassware extras: 3D model prompt: realistic game-ready 3D models of a garnish tray and extra glassware for a ballroom bar, clean topology, PBR textures, no background, no people, no text: a tray with lemon and lime wedges, olives, and cocktail picks, plus shot glasses and beer mugs, sized for a bar counter.
-- Pendant lights over the bar: 3D model prompt: realistic game-ready 3D models of pendant lights over a ballroom bar, clean topology, PBR textures, no background, no people, no text: three brass pendant shades with warm glowing bulbs hanging on short cords, sized to hang above a 4 metre bar counter.
-- Cake table: 3D model prompt: realistic game-ready 3D model of a cake table for a ballroom, clean topology, PBR textures, no background, no people, no text: a small round table with a white cloth and a tiered celebration cake with cream frosting on a stand, plus a cake knife and plates, sized for a ballroom corner.
-- Grand piano: 3D model prompt: realistic game-ready 3D model of a grand piano for a ballroom, clean topology, PBR textures, no background, no people, no text: a black grand piano with the lid open on its prop stick, keys, three legs, and a matching bench, sized for a ballroom corner where a trio can play.
-- Drum kit and bass for the trio: 3D model prompt: realistic game-ready 3D models of a drum kit and a double bass for a ballroom trio, clean topology, PBR textures, no background, no people, no text: a small jazz drum kit with kick, snare, hi-hat and a ride cymbal, and an upright double bass with a bow, sized for a ballroom band corner.
-- Drinking animations: Animation brief, for a human character at a gala holding a drink: 1) Sip: raise a glass to the lips, take a small sip, lower it back down, loop-ready. 2) Hold and gesture: hold a glass at waist height while talking, with small hand gestures. 3) Toast: raise the glass toward another guest, clink, and sip. Full body in frame, front reference view, no other motion. This is being searched on Mixamo as well as listed here.
-- Bartender NPC model: 3D model prompt: realistic game-ready 3D model of a bartender for a ballroom bar, clean topology, PBR textures, no background, no text: a person in a bartender outfit with a waist apron and rolled sleeves, standing behind a bar counter in a neutral pose, full body in frame, rigged for idle, walk, talk, pour, shake, and wipe animation, clearly distinct from the player model Agent_Kyle and from the ballroom guests.
-- Bartender animations — pour, shake, wipe, serve: Animation brief, for a human character behind a bar counter: 1) Pour: tilt a bottle over a glass and pour, then set the bottle down, one-shot. 2) Shake: shake a cocktail shaker with both hands at chest height for a few seconds, then set it down, loop-ready. 3) Wipe: wipe the bar counter in long strokes with a cloth, loop. 4) Serve: slide a glass across the counter toward a guest, one-shot. Full body in frame, front reference view, no other motion. This is being searched on Mixamo as well as listed here.
+Environments:
+- Enterable interior office, server room, warehouse
+- Opening interior doors, vents, camera-disable security office, real cover models
+
+Textures, still missing:
+- Hazard stripes, signage / posters, floor markings, night / wet-look variants
+
+Textures obtained, unwired (files exist, not referenced in any page — do not re-request): facility door / EXFIL gate metal, metal barrel textures, weathered concrete barrier texture. Building window glass and tire marks / oil stains textures are now wired in the courtyard, so they are removed from missing.
+
+## 5a. Checked, not dropped
+- Suppressors, glasses, watch — wired in the courtyard (suppressor, glasses, watch loaders), not missing.
+- Pen, cufflinks, bag — GLBs exist, intentionally HUD-only: no sensible bone anchor that would not clip the weapon hand, per the courtyard comment. Not missing.
+- Cat tail flick — not separately labeled in the 30 pooled cat actions, so it is kept below as a still-missing clip unless it is already inside an idle/sit clip.
+- Opening_Door_Inwards clip exists in the courtyard animation manifest; an interior door system is still missing.
+
+## 6. Obtained but unwired — awaiting your pick, NOT missing
+Do not re-request these. They are verified on disk and ready to wire on your tap:
+- Dance: Samba, Twist, YMCA, Macarena, Hokey Pokey, Dancing (needs root strip)
+- Drunk set: Drunk Idle, Idle Variation, Stumbling Walk, Walk, Walk Backwards, Run Forward, Run Backward
+- Drinking, Bartending
+- Falling_Down — candidate to replace Donald's procedural fall, Mixamo Donald now exists
