@@ -1064,6 +1064,12 @@ const keys = {};
 let yaw = 0, pitch = 0.15, started = false, joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 if (isTouch) document.body.classList.add('touch');
+// Ballroom waltz (user-supplied, mono AAC): looping background music, started on the Enter tap (the user gesture iPhone Safari needs for audio).
+const waltzAudio = new Audio('assets/audio/ballroom_waltz.m4a');
+waltzAudio.loop = true; waltzAudio.volume = 0.7;
+function startWaltz(){ if (waltzAudio.paused) waltzAudio.play().catch(()=>{}); }
+function stopWaltz(){ if (!waltzAudio.paused) waltzAudio.pause(); }
+document.addEventListener('pointerdown', ()=>{ if (started && !won) startWaltz(); });
 document.getElementById('startBtn').onclick = () => {
   document.getElementById('overlay').style.display = 'none'; started = true;
   missionStage = 'outside'; updateMissionHUD();
@@ -1131,7 +1137,7 @@ function nearestTalk() {
   else {
     // Near exit?
     if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
-      if (photos.length === 3 && !won) { won = true; document.getElementById('winText').textContent = 'You photographed all 3 cat collars — moon, note, rose, in that order — while the guests looked away, and slipped out the north door. Still just the photographer.'; document.getElementById('win').style.display = 'flex'; }
+      if (photos.length === 3 && !won) { won = true; stopWaltz(); document.getElementById('winText').textContent = 'You photographed all 3 cat collars — moon, note, rose, in that order — while the guests looked away, and slipped out the north door. Still just the photographer.'; document.getElementById('win').style.display = 'flex'; }
     }
   }
 }
