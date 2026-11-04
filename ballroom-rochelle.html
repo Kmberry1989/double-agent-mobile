@@ -434,6 +434,221 @@ const CATS = [
 // wandering all work for them exactly like the guests. They have no
 // health, damage, or combat code anywhere — they cannot be fought.
 NPCS.push(...CATS);
+// ---- Real GLB cats + pooled animations (2026-11-04) ----
+// Cats load as GLBs (Mabel/Margo/Moxie, 0.5 m tall, faces +Z, no turn),
+// with all animations pooled across cats + the More batch, by canonical
+// label. Each cat uses its own clip for an action when it has one,
+// otherwise another cat's clip (same 33-bone rig, so it plays cleanly).
+// Procedural spheres stay as fallback and hide only on successful load.
+const CAT_LABELS = {
+  Mabel: {
+    '1cf7270f-6184-4446-95fb-65b6e74a7b31': 'walk',
+    '1fe05240-ee28-48bc-8e22-47cf4258a154': 'eat',
+    '67621291-ce2b-4c4d-a1ee-ee78487d16db': 'running leap',
+    'c0c27724-a025-4dfe-a20b-8591afd76fc2': 'trot',
+    'ca2e3dda-fccd-4b09-a631-44ccf0c1f780': 'gallop',
+    'd200fef0-3ff1-4b3e-a7ea-850bbec5ed9d': 'sit',
+    'da96478c-5ab8-4c52-be99-b2e35e4d73db': 'scratch furniture',
+    'f0ae8d58-b419-4d60-9135-c2508b4d5cfe': 'stand',
+    'f7f21fc2-9642-4041-adeb-fab4c47e6e1d': 'start walk',
+    'f849bf50-4d55-47bc-9988-523744d205e1': 'laying'
+  },
+  Margo: {
+    '2f2bdf5a-4a96-4110-b596-cd2c0e1dd9b7': 'from laying to sitting',
+    '1acdce41-81f6-41ca-8592-f8ae3c2023b9': 'slow walk',
+    '3257fce3-6380-453b-8ccd-673700cd6892': 'defensive scared',
+    '3ad68afe-e66c-47e0-995f-56023f277c1c': 'distracted',
+    '703cd6d7-9e07-4ff7-a76d-6f9560e6708c': 'sit',
+    '718dfbcc-f495-4f3b-9742-0b4be26f920c': 'start walk',
+    'c6c3a10d-8b34-495a-b022-2ca3ece6d938': 'running leap',
+    'eae36911-ce00-4c14-8788-203c13f9e9a4': 'eat',
+    'ebc35721-0db8-4541-945b-92dc10289338': 'climb over small obstacle',
+    'f673a63d-42fa-4dec-a26b-1476bbbd1b66': 'stop walk'
+  },
+  Moxie: {
+    '037c9b9a-f766-4261-a518-c9ab8725f4e9': 'from laying to sitting',
+    '24a6632d-93da-4e4d-85d6-f41c145946b8': 'gallop',
+    '2bcac494-fe1d-4be4-b948-b69dff552342': 'idle',
+    '2dcfff75-e05d-4b31-a2a9-98c423315956': 'from sitting to idle',
+    '59d9edbe-6a4a-455d-baeb-285fc9f54679': 'laying, getting comfortable',
+    '66d14cc1-b97e-4c84-9f62-c4cc651c8acb': 'turn left',
+    '79e7714f-38e8-4366-9387-369fc07950f6': 'slow walk',
+    'd220d22d-6ee4-458c-a070-ef9b61901bc5': 'start walk',
+    'dbb539d0-ca9c-41de-b7ac-2e1f6768f58b': 'stop walk',
+    'dbc457af-08b9-49ce-8d9c-fd6b5c200c1a': 'excited trot'
+  },
+  More: {
+    '079d4468-b2c8-4df4-8895-227362325c25': 'idle, curious',
+    '132681f1-e799-4695-b008-c9f1c8f05708': 'sneak',
+    '1aad1a61-9661-4343-97d6-2a438afe1273': 'stand on hind legs',
+    '293527ae-4043-432a-bd9d-4b63c5ea762b': 'eat',
+    '660b1d28-d796-42e0-8adb-ff0aa067edde': 'turn in place',
+    '8fe930ba-1fa5-4476-97f0-451837fee110': 'kick dirt up',
+    'a62e2e95-4b7d-4be7-94d2-31fb07587bb7': 'dodge',
+    'c50e95c1-6c24-4f99-bdaa-a76efdb98cce': 'attack forward leap',
+    'cc9a2fba-3a5c-49ab-b224-317d9111f1b1': 'left paw attack',
+    'f43a965a-34a6-4894-bdc1-5dc73f0b5f97': 'right paw attack'
+  }
+};
+// Canonical merges (user-confirmed): eating -> eat, walk slow -> slow walk, sitting -> sit.
+const CAT_CANON = { 'eating': 'eat', 'walk slow': 'slow walk', 'sitting': 'sit' };
+function catCanon(label) { return CAT_CANON[label] || label; }
+function stripCatClip(clip) {
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    if (t.name === 'Hips.position' && nt.values && nt.values.length >= 3) {
+      const x0 = nt.values[0], z0 = nt.values[2];
+      for (let i = 0; i + 2 < nt.values.length; i += 3) { nt.values[i] = x0; nt.values[i + 2] = z0; }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
+const catClipSources = {};
+let catLoadsDone = 0;
+function buildCatClipLibraries() {
+  for (const cat of CATS) {
+    cat.clips = {};
+    const order = [cat.name, 'Mabel', 'Margo', 'Moxie', 'More'];
+    for (const src of order) {
+      const srcClips = catClipSources[src]; if (!srcClips) continue;
+      for (const action in srcClips) { if (!cat.clips[action]) cat.clips[action] = srcClips[action]; }
+    }
+  }
+}
+function loadCatGLB(cat) {
+  gltfLoader.load('assets/models/cats/' + cat.name + '.glb', (gltf) => {
+    const obj = gltf.scene;
+    fitCharacter(obj, 0.5);
+    cat.group.add(obj); cat.model = obj;
+    cat.mixer = new THREE.AnimationMixer(obj); cat._curCatClip = null;
+    cat.group.children.forEach((child) => {
+      if (child.isMesh && child.geometry.type !== 'TorusGeometry' && !(child.material && child.material.emissiveIntensity === 1.4)) child.visible = false;
+    });
+    const src = {};
+    (gltf.animations || []).forEach((clip) => {
+      const label = CAT_LABELS[cat.name] && CAT_LABELS[cat.name][clip.name];
+      if (label) src[catCanon(label)] = stripCatClip(clip);
+    });
+    catClipSources[cat.name] = src; catLoadsDone++;
+    if (catLoadsDone >= 4) buildCatClipLibraries();
+  }, undefined, () => {});
+}
+CATS.forEach((cat) => loadCatGLB(cat));
+gltfLoader.load('assets/models/cats/morecatanimations.glb', (gltf) => {
+  const src = {};
+  (gltf.animations || []).forEach((clip) => {
+    const label = CAT_LABELS.More[clip.name];
+    if (label) src[catCanon(label)] = stripCatClip(clip);
+  });
+  catClipSources.More = src; catLoadsDone++;
+  if (catLoadsDone >= 4) buildCatClipLibraries();
+}, undefined, () => {});
+function playCatClip(cat, action, loop) {
+  if (!cat.mixer || !cat.clips || !cat.clips[action]) return;
+  const clip = cat.clips[action];
+  const act = cat.mixer.clipAction(clip);
+  if (cat._curCatClip === act && act.isRunning()) return;
+  if (cat._curCatClip && cat._curCatClip !== act) cat._curCatClip.fadeOut(0.15);
+  act.reset();
+  if (loop === false) { act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; }
+  else { act.setLoop(THREE.LoopRepeat, Infinity); }
+  act.fadeIn(0.15).play(); cat._curCatClip = act;
+}
+function catMoveClip(cat) {
+  if (cat.name === 'Mabel') return 'walk';
+  return 'slow walk';
+}
+function updateCatClips() {
+  for (const cat of CATS) {
+    if (!cat.mixer || !cat.clips) continue;
+    if (cat.playFightOverride) { playCatClip(cat, cat.playFightOverride, cat.playFightLoop !== false); continue; }
+    if (cat.fed) { playCatClip(cat, 'sit', true); continue; }
+    if (cat.hiding) { playCatClip(cat, 'sit', true); continue; }
+    if (cat.fleeing) { playCatClip(cat, cat.clips['gallop'] ? 'gallop' : catMoveClip(cat), true); continue; }
+    if (cat.moving) { playCatClip(cat, catMoveClip(cat), true); continue; }
+    if (cat.pause > 0) { playCatClip(cat, cat.clips['stand'] ? 'stand' : 'idle', true); continue; }
+    playCatClip(cat, cat.clips['idle'] ? 'idle' : 'stand', true);
+  }
+}
+// ---- Play fight: Moxie + Mabel, after both photographed, until Margo photographed / win ----
+// Trigger: photos.length >= 2 (Moxie moon + Mabel note done, mission is now Margo).
+// Flee overrides: approach within 2.0 m calls fleeCat, play fight pauses until flee ends.
+const playFight = { active: false, phase: 'gather', timer: 0, spot: [0, 0], attacker: 'Moxie', attacksDone: 0 };
+function pickPlaySpot() {
+  const x = -12 + Math.random() * 24, z = -10 + Math.random() * 20;
+  playFight.spot = [x, z];
+}
+function updatePlayFight(dt) {
+  const moxie = CATS.find(c => c.name === 'Moxie'), mabel = CATS.find(c => c.name === 'Mabel');
+  if (!moxie || !mabel || won) { playFight.active = false; return; }
+  if (photos.length < 2 || photos.length >= 3) { playFight.active = false; moxie.playFightOverride = null; mabel.playFightOverride = null; return; }
+  if (cinematic || (typeof handoffCine !== 'undefined' && handoffCine)) { return; }
+  for (const cat of [moxie, mabel]) {
+    if (!cat.fed && !cat.fleeing && cat.group.position.distanceTo(player.position) < 2.0 && !(windowOpen && cat === missionTarget())) {
+      fleeCat(cat); playFight.active = false; playFight.phase = 'gather';
+      moxie.playFightOverride = null; mabel.playFightOverride = null; return;
+    }
+    if (cat.fleeing || cat.fed) { playFight.active = false; moxie.playFightOverride = null; mabel.playFightOverride = null; return; }
+  }
+  if (!playFight.active) { playFight.active = true; playFight.phase = 'gather'; pickPlaySpot(); playFight.timer = 0; }
+  const spot = playFight.spot;
+  const targets = { 'Moxie': [spot[0] - 0.6, spot[1]], 'Mabel': [spot[0] + 0.6, spot[1]] };
+  if (playFight.phase === 'gather') {
+    let allArrived = true;
+    for (const cat of [moxie, mabel]) {
+      const tgt = targets[cat.name];
+      const ddx = tgt[0] - cat.group.position.x, ddz = tgt[1] - cat.group.position.z, d = Math.hypot(ddx, ddz);
+      if (d > 0.3) {
+        allArrived = false;
+        const sp = 1.0;
+        cat.group.position.x += ddx / d * sp * dt; cat.group.position.z += ddz / d * sp * dt;
+        cat.group.rotation.y = Math.atan2(ddx, ddz); cat.moving = true;
+        cat.playFightOverride = cat.clips && cat.clips['trot'] ? 'trot' : (cat.clips && cat.clips['gallop'] ? 'gallop' : catMoveClip(cat)); cat.playFightLoop = true;
+      } else {
+        cat.moving = false;
+        const other = cat === moxie ? mabel : moxie;
+        cat.group.rotation.y = Math.atan2(other.group.position.x - cat.group.position.x, other.group.position.z - cat.group.position.z);
+        cat.playFightOverride = 'stand'; cat.playFightLoop = true;
+      }
+    }
+    if (allArrived) { playFight.phase = 'faceoff'; playFight.timer = 1.0; }
+    return;
+  }
+  if (playFight.phase === 'faceoff') {
+    for (const cat of [moxie, mabel]) {
+      cat.moving = false;
+      const other = cat === moxie ? mabel : moxie;
+      cat.group.rotation.y = Math.atan2(other.group.position.x - cat.group.position.x, other.group.position.z - cat.group.position.z);
+      cat.playFightOverride = 'stand'; cat.playFightLoop = true;
+    }
+    playFight.timer -= dt;
+    if (playFight.timer <= 0) { playFight.phase = 'attack'; playFight.attacksDone = 0; playFight.timer = 1.2; }
+    return;
+  }
+  if (playFight.phase === 'attack') {
+    const attacker = playFight.attacker === 'Moxie' ? moxie : mabel;
+    const defender = playFight.attacker === 'Moxie' ? mabel : moxie;
+    for (const cat of [moxie, mabel]) {
+      cat.moving = false;
+      const other = cat === moxie ? mabel : moxie;
+      cat.group.rotation.y = Math.atan2(other.group.position.x - cat.group.position.x, other.group.position.z - cat.group.position.z);
+    }
+    const attacks = ['left paw attack', 'right paw attack', 'attack forward leap'];
+    const attack = attacks[playFight.attacksDone % attacks.length];
+    attacker.playFightOverride = attack; attacker.playFightLoop = false;
+    defender.playFightOverride = 'dodge'; defender.playFightLoop = false;
+    playFight.timer -= dt;
+    if (playFight.timer <= 0) {
+      playFight.attacksDone++;
+      playFight.attacker = playFight.attacker === 'Moxie' ? 'Mabel' : 'Moxie';
+      playFight.timer = 1.2;
+      if (playFight.attacksDone >= 6) { playFight.phase = 'gather'; pickPlaySpot(); }
+    }
+    return;
+  }
+}
+
 // Real cat collars replace the torus collars when loaded (the glowing tag
 // stays — it is the scannable part). Real scanner: the player carries it
 // at their right side, since it is the tool used to scan the tags.
@@ -737,9 +952,11 @@ function animate() {
     else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
       if (prompt) { prompt.textContent = photos.length === 3 ? 'North exit open — press E / USE to leave' : 'North exit is locked — photograph all 3 collars first (moon, note, rose)'; prompt.style.display = 'block'; }
     } else { if (prompt) prompt.style.display = 'none'; if (talking) endTalk(); }
+    updatePlayFight(dt);
     // NPC wander + sway
     for (const n of NPCS) {
       if (n === talking) continue;
+      if (n.role === 'cat' && (n.name === 'Moxie' || n.name === 'Mabel') && playFight.active && !n.fleeing && !n.fed) continue; // play fight moves these cats, not the wander loop
       if (windowOpen && n.role !== 'cat') {
         // Everybody's back is turned: dancing, at the bar, or checking on
         // Donald. Nobody is watching Rochelle or the cat.
@@ -784,6 +1001,7 @@ function animate() {
       }
       else { const sp = n.fleeing ? 2.6 : (n.shy ? 0.5 : 0.8); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); n.moving = true; }
     }
+    updateCatClips(); for (const cat of CATS) { if (cat.mixer) cat.mixer.update(dt); }
   }
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
   camera.position.set(player.position.x + back.x * 5, 2.6, player.position.z + back.z * 5);
