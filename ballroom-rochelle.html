@@ -30,7 +30,7 @@
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
-<div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div></div>
+<div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div><div class="hint">Tap dialogue to continue</div></div>
 <div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span><div id="missionStatus">Kyle is on your earpiece.</div></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>Rochelle's Photo Mission</h1><p>Photographer first, agent second. Kyle is on your earpiece.</p><button id="startBtn">Enter as Rochelle</button><p><a href="ballroom.html">Back to the Kyle-player ballroom</a></p></div>
@@ -259,7 +259,7 @@ function playCharClip(char, key) {
   act.reset().fadeIn(0.15).play(); char._cur = act;
 }
 // ---- Player (Rochelle_undercover, Mixamo — no weapon is ever attached) ----
-const player = new THREE.Group(); player.position.set(0, 0, 12); scene.add(player);
+const player = new THREE.Group(); player.position.set(0, 0, 8); scene.add(player);
 let playerModel = null, mixer = null;
 const fbxLoader = new FBXLoader();
 // Player Rochelle is now Mixamo (Rochelle_undercover_textured.glb), so
@@ -293,9 +293,9 @@ function playMxCharClip(char, key) {
 }
 fbxLoader.load('assets/models/Rochelle_undercover.fbx', (obj) => {
   fitCharacter(obj, 1.8);
-  // Rochelle's FBX faces +X, not +Z: +PI/2 turns it to face forward
-  // for a player (camera yaw), where +Z in group space is toward camera.
-  obj.rotation.y = Math.PI / 2;
+  // Rochelle's FBX faces +Z in Three.js (0.88 wide in X, 0.23 deep in Z),
+  // like the other guests: PI turns it to face forward for a player.
+  obj.rotation.y = Math.PI;
   applyBasecolor(obj, 'assets/models/textures/Rochelle_basecolor.jpg');
   player.add(obj); playerModel = obj;
   mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
@@ -434,6 +434,35 @@ const CATS = [
 // wandering all work for them exactly like the guests. They have no
 // health, damage, or combat code anywhere — they cannot be fought.
 NPCS.push(...CATS);
+// ---- Dialogue: typewriter + tap to advance/dismiss (mobile, 2026-11-04) ----
+// Tap the dialogue box: first tap finishes the line instantly, next tap
+// advances to the next line, or hides the dialogue if it was a photo line.
+// Typewriter runs at 20 ms per character. Keyboard E / USE still works,
+// it is just no longer listed in the game text.
+let typeTimer = null, typeFullLine = '', typeIdx = 0, typing = false, dialogMode = 'talk';
+function typeDialogue(name, line) {
+  const nameEl = document.getElementById('dlgName'), lineEl = document.getElementById('dlgLine');
+  if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+  nameEl.textContent = name; typeFullLine = line; typeIdx = 0; typing = true; dialogMode = 'talk';
+  lineEl.textContent = '';
+  typeTimer = setInterval(() => {
+    typeIdx++;
+    lineEl.textContent = typeFullLine.slice(0, typeIdx);
+    if (typeIdx >= typeFullLine.length) { clearInterval(typeTimer); typeTimer = null; typing = false; }
+  }, 20);
+}
+function finishTyping() {
+  if (!typing) return false;
+  if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+  document.getElementById('dlgLine').textContent = typeFullLine; typing = false; return true;
+}
+document.getElementById('dialog').addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  if (finishTyping()) return;
+  if (dialogMode === 'photo') { document.getElementById('dialog').style.display = 'none'; return; }
+  if (typeof nearestTalk === 'function') nearestTalk();
+});
+
 // ---- Real GLB cats + pooled animations (2026-11-04) ----
 // Cats load as GLBs (Mabel/Margo/Moxie, 0.5 m tall, faces +Z, no turn),
 // with all animations pooled across cats + the More batch, by canonical
@@ -691,22 +720,18 @@ function updateMissionHUD() {
   const slots = document.getElementById('photoSlots');
   if (slots) slots.textContent = PHOTOS.map((p, i) => i < photos.length ? p.symbol : '—').join(' ');
   const st = document.getElementById('missionStatus'); if (!st) return;
-  if (photos.length === 3) st.textContent = 'Moon, note, rose — north door open. Walk to it and press E / USE.';
+  if (photos.length === 3) st.textContent = 'Moon, note, rose — north door open. Walk to it and tap USE.';
   else if (cinematic) st.textContent = 'Cinematic — watch the room.';
   else if (windowOpen) st.textContent = 'Photo window open (' + Math.ceil(windowTimer) + 's) — guests are looking away. Treat ' + PHOTOS[photoIdx].cat + ', then photograph her collar.';
-  else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — press E / USE to continue.';
+  else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — tap the dialogue to continue.';
   else st.textContent = 'Next photo chance coming up — ' + PHOTOS[photoIdx].cat + ' (' + PHOTOS[photoIdx].symbol + ').';
   exitDoor.material.color.set(photos.length === 3 ? 0x2e7d32 : 0x7a2020);
 }
 function showIntroLine() {
-  document.getElementById('dlgName').textContent = INTRO[introIdx][0];
-  document.getElementById('dlgLine').textContent = INTRO[introIdx][1];
-  document.getElementById('dialog').style.display = 'block';
+  typeDialogue(INTRO[introIdx][0], INTRO[introIdx][1]); document.getElementById('dialog').style.display = 'block';
 }
 function showPhotoLine(name, line) {
-  document.getElementById('dlgName').textContent = name;
-  document.getElementById('dlgLine').textContent = line;
-  document.getElementById('dialog').style.display = 'block';
+  typeDialogue(name, line); dialogMode = 'photo'; document.getElementById('dialog').style.display = 'block';
 }
 function startCinematic(idx) {
   const p = PHOTOS[idx], target = missionTarget();
@@ -743,7 +768,7 @@ function closeWindow() {
 // ---- Cat chase + treats + Margo reveal ----
 // Taming loop, all three cats: a cat runs from point to point away from
 // you. At each stop, press E / USE once to give it a treat — it stays put
-// for a few seconds — then press E / USE again to scan its tag. If you
+// for a few seconds — then tap USE again to scan its tag. If you
 // wait too long after the treat, it runs to the next point and you have
 // to give it another treat to try again. Treats are unlimited; there is
 // no treat pickup or inventory to manage.
@@ -819,18 +844,16 @@ function talkTo(npc) {
 function showLine() {
   if (!talking) return;
   let line = talking.lines[lineIdx % talking.lines.length];
-  if (talking.role === 'cat' && !talking.fed) line = 'You offer ' + talking.name + ' a treat. She sniffs it, eats it, and stays put — quick, press E / USE again to scan her tag before she changes her mind.';
-  document.getElementById('dlgName').textContent = talking.name;
-  document.getElementById('dlgLine').textContent = line;
-  document.getElementById('dialog').style.display = 'block';
+  if (talking.role === 'cat' && !talking.fed) line = 'You offer ' + talking.name + ' a treat. She sniffs it, eats it, and stays put — quick, tap USE again to scan her tag before she changes her mind.';
+  typeDialogue(talking.name, line); document.getElementById('dialog').style.display = 'block';
   playClip('talk');
   if (talking.mixer) playMxCharClip(talking, 'talk');
 }
-function endTalk() { talking = null; document.getElementById('dialog').style.display = 'none'; }
+function endTalk() { if (typeTimer) { clearInterval(typeTimer); typeTimer = null; typing = false; } talking = null; document.getElementById('dialog').style.display = 'none'; }
 
 // ---- Input: keyboard + touch (no combat controls anywhere) ----
 const keys = {};
-let yaw = Math.PI, pitch = 0.15, started = false, joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
+let yaw = 0, pitch = 0.15, started = false, joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 if (isTouch) document.body.classList.add('touch');
 document.getElementById('startBtn').onclick = () => {
@@ -948,9 +971,9 @@ function animate() {
     // The prompt element was removed with the HUD text, so prompt is null:
     // only end a conversation when nobody is nearby, not on every frame.
     // (Without this, dialogue closed one frame after opening.)
-    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — press E / USE'; prompt.style.display = 'block'; } }
+    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — tap USE'; prompt.style.display = 'block'; } }
     else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
-      if (prompt) { prompt.textContent = photos.length === 3 ? 'North exit open — press E / USE to leave' : 'North exit is locked — photograph all 3 collars first (moon, note, rose)'; prompt.style.display = 'block'; }
+      if (prompt) { prompt.textContent = photos.length === 3 ? 'North exit open — tap USE to leave' : 'North exit is locked — photograph all 3 collars first (moon, note, rose)'; prompt.style.display = 'block'; }
     } else { if (prompt) prompt.style.display = 'none'; if (talking) endTalk(); }
     updatePlayFight(dt);
     // NPC wander + sway

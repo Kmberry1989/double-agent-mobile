@@ -26,7 +26,7 @@
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
-<div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div></div>
+<div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div><div class="hint">Tap dialogue to continue</div></div>
 <div id="overlay"><h1>Undercover Ballroom</h1><button id="startBtn">Enter the ballroom</button><p><a href="index.html">Back to the courtyard mission</a></p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="joy"><div id="knob"></div></div>
@@ -262,7 +262,7 @@ function playCharClip(char, key) {
 // Each character uses only its own skeleton's clips, never mixed.
 // Root XZ travel is stripped from the player clips (game code moves the
 // player), Y bob is kept, so walk stays in place under the player group.
-const player = new THREE.Group(); player.position.set(0, 0, 12); scene.add(player);
+const player = new THREE.Group(); player.position.set(0, 0, 8); scene.add(player);
 let playerModel = null, mixer = null;
 const fbxLoader = new FBXLoader();
 const mxClips = {};
@@ -358,7 +358,7 @@ function loadGuestModel(npc, path) {
   }, undefined, () => {});
 }
 const NPCS = [
-  makeGuest({ name: 'Rochelle', role: 'contact', model: 'assets/models/Rochelle_undercover.fbx', texture: 'assets/models/textures/Rochelle_basecolor.jpg', turn: -Math.PI / 2, color: 0x0e5a3a, skin: 0xe8b48a, x: 15, z: 6, wps: [[15, 6], [12, 4], [16, 2]], lines: ['You found me. So — do you know the three words?', 'Come back when you have all three. The cats carry them on their collars.'] }),
+  makeGuest({ name: 'Rochelle', role: 'contact', model: 'assets/models/Rochelle_undercover.fbx', texture: 'assets/models/textures/Rochelle_basecolor.jpg', turn: 0, color: 0x0e5a3a, skin: 0xe8b48a, x: 15, z: 6, wps: [[15, 6], [12, 4], [16, 2]], lines: ['You found me. So — do you know the three words?', 'Come back when you have all three. The cats carry them on their collars.'] }),
   makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/models/Vickie.fbx', texture: 'assets/models/textures/Vickie_basecolor.png', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Rochelle is near the bar, in green. She is the one to find.'] }),
   makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/models/Eric.fbx', texture: 'assets/models/textures/Eric_basecolor.png', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
   makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/models/Kristen.fbx', texture: 'assets/models/textures/Kristen_basecolor.png', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'If you are looking for Rochelle, try by the bar.'] }),
@@ -444,6 +444,35 @@ const CATS = [
 // wandering all work for them exactly like the guests. They have no
 // health, damage, or combat code anywhere — they cannot be fought.
 NPCS.push(...CATS);
+// ---- Dialogue: typewriter + tap to advance/dismiss (mobile, 2026-11-04) ----
+// Tap the dialogue box: first tap finishes the line instantly, next tap
+// advances to the next line, or hides the dialogue if it was a photo line.
+// Typewriter runs at 20 ms per character. Keyboard E / USE still works,
+// it is just no longer listed in the game text.
+let typeTimer = null, typeFullLine = '', typeIdx = 0, typing = false, dialogMode = 'talk';
+function typeDialogue(name, line) {
+  const nameEl = document.getElementById('dlgName'), lineEl = document.getElementById('dlgLine');
+  if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+  nameEl.textContent = name; typeFullLine = line; typeIdx = 0; typing = true; dialogMode = 'talk';
+  lineEl.textContent = '';
+  typeTimer = setInterval(() => {
+    typeIdx++;
+    lineEl.textContent = typeFullLine.slice(0, typeIdx);
+    if (typeIdx >= typeFullLine.length) { clearInterval(typeTimer); typeTimer = null; typing = false; }
+  }, 20);
+}
+function finishTyping() {
+  if (!typing) return false;
+  if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+  document.getElementById('dlgLine').textContent = typeFullLine; typing = false; return true;
+}
+document.getElementById('dialog').addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  if (finishTyping()) return;
+  if (dialogMode === 'photo') { document.getElementById('dialog').style.display = 'none'; return; }
+  if (typeof nearestTalk === 'function') nearestTalk();
+});
+
 // Real cat collars replace the torus collars when loaded (the glowing tag
 // stays — it is the scannable part). Real scanner: the player carries it
 // at their right side, since it is the tool used to scan the tags.
@@ -464,7 +493,7 @@ const clues = new Set(); let contactFound = false, won = false, talking = null, 
 // ---- Cat chase + treats + Margo reveal ----
 // Taming loop, all three cats: a cat runs from point to point away from
 // you. At each stop, press E / USE once to give it a treat — it stays put
-// for a few seconds — then press E / USE again to scan its tag. If you
+// for a few seconds — then tap USE again to scan its tag. If you
 // wait too long after the treat, it runs to the next point and you have
 // to give it another treat to try again. Treats are unlimited; there is
 // no treat pickup or inventory to manage.
@@ -533,20 +562,18 @@ function talkTo(npc) {
 function showLine() {
   if (!talking) return;
   let line = talking.lines[lineIdx % talking.lines.length];
-  if (talking.role === 'cat' && !talking.fed) line = 'You offer ' + talking.name + ' a treat. She sniffs it, eats it, and stays put — quick, press E / USE again to scan her tag before she changes her mind.';
+  if (talking.role === 'cat' && !talking.fed) line = 'You offer ' + talking.name + ' a treat. She sniffs it, eats it, and stays put — quick, tap USE again to scan her tag before she changes her mind.';
   if (talking.role === 'contact' && clues.size < 3 && !contactFound) line = 'I can only trust someone who knows all three passphrase words. The cats carry them — scan the ID tags on Margo, Moxie, and Mabel.';
   if (talking.role === 'contact' && contactFound) line = 'Velvet, midnight, waltz — that is right. The north door is open. Go, quietly.';
-  document.getElementById('dlgName').textContent = talking.name;
-  document.getElementById('dlgLine').textContent = line;
-  document.getElementById('dialog').style.display = 'block';
+  typeDialogue(talking.name, line); document.getElementById('dialog').style.display = 'block';
   playClip('talk');
   if (talking.mixer) playGuestClip(talking, 'talk');
 }
-function endTalk() { talking = null; document.getElementById('dialog').style.display = 'none'; }
+function endTalk() { if (typeTimer) { clearInterval(typeTimer); typeTimer = null; typing = false; } talking = null; document.getElementById('dialog').style.display = 'none'; }
 
 // ---- Input: keyboard + touch (no combat controls anywhere) ----
 const keys = {};
-let yaw = Math.PI, pitch = 0.15, started = false, joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
+let yaw = 0, pitch = 0.15, started = false, joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 if (isTouch) document.body.classList.add('touch');
 document.getElementById('startBtn').onclick = () => {
@@ -641,9 +668,9 @@ function animate() {
     // The prompt element was removed with the HUD text, so prompt is null:
     // only end a conversation when nobody is nearby, not on every frame.
     // (Without this, dialogue closed one frame after opening.)
-    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — press E / USE'; prompt.style.display = 'block'; } }
+    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — tap USE'; prompt.style.display = 'block'; } }
     else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
-      if (prompt) { prompt.textContent = contactFound ? 'North exit open — press E / USE to leave' : 'North exit is locked — find Rochelle first (gather 3 clues)'; prompt.style.display = 'block'; }
+      if (prompt) { prompt.textContent = contactFound ? 'North exit open — tap USE to leave' : 'North exit is locked — find Rochelle first (gather 3 clues)'; prompt.style.display = 'block'; }
     } else { if (prompt) prompt.style.display = 'none'; if (talking) endTalk(); }
     // NPC wander + sway
     for (const n of NPCS) {
