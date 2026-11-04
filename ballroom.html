@@ -127,11 +127,11 @@ flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroo
 // Carpet runner (entrance to dance floor) and a rug in front of the bar.
 flatPlane(0, 0.03, 7.5, 2.5, 11, 0x7a1a1a, 'assets/textures/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4);
 flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom_rug_medallion_large_1024.webp', 1, 1);
-// Exit door (north) + entrance (south), mahogany.
+// Exit door (north) + entrance (south): one single double-door texture.
 const exitDoor = box(0, 1.5, -HALL_Z + 0.1, 3, 3, 0.3, 0x2e7d32);
-applyTex(exitDoor, 'assets/textures/ballroom_door_entrance_mahogany_1024.webp', 1, 1);
+applyTex(exitDoor, 'assets/textures/ballroom_door_double_mahogany_1024.webp', 1, 1);
 const entranceDoor = box(0, 1.5, HALL_Z - 0.1, 3, 3, 0.3, 0x3a2a18);
-applyTex(entranceDoor, 'assets/textures/ballroom_door_entrance_mahogany_1024.webp', 1, 1);
+applyTex(entranceDoor, 'assets/textures/ballroom_door_double_mahogany_1024.webp', 1, 1);
 // Chandeliers: 6 now (3 north + 3 south, so the entrance side is no longer
 // dark), brighter — point lights 30 -> 80, distance 22 -> 30. Real
 // chandelier GLBs replace the spheres when loaded; lights stay.
@@ -540,7 +540,7 @@ const clueEl = document.getElementById('clueCount'), contactEl = document.getEle
 function updateHUD() {
   if(clueEl) clueEl.textContent = clues.size + '/3';
   if(contactEl) contactEl.textContent = contactFound ? 'found ✓' : 'not found';
-  exitDoor.material.color.set(contactFound ? 0x2e7d32 : 0x7a2020);
+  // exit door keeps its door texture (no green/red tint, or it would not look like a door)
 }
 updateHUD();
 function talkTo(npc) {

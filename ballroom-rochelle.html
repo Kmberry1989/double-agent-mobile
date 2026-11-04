@@ -133,11 +133,11 @@ flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroo
 // Carpet runner (entrance to dance floor) and a rug in front of the bar.
 flatPlane(0, 0.03, 7.5, 2.5, 11, 0x7a1a1a, 'assets/textures/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4);
 flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom_rug_medallion_large_1024.webp', 1, 1);
-// Exit door (north) + entrance (south), mahogany.
+// Exit door (north) + entrance (south): one single double-door texture.
 const exitDoor = box(0, 1.5, -HALL_Z + 0.1, 3, 3, 0.3, 0x2e7d32);
-applyTex(exitDoor, 'assets/textures/ballroom_door_entrance_mahogany_1024.webp', 1, 1);
+applyTex(exitDoor, 'assets/textures/ballroom_door_double_mahogany_1024.webp', 1, 1);
 const entranceDoor = box(0, 1.5, HALL_Z - 0.1, 3, 3, 0.3, 0x3a2a18);
-applyTex(entranceDoor, 'assets/textures/ballroom_door_entrance_mahogany_1024.webp', 1, 1);
+applyTex(entranceDoor, 'assets/textures/ballroom_door_double_mahogany_1024.webp', 1, 1);
 // Chandeliers: 6 now (3 north + 3 south, so the entrance side is no longer
 // dark), brighter — point lights 30 -> 80, distance 22 -> 30. Real
 // chandelier GLBs replace the spheres when loaded; lights stay.
@@ -464,7 +464,7 @@ document.getElementById('dialog').addEventListener('pointerdown', (e) => {
 });
 
 // ---- Real GLB cats + pooled animations (2026-11-04) ----
-// Cats load as GLBs (Mabel/Margo/Moxie, 0.30 m tall, faces +Z, no turn),
+// Cats load as GLBs (Mabel/Margo/Moxie, 0.22 m tall, faces +Z, no turn),
 // with all animations pooled across cats + the More batch, by canonical
 // label. Each cat uses its own clip for an action when it has one,
 // otherwise another cat's clip (same 33-bone rig, so it plays cleanly).
@@ -548,17 +548,17 @@ function buildCatClipLibraries() {
 function loadCatGLB(cat) {
   gltfLoader.load('assets/models/cats/' + cat.name + '.glb', (gltf) => {
     const obj = gltf.scene;
-    fitCharacter(obj, 0.30);
+    fitCharacter(obj, 0.22);
     cat.group.add(obj); cat.model = obj;
     cat.mixer = new THREE.AnimationMixer(obj); cat._curCatClip = null;
     cat.group.children.forEach((child) => {
       if (child.isMesh && child.geometry.type !== 'TorusGeometry' && !(child.material && child.material.emissiveIntensity === 1.4)) child.visible = false;
     });
-    // Shrink the procedural collar/tag/name to match the 0.30 m GLB cat (they were sized for the 0.5 m procedural cat).
+    // Shrink the procedural collar/tag/name to match the 0.22 m GLB cat (they were sized for the 0.5 m procedural cat).
     cat.group.children.forEach((child) => {
-      if (child.isSprite) { child.scale.set(1.2, 0.23, 1); child.position.y = 0.55; }
-      else if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.6); child.position.set(0, 0.20, 0.19); }
-      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.6); child.position.set(0, 0.13, 0.28); }
+      if (child.isSprite) { child.scale.set(0.9, 0.17, 1); child.position.y = 0.42; }
+      else if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.44); child.position.set(0, 0.15, 0.14); }
+      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.44); child.position.set(0, 0.10, 0.21); }
     });
     const src = {};
     (gltf.animations || []).forEach((clip) => {
@@ -731,7 +731,7 @@ function updateMissionHUD() {
   else if (windowOpen) st.textContent = 'Photo window open (' + Math.ceil(windowTimer) + 's) — guests are looking away. Treat ' + PHOTOS[photoIdx].cat + ', then photograph her collar.';
   else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — tap the dialogue to continue.';
   else st.textContent = 'Next photo chance coming up — ' + PHOTOS[photoIdx].cat + ' (' + PHOTOS[photoIdx].symbol + ').';
-  exitDoor.material.color.set(photos.length === 3 ? 0x2e7d32 : 0x7a2020);
+  // exit door keeps its door texture (no green/red tint, or it would not look like a door)
 }
 function showIntroLine() {
   typeDialogue(INTRO[introIdx][0], INTRO[introIdx][1]); document.getElementById('dialog').style.display = 'block';
@@ -782,7 +782,7 @@ function setTreat(cat, on) {
   if (!cat.group) return;
   if (!cat.treatMesh) {
     cat.treatMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a5a2e }));
-    cat.treatMesh.position.set(0, 0.04, 0.35); cat.group.add(cat.treatMesh);
+    cat.treatMesh.position.set(0, 0.03, 0.26); cat.group.add(cat.treatMesh);
   }
   cat.treatMesh.visible = on;
 }
