@@ -207,9 +207,11 @@ colliders.push({ x: 17.5, z: 6, r: 2.6 });
 // so a 6-step flight climbs from the drive to the double doors.
 // Bushes and mansion wings are procedural geometry (no bush/car model was
 // supplied for these); the white Lamborghini is the real repo GLB.
-flatPlane(0, -1.5, 32, 80, 50, 0x2e5a2e, null, 1, 1); // lawn
-cyl(0, -1.48, 32, 13, 13, 0.1, 0x333333); // round drive
-cyl(0, -1.47, 32, 5, 5, 0.2, 0x2e5a2e); // drive island
+flatPlane(0, -1.5, 32, 80, 50, 0x2e5a2e, 'assets/textures/exterior_lawn_grass_clover_1024.webp', 8, 5); // lawn
+const driveMesh = cyl(0, -1.48, 32, 13, 13, 0.1, 0x333333); // round drive
+applyTex(driveMesh, 'assets/textures/exterior_drive_asphalt_1024.webp', 4, 4);
+const islandMesh = cyl(0, -1.47, 32, 5, 5, 0.2, 0x2e5a2e); // drive island
+applyTex(islandMesh, 'assets/textures/exterior_lawn_grass_clover_1024.webp', 2, 2);
 function bush(x, z, r) {
   const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshStandardMaterial({ color: 0x1e4d1e }));
   m.position.set(x, -1.5 + r * 0.7, z); scene.add(m); return m;
@@ -224,7 +226,7 @@ cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 box(0, 3.8, 17, 12, 0.4, 6, 0xd8c8a8);
 // 6 steps, 1 m deep each, 0.25 m high each, from drive (y -1.5) to floor (y 0)
-for (let i = 0; i < 6; i++) { box(0, -1.5 + (i + 1) * 0.25 - 0.125, 19.5 - i, 5, 0.25, 1, 0xb8b8b8); }
+for (let i = 0; i < 6; i++) { const st = box(0, -1.5 + (i + 1) * 0.25 - 0.125, 19.5 - i, 5, 0.25, 1, 0xb8b8b8); applyTex(st, 'assets/textures/exterior_drive_cobblestone_1024.webp', 1, 1); }
 // Double doors, hinged at the outer edges, closed at start
 function makeDoorPanel(sign) {
   const g = new THREE.Group(); g.position.set(sign * 1.5, 0, 14.5);
