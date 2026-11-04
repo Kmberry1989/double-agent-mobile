@@ -226,8 +226,15 @@ for (let a = 0; a < 360; a += 20) { const rad = a * Math.PI / 180; bush(13.5 * M
 for (let x = -18; x <= 18; x += 3) { if (Math.abs(x) < 3) continue; bush(x, 16.5, 0.8); }
 for (let a = 0; a < 360; a += 60) { const rad = a * Math.PI / 180; bush(3.5 * Math.cos(rad), 32 + 3.5 * Math.sin(rad), 0.7); }
 // Mansion wings + portico columns + roof
-box(-28, 2.5, 14, 16, 8, 12, 0xd8c8a8);
-box(28, 2.5, 14, 16, 8, 12, 0xd8c8a8);
+const wingL = box(-28, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingL, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 2, 1);
+const wingR = box(28, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingR, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 2, 1);
+// Exterior facade for the central block: a stone + windows skin just south of the
+// ballroom south wall (z 15.2, wall back is 15.0), so from outside you see windows,
+// not the interior damask wallpaper. Left/right segments + a plain lintel above the doors;
+// the door gap stays open so the double doors show through the portico.
+const facL = box(-11.25, 3, 15.2, 19.5, 6, 0.2, 0xd8c8a8); applyTex(facL, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 3, 1);
+const facR = box(11.25, 3, 15.2, 19.5, 6, 0.2, 0xd8c8a8); applyTex(facR, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 3, 1);
+box(0, 4.5, 15.2, 3, 3, 0.2, 0xd8c8a8); // lintel above the double doors, plain stone
 cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 box(0, 3.8, 17, 12, 0.4, 6, 0xd8c8a8);
