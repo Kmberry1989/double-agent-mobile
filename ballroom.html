@@ -278,7 +278,7 @@ function stripRootTravel(clip) {
   });
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -318,6 +318,15 @@ function playMxCharClip(char, key) {
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset().fadeIn(0.15).play(); char._cur = act;
 }
+function playMxCharClipOnce(char, key) {
+  // Falling_Down: play once and hold the final (on-the-floor) pose, do not loop or restart.
+  if (!char.mixer || !mxClips[key]) return;
+  const act = char.mixer.clipAction(mxClips[key]);
+  if (char._cur === act) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); char._cur = act;
+}
+
 function playGuestClip(npc, key) {
   // All ballroom characters are now Mixamo (2026-11-03): Rochelle contact
   // plus Vickie, Eric, Kristen, Donald guests all run on mxClips.
@@ -650,6 +659,9 @@ function animate() {
       if (!n.mixer || n.role === 'cat') continue;
       n.mixer.update(dt);
       if (talking === n) playGuestClip(n, 'talk');
+      else if (n.role === 'donald' && n.falling > 0) playMxCharClipOnce(n, 'falling');
+      else if (n.role === 'donald' && n.moving) playGuestClip(n, 'drunkStumble');
+      else if (n.role === 'donald') playGuestClip(n, 'drunkIdle');
       else if (n.moving) playGuestClip(n, 'walk');
       else playGuestClip(n, 'idle');
     }
@@ -671,10 +683,9 @@ function animate() {
       if (n.role === 'donald') {
         // Stumble walk: slow, wobbling, and every so often he falls down
         // flat for a couple of seconds, drink still in hand, then gets up.
-        if (n.falling > 0) { n.falling -= dt; n.moving = false; n.group.rotation.x = -1.35; if (n.falling <= 0) { n.group.rotation.x = 0; n.fallTimer = 14 + Math.random() * 14; } continue; }
-        n.fallTimer -= dt; if (n.fallTimer <= 0) { n.falling = 2.2; continue; }
-        n.group.rotation.z = Math.sin(t * 3 + n.phase) * 0.12;
-        n.group.position.y = Math.abs(Math.sin(t * 2 + n.phase)) * 0.04;
+        if (n.falling > 0) { n.falling -= dt; n.moving = false; if (n.falling <= 0) { n.fallTimer = 14 + Math.random() * 14; } continue; }
+        n.fallTimer -= dt; if (n.fallTimer <= 0) { n.falling = 3.5; continue; }
+        // No procedural wobble: Drunk_Stumbling_Walking / Drunk_Idle do the swaying.
         if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
         const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
         if (d < 0.3) { n.wp = (n.wp + 1) % n.wps.length; n.pause = 1 + Math.random() * 2; n.moving = false; }

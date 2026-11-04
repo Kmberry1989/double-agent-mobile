@@ -278,7 +278,7 @@ function stripRootTravel(clip) {
   });
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -291,6 +291,15 @@ function playMxCharClip(char, key) {
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset().fadeIn(0.15).play(); char._cur = act;
 }
+function playMxCharClipOnce(char, key) {
+  // Falling_Down: play once and hold the final (on-the-floor) pose, do not loop or restart.
+  if (!char.mixer || !mxClips[key]) return;
+  const act = char.mixer.clipAction(mxClips[key]);
+  if (char._cur === act) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); char._cur = act;
+}
+
 fbxLoader.load('assets/models/Rochelle_undercover.fbx', (obj) => {
   fitCharacter(obj, 1.8);
   // Rochelle's FBX faces +Z in Three.js (0.88 wide in X, 0.23 deep in Z),
@@ -734,7 +743,7 @@ function startCinematic(idx) {
   cinematic = { t: 0, dur: 6.2, fromPos: camPos, fromLook: camLook, toPos, toLook: toPos.clone() };
   document.getElementById('barTop').style.height = '8vh';
   document.getElementById('barBottom').style.height = '8vh';
-  if (idx === 2) donald.falling = 2.2; // Donald spills and tumbles as the camera finds him
+  if (idx === 2) donald.falling = 3.5; // Donald spills and tumbles as the camera finds him
   missionStage = 'cinematic';
   updateMissionHUD();
 }
@@ -742,7 +751,7 @@ function endCinematic() {
   cinematic = null;
   document.getElementById('barTop').style.height = '0';
   document.getElementById('barBottom').style.height = '0';
-  windowOpen = true; windowTimer = 60; lastWinSec = -1;
+  windowOpen = true; windowTimer = 0; lastWinSec = -1; // no time limit
   missionStage = 'window';
   updateMissionHUD();
 }
@@ -928,12 +937,8 @@ function animate() {
   if (missionStage === 'waiting' && photoIdx < 3 && clock.elapsedTime >= nextCineAt && nextCineAt > 0) {
     nextCineAt = 0; startCinematic(photoIdx);
   }
-  if (windowOpen) {
-    windowTimer -= dt;
-    const sec = Math.ceil(windowTimer);
-    if (sec !== lastWinSec) { lastWinSec = sec; updateMissionHUD(); }
-    if (windowTimer <= 0) closeWindow();
-  }
+  // Photo window has no countdown: it stays open until you take the photo.
+  // (windowTimer is no longer counted down, and closeWindow is not auto-called.)
   if (started && !won && !cinematic) {
     let fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
     let fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
@@ -958,6 +963,9 @@ function animate() {
       if (!n.mixer || n.role === 'cat') continue;
       n.mixer.update(dt);
       if (talking === n) playMxCharClip(n, 'talk');
+      else if (n.role === 'donald' && n.falling > 0) playMxCharClipOnce(n, 'falling');
+      else if (n.role === 'donald' && n.moving) playMxCharClip(n, 'drunkStumble');
+      else if (n.role === 'donald') playMxCharClip(n, 'drunkIdle');
       else if (n.moving) playMxCharClip(n, 'walk');
       else playMxCharClip(n, 'idle');
     }
@@ -987,10 +995,9 @@ function animate() {
       if (n.role === 'donald') {
         // Stumble walk: slow, wobbling, and every so often he falls down
         // flat for a couple of seconds, drink still in hand, then gets up.
-        if (n.falling > 0) { n.falling -= dt; n.moving = false; n.group.rotation.x = -1.35; if (n.falling <= 0) { n.group.rotation.x = 0; n.fallTimer = 14 + Math.random() * 14; } continue; }
-        n.fallTimer -= dt; if (n.fallTimer <= 0) { n.falling = 2.2; continue; }
-        n.group.rotation.z = Math.sin(t * 3 + n.phase) * 0.12;
-        n.group.position.y = Math.abs(Math.sin(t * 2 + n.phase)) * 0.04;
+        if (n.falling > 0) { n.falling -= dt; n.moving = false; if (n.falling <= 0) { n.fallTimer = 14 + Math.random() * 14; } continue; }
+        n.fallTimer -= dt; if (n.fallTimer <= 0) { n.falling = 3.5; continue; }
+        // No procedural wobble: Drunk_Stumbling_Walking / Drunk_Idle do the swaying.
         if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
         const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
         if (d < 0.3) { n.wp = (n.wp + 1) % n.wps.length; n.pause = 1 + Math.random() * 2; n.moving = false; }
