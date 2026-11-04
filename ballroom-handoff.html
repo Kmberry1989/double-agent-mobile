@@ -33,7 +33,7 @@
 <div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div></div>
 <div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span><div id="missionStatus">Walk in as Kyle — find Rochelle on the dance floor and tap USE to rendezvous.</div></div>
 <div id="barTop"></div><div id="barBottom"></div>
-<div id="overlay"><h1>Undercover Ballroom — Handoff</h1><p>Walk in as Kyle undercover. Rendezvous with Rochelle, then take over as Rochelle and photograph the cat collars.</p><button id="startBtn">Enter as Kyle</button><p><a href="ballroom.html">Back to the Kyle-player ballroom</a> · <a href="ballroom-rochelle.html">Rochelle-only version</a></p></div>
+<div id="overlay"><h1>Undercover Ballroom — Handoff</h1><p>Kyle arrives at the mansion in the white Lamborghini. Walk up the drive, up the steps, through the double doors, then rendezvous with Rochelle inside.</p><button id="startBtn">Enter as Kyle</button><p><a href="ballroom.html">Back to the Kyle-player ballroom</a> · <a href="ballroom-rochelle.html">Rochelle-only version</a></p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="joy"><div id="knob"></div></div>
 <button id="useBtn">USE</button>
@@ -114,14 +114,16 @@ dance.rotation.x = -Math.PI / 2; dance.position.set(0, 0.02, -1); scene.add(danc
 applyTex(dance, 'assets/textures/ballroom_floor_herringbone_marble_border_1024.webp', 1, 1);
 const walls = [
   box(0, 3, -HALL_Z - 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // north wall
-  box(0, 3, HALL_Z + 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // south wall (entrance side)
+  box(-11.25, 3, HALL_Z + 0.5, 19.5, 6, 1, 0x5a2f22), // south wall, left of doors
+  box(11.25, 3, HALL_Z + 0.5, 19.5, 6, 1, 0x5a2f22), // south wall, right of doors
+  box(0, 4.5, HALL_Z + 0.5, 3, 3, 1, 0x5a2f22), // lintel above double doors
   box(-HALL_X - 0.5, 3, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
   box(HALL_X + 0.5, 3, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
 ];
 walls.forEach((w)=>applyTex(w, 'assets/textures/ballroom_wall_damask_burgundy_gold_1024.webp', 8, 2));
 // Wood wainscoting strip along the lower walls (player clamp is ±19/±13,
 // the strips sit at ±19.9/±13.9, so they are never walked into).
-[[0, -13.9, 40, 0.2], [0, 13.9, 40, 0.2], [-19.9, 0, 0.2, 28], [19.9, 0, 0.2, 28]].forEach(([x, z, w, d])=>{
+[[-11.25, -13.9, 19.5, 0.2], [11.25, -13.9, 19.5, 0.2], [-11.25, 13.9, 19.5, 0.2], [11.25, 13.9, 19.5, 0.2], [-19.9, 0, 0.2, 28], [19.9, 0, 0.2, 28]].forEach(([x, z, w, d])=>{
   const m = box(x, 0.6, z, w, 1.2, d, 0x3a2410); applyTex(m, 'assets/textures/ballroom_wall_wood_wainscoting_dark_1024.webp', 8, 1);
 });
 // Ceiling (was open) with plaster/moulding, plus curtains on the north wall.
@@ -136,8 +138,7 @@ flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom_rug_medallion_l
 // Exit door (north) + entrance (south), mahogany.
 const exitDoor = box(0, 1.5, -HALL_Z + 0.1, 3, 3, 0.3, 0x2e7d32);
 applyTex(exitDoor, 'assets/textures/ballroom_door_entrance_mahogany_1024.webp', 1, 1);
-const entranceDoor = box(0, 1.5, HALL_Z - 0.1, 3, 3, 0.3, 0x3a2a18);
-applyTex(entranceDoor, 'assets/textures/ballroom_door_entrance_mahogany_1024.webp', 1, 1);
+// Double doors are built in the exterior block below (auto-open on approach).
 // Chandeliers: 6 now (3 north + 3 south, so the entrance side is no longer
 // dark), brighter — point lights 30 -> 80, distance 22 -> 30. Real
 // chandelier GLBs replace the spheres when loaded; lights stay.
@@ -201,6 +202,51 @@ gltfLoader.load('assets/models/ballroom_chair.glb', (gltf)=>{
   chairProc.forEach((m)=>{ m.visible = false; });
 }, undefined, ()=>{});
 colliders.push({ x: 17.5, z: 6, r: 2.6 });
+// ---- Exterior: mansion drive, round drive, bushes, steps, double doors (2026-11-04) ----
+// Kyle's mission starts outside. Ground is 1.5 m below the ballroom floor,
+// so a 6-step flight climbs from the drive to the double doors.
+// Bushes and mansion wings are procedural geometry (no bush/car model was
+// supplied for these); the white Lamborghini is the real repo GLB.
+flatPlane(0, -1.5, 32, 80, 50, 0x2e5a2e, null, 1, 1); // lawn
+cyl(0, -1.48, 32, 13, 13, 0.1, 0x333333); // round drive
+cyl(0, -1.47, 32, 5, 5, 0.2, 0x2e5a2e); // drive island
+function bush(x, z, r) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshStandardMaterial({ color: 0x1e4d1e }));
+  m.position.set(x, -1.5 + r * 0.7, z); scene.add(m); return m;
+}
+for (let a = 0; a < 360; a += 20) { const rad = a * Math.PI / 180; bush(13.5 * Math.cos(rad), 32 + 13.5 * Math.sin(rad), 0.9); }
+for (let x = -18; x <= 18; x += 3) { if (Math.abs(x) < 3) continue; bush(x, 16.5, 0.8); }
+for (let a = 0; a < 360; a += 60) { const rad = a * Math.PI / 180; bush(3.5 * Math.cos(rad), 32 + 3.5 * Math.sin(rad), 0.7); }
+// Mansion wings + portico columns + roof
+box(-28, 2.5, 14, 16, 8, 12, 0xd8c8a8);
+box(28, 2.5, 14, 16, 8, 12, 0xd8c8a8);
+cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
+cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
+box(0, 3.8, 17, 12, 0.4, 6, 0xd8c8a8);
+// 6 steps, 1 m deep each, 0.25 m high each, from drive (y -1.5) to floor (y 0)
+for (let i = 0; i < 6; i++) { box(0, -1.5 + (i + 1) * 0.25 - 0.125, 19.5 - i, 5, 0.25, 1, 0xb8b8b8); }
+// Double doors, hinged at the outer edges, closed at start
+function makeDoorPanel(sign) {
+  const g = new THREE.Group(); g.position.set(sign * 1.5, 0, 14.5);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 0.1), new THREE.MeshStandardMaterial({ color: 0x3a2a18 }));
+  panel.position.set(-sign * 0.75, 1.5, 0); g.add(panel); applyTex(panel, 'assets/textures/ballroom_door_entrance_mahogany_1024.webp', 1, 1);
+  scene.add(g); return g;
+}
+const doorL = makeDoorPanel(-1), doorR = makeDoorPanel(1);
+let doorOpen = 0;
+function updateDoors(dt) {
+  if (missionStage !== 'outside') return;
+  if (player.position.z < 18 && Math.abs(player.position.x) < 3) doorOpen = Math.min(1, doorOpen + dt);
+  doorL.rotation.y = -doorOpen * Math.PI / 2;
+  doorR.rotation.y = doorOpen * Math.PI / 2;
+}
+// White Lamborghini, parked in the drive (real repo GLB, not driven)
+gltfLoader.load('assets/white_lambo.glb', (gltf) => {
+  const g = fitPropGroup(gltf.scene, 2.0, 1.2, 4.5); if (!g) return;
+  g.position.set(8, -0.9, 34); g.rotation.y = 0.4; scene.add(g);
+  colliders.push({ x: 8, z: 34, r: 2.8 });
+}, undefined, () => {});
+
 
 // ---- ActionForge characters: real GLB models + baked clips ----
 // The 6 ActionForge GLBs share one 71-joint skeleton, so one set of baked
@@ -263,7 +309,7 @@ function playCharClip(char, key) {
 // with root XZ travel stripped so walk stays in place under the player
 // group. After the rendezvous, the same clip set drives Rochelle, who is
 // also Mixamo-rigged (Rochelle_undercover_textured.glb, 41 bones).
-const player = new THREE.Group(); player.position.set(0, 0, 8); scene.add(player);
+const player = new THREE.Group(); player.position.set(0, -1.5, 40); scene.add(player); // outside, on the round drive, facing the mansion
 let playerModel = null, mixer = null;
 const fbxLoader = new FBXLoader();
 const mxClips = {};
@@ -747,7 +793,7 @@ const PHOTOS = [
   { cat: 'Margo', symbol: 'rose', label: 'velvet rose' },
 ];
 const photos = [];
-let photoIdx = 0, windowOpen = false, windowTimer = 0, cinematic = null, missionStage = 'handoff', introIdx = 0, nextCineAt = 0, lastWinSec = -1;
+let photoIdx = 0, windowOpen = false, windowTimer = 0, cinematic = null, missionStage = 'outside', introIdx = 0, nextCineAt = 0, lastWinSec = -1;
 let handoffCine = null, handedOff = false, kyleNPCMixer = null, kyleNPCGroup = null;
 const INTRO = [
   ['Kyle (earpiece)', "Rochelle, you're in. Camera out, photographer first, agent second."],
@@ -880,6 +926,7 @@ function updateMissionHUD() {
   if (photos.length === 3) st.textContent = 'Moon, note, rose — north door open. Walk to it and tap USE.';
   else if (cinematic) st.textContent = 'Cinematic — watch the room.';
   else if (windowOpen) st.textContent = 'Photo window open (' + Math.ceil(windowTimer) + 's) — guests are looking away. Treat ' + PHOTOS[photoIdx].cat + ', then photograph her collar.';
+  else if (missionStage === 'outside') st.textContent = 'Mansion drive — walk to the double doors.';
   else if (missionStage === 'handoff') st.textContent = 'Walk to Rochelle on the dance floor and tap USE to rendezvous.';
   else if (missionStage === 'handoffCine') st.textContent = handoffPhase === 'donald' ? 'Donald stumbles through the doorway…' : handoffPhase === 'discussion' ? 'Cats talk — tap the dialogue to continue.' : handoffPhase === 'done' ? 'Rendezvous done — tap the dialogue to take over as Rochelle.' : 'Rendezvous — tap the dialogue to continue the conversation.';
   else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — tap the dialogue to continue.';
@@ -1017,7 +1064,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in win
 if (isTouch) document.body.classList.add('touch');
 document.getElementById('startBtn').onclick = () => {
   document.getElementById('overlay').style.display = 'none'; started = true;
-  missionStage = 'handoff'; updateMissionHUD();
+  missionStage = 'outside'; updateMissionHUD();
   if (!isTouch) renderer.domElement.requestPointerLock();
 };
 addEventListener('keydown', (e) => {
@@ -1052,6 +1099,7 @@ renderer.domElement.addEventListener('touchend', (e) => { for (const t of e.chan
 document.getElementById('useBtn').onclick = () => { if (started) nearestTalk(); };
 
 function nearestTalk() {
+  if (missionStage === 'outside') return; // doors open automatically; handoff is inside, with Rochelle
   if (handoffCine) { advanceHandoffLine(); return; }
   if (missionStage === 'handoff') {
     // Before the rendezvous, only Rochelle starts the handoff; guests
@@ -1129,8 +1177,22 @@ function animate() {
     const dz = -fx * Math.sin(yaw) - fz * Math.cos(yaw);
     const speed = (keys['shift'] ? 5.5 : 4) * dt;
     player.position.x += dx * speed; player.position.z += dz * speed;
-    player.position.x = Math.max(-HALL_X + 1, Math.min(HALL_X - 1, player.position.x));
-    player.position.z = Math.max(-HALL_Z + 1, Math.min(HALL_Z - 1, player.position.z));
+    if (player.position.z > HALL_Z) {
+      // Outside: driveway bounds, mansion wall except the door gap, steps height
+      player.position.x = Math.max(-30, Math.min(30, player.position.x));
+      player.position.z = Math.max(13.5, Math.min(45, player.position.z));
+      if (Math.abs(player.position.x) > 1.5 && player.position.z < 15) player.position.z = 15;
+      if (Math.abs(player.position.x) <= 2.5 && player.position.z >= 14 && player.position.z <= 20) {
+        const stepIdx = Math.min(5, Math.floor((20 - player.position.z) / 1));
+        player.position.y = -1.5 + (stepIdx + 1) * 0.25;
+      } else if (player.position.z > 14) player.position.y = -1.5;
+      if (player.position.z < 14 && Math.abs(player.position.x) <= 1.5) { player.position.y = 0; if (missionStage === 'outside') { missionStage = 'handoff'; updateMissionHUD(); } }
+    } else {
+      player.position.x = Math.max(-HALL_X + 1, Math.min(HALL_X - 1, player.position.x));
+      player.position.z = Math.max(-HALL_Z + 1, Math.min(HALL_Z - 1, player.position.z));
+      player.position.y = 0;
+    }
+    if (missionStage === 'outside' && player.position.z <= 13) { missionStage = 'handoff'; updateMissionHUD(); }
     for (const c of colliders) {
       const ddx = player.position.x - c.x, ddz = player.position.z - c.z, d = Math.hypot(ddx, ddz);
       if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
@@ -1242,9 +1304,10 @@ function animate() {
     d.rotation.z = Math.sin(handoffCine.t * 3) * 0.12;
     d.rotation.y = Math.PI;
   }
+  updateDoors(dt);
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  camera.position.set(player.position.x + back.x * 5, 2.6, player.position.z + back.z * 5);
-  camera.lookAt(player.position.x - back.x * 3, 1.6, player.position.z - back.z * 3);
+  camera.position.set(player.position.x + back.x * 5, player.position.y + 2.6, player.position.z + back.z * 5);
+  camera.lookAt(player.position.x - back.x * 3, player.position.y + 1.6, player.position.z - back.z * 3);
   if (handoffCine) {
     const c = handoffCine, ph = Math.min(c.t / c.dur, 1);
     const ease = (x) => x * x * (3 - 2 * x);
