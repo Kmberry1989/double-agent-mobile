@@ -20,7 +20,7 @@
   #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5}
   #knob{position:absolute;left:37px;top:37px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.45)}
   #useBtn{position:fixed;right:18px;bottom:90px;width:76px;height:76px;border-radius:50%;background:#c9a227;color:#111;font-weight:800;font-size:15px;display:none;z-index:5;border:0}
-  body.touch #joy,body.touch #useBtn{display:block}
+  body.touch #joy{display:block}
   a{color:#ffd97a}
   #mission{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5;max-width:min(480px,92vw)}
   #mission b{color:#ffd97a}
@@ -120,15 +120,15 @@ const walls = [
 ];
 walls.forEach((w)=>applyTex(w, 'assets/textures/ballroom_wall_damask_burgundy_gold_1024.webp', 8, 2));
 // Wood wainscoting strip along the lower walls (player clamp is ±19/±13,
-// the strips sit at ±19.9/±13.9, so they are never walked into).
-[[0, -13.9, 40, 0.2], [0, 13.9, 40, 0.2], [-19.9, 0, 0.2, 28], [19.9, 0, 0.2, 28]].forEach(([x, z, w, d])=>{
+// the strips sit at ±19.82/±13.82, so they are never walked into).
+[[0, -13.82, 40, 0.2], [0, 13.82, 40, 0.2], [-19.82, 0, 0.2, 28], [19.82, 0, 0.2, 28]].forEach(([x, z, w, d])=>{
   const m = box(x, 0.6, z, w, 1.2, d, 0x3a2410); applyTex(m, 'assets/textures/ballroom_wall_wood_wainscoting_dark_1024.webp', 8, 1);
 });
 // Ceiling (was open) with plaster/moulding, plus curtains on the north wall.
 flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroom_ceiling_plaster_moulding_1024.webp', 6, 4, Math.PI / 2);
 [-12, -4, 4, 12].forEach((x)=>{
   const c = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 3.5), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
-  c.position.set(x, 2.75, -13.9); scene.add(c); applyTex(c, 'assets/textures/ballroom_curtain_velvet_1024.webp', 1, 1);
+  c.position.set(x, 2.75, -13.65); scene.add(c); applyTex(c, 'assets/textures/ballroom_curtain_velvet_1024.webp', 1, 1);
 });
 // Carpet runner (entrance to dance floor) and a rug in front of the bar.
 flatPlane(0, 0.03, 7.5, 2.5, 11, 0x7a1a1a, 'assets/textures/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4);
@@ -184,7 +184,7 @@ gltfLoader.load('assets/models/ballroom_table.glb', (gltf)=>{
     g.position.set(x, 0.375, z); scene.add(g);
     // Linen tablecloth disc on top of the GLB table (top is at 0.75 m).
     const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.02, 24), new THREE.MeshStandardMaterial({ color: 0xf5ead0 }));
-    cloth.position.set(x, 0.76, z); scene.add(cloth); applyTex(cloth, 'assets/textures/ballroom_tablecloth_linen_cream_1024.webp', 1, 1);
+    cloth.position.set(x, 0.78, z); scene.add(cloth); applyTex(cloth, 'assets/textures/ballroom_tablecloth_linen_cream_1024.webp', 1, 1);
   });
   tableProc.forEach((m)=>{ m.visible = false; });
 }, undefined, ()=>{});
@@ -464,7 +464,7 @@ document.getElementById('dialog').addEventListener('pointerdown', (e) => {
 });
 
 // ---- Real GLB cats + pooled animations (2026-11-04) ----
-// Cats load as GLBs (Mabel/Margo/Moxie, 0.5 m tall, faces +Z, no turn),
+// Cats load as GLBs (Mabel/Margo/Moxie, 0.30 m tall, faces +Z, no turn),
 // with all animations pooled across cats + the More batch, by canonical
 // label. Each cat uses its own clip for an action when it has one,
 // otherwise another cat's clip (same 33-bone rig, so it plays cleanly).
@@ -548,11 +548,17 @@ function buildCatClipLibraries() {
 function loadCatGLB(cat) {
   gltfLoader.load('assets/models/cats/' + cat.name + '.glb', (gltf) => {
     const obj = gltf.scene;
-    fitCharacter(obj, 0.5);
+    fitCharacter(obj, 0.30);
     cat.group.add(obj); cat.model = obj;
     cat.mixer = new THREE.AnimationMixer(obj); cat._curCatClip = null;
     cat.group.children.forEach((child) => {
       if (child.isMesh && child.geometry.type !== 'TorusGeometry' && !(child.material && child.material.emissiveIntensity === 1.4)) child.visible = false;
+    });
+    // Shrink the procedural collar/tag/name to match the 0.30 m GLB cat (they were sized for the 0.5 m procedural cat).
+    cat.group.children.forEach((child) => {
+      if (child.isSprite) { child.scale.set(1.2, 0.23, 1); child.position.y = 0.55; }
+      else if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.6); child.position.set(0, 0.20, 0.19); }
+      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.6); child.position.set(0, 0.13, 0.28); }
     });
     const src = {};
     (gltf.animations || []).forEach((clip) => {
@@ -720,7 +726,7 @@ function updateMissionHUD() {
   const slots = document.getElementById('photoSlots');
   if (slots) slots.textContent = PHOTOS.map((p, i) => i < photos.length ? p.symbol : '—').join(' ');
   const st = document.getElementById('missionStatus'); if (!st) return;
-  if (photos.length === 3) st.textContent = 'Moon, note, rose — north door open. Walk to it and tap USE.';
+  if (photos.length === 3) st.textContent = 'Moon, note, rose — north door open. Walk to it.';
   else if (cinematic) st.textContent = 'Cinematic — watch the room.';
   else if (windowOpen) st.textContent = 'Photo window open (' + Math.ceil(windowTimer) + 's) — guests are looking away. Treat ' + PHOTOS[photoIdx].cat + ', then photograph her collar.';
   else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — tap the dialogue to continue.';
@@ -776,7 +782,7 @@ function setTreat(cat, on) {
   if (!cat.group) return;
   if (!cat.treatMesh) {
     cat.treatMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a5a2e }));
-    cat.treatMesh.position.set(0, 0.06, 0.6); cat.group.add(cat.treatMesh);
+    cat.treatMesh.position.set(0, 0.04, 0.35); cat.group.add(cat.treatMesh);
   }
   cat.treatMesh.visible = on;
 }
@@ -896,7 +902,10 @@ renderer.domElement.addEventListener('touchmove', (e) => {
   }
 }, { passive: true });
 renderer.domElement.addEventListener('touchend', (e) => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; });
-document.getElementById('useBtn').onclick = () => { if (started) nearestTalk(); };
+// USE button removed 2026-11-04 (user: no USE button on screen): tap the scene to interact instead.
+let tapSX=0, tapSY=0, tapST=0;
+renderer.domElement.addEventListener('touchstart', (e)=>{ const tt=e.changedTouches[0]; tapSX=tt.clientX; tapSY=tt.clientY; tapST=Date.now(); }, {passive:true});
+renderer.domElement.addEventListener('touchend', (e)=>{ if(!started) return; for(const tt of e.changedTouches){ if(Math.hypot(tt.clientX-tapSX, tt.clientY-tapSY)<15 && Date.now()-tapST<500) nearestTalk(); } }, {passive:true});
 
 function nearestTalk() {
   if (missionStage === 'intro') {
