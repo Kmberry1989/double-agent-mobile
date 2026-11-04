@@ -31,7 +31,7 @@
 </head>
 <body>
 <div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div></div>
-<div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span><div id="missionStatus">Kyle is on your earpiece.</div></div>
+<div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>Rochelle's Photo Mission</h1><p>Photographer first, agent second. Kyle is on your earpiece.</p><button id="startBtn">Enter as Rochelle</button><p><a href="ballroom.html">Back to the Kyle-player ballroom</a></p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
@@ -316,21 +316,12 @@ function playClip(key) {
 }
 
 // ---- NPCs: original names/lines, friendly only ----
-function nameSprite(text) {
-  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 48;
-  const ctx = cv.getContext('2d'); ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, 256, 48);
-  ctx.fillStyle = '#ffd97a'; ctx.fillText(text, 128, 33);
-  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
-}
 function makeGuest(npc) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 1.05, 4, 12), new THREE.MeshStandardMaterial({ color: npc.color }));
   body.position.y = 1.0; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), new THREE.MeshStandardMaterial({ color: npc.skin }));
   head.position.y = 1.92; g.add(head); npc.capsuleParts = [body, head];
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(npc.name), transparent: true }));
-  sp.scale.set(2.2, 0.42, 1); sp.position.y = 2.45; g.add(sp);
   g.position.set(npc.x, 0, npc.z); scene.add(g);
   npc.group = g; npc.phase = Math.random() * 6.28; npc.wp = 0; npc.pause = 0;
   return npc;
@@ -411,8 +402,6 @@ function makeCat(cat) {
   collar.position.set(0, 0.34, 0.32); collar.rotation.x = 0.5; g.add(collar); cat.collarMesh = collar;
   const tag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.02), new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x00ffcc, emissiveIntensity: 1.4 }));
   tag.position.set(0, 0.22, 0.48); g.add(tag);
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(cat.name + ' 🐱'), transparent: true }));
-  sp.scale.set(2.2, 0.42, 1); sp.position.y = 0.85; g.add(sp);
   g.position.set(cat.x, 0, cat.z); scene.add(g);
   cat.group = g; cat.phase = Math.random() * 6.28; cat.wp = 0; cat.pause = 0;
   // Margo starts hidden (see below) — she only appears once Moxie and
@@ -554,10 +543,9 @@ function loadCatGLB(cat) {
     cat.group.children.forEach((child) => {
       if (child.isMesh && child.geometry.type !== 'TorusGeometry' && !(child.material && child.material.emissiveIntensity === 1.4)) child.visible = false;
     });
-    // Shrink the procedural collar/tag/name to match the 0.22 m GLB cat (they were sized for the 0.5 m procedural cat).
+    // Shrink the procedural collar/tag to match the 0.22 m GLB cat (they were sized for the 0.5 m procedural cat).
     cat.group.children.forEach((child) => {
-      if (child.isSprite) { child.scale.set(0.9, 0.17, 1); child.position.y = 0.42; }
-      else if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.44); child.position.set(0, 0.15, 0.14); }
+      if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.44); child.position.set(0, 0.15, 0.14); }
       else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.44); child.position.set(0, 0.10, 0.21); }
     });
     const src = {};
@@ -725,12 +713,6 @@ function missionTarget() { return CATS.find(c => c.name === PHOTOS[photoIdx].cat
 function updateMissionHUD() {
   const slots = document.getElementById('photoSlots');
   if (slots) slots.textContent = PHOTOS.map((p, i) => i < photos.length ? p.symbol : '—').join(' ');
-  const st = document.getElementById('missionStatus'); if (!st) return;
-  if (photos.length === 3) st.textContent = 'Moon, note, rose — north door open. Walk to it.';
-  else if (cinematic) st.textContent = 'Cinematic — watch the room.';
-  else if (windowOpen) st.textContent = 'Photo window open (' + Math.ceil(windowTimer) + 's) — guests are looking away. Treat ' + PHOTOS[photoIdx].cat + ', then photograph her collar.';
-  else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — tap the dialogue to continue.';
-  else st.textContent = 'Next photo chance coming up — ' + PHOTOS[photoIdx].cat + ' (' + PHOTOS[photoIdx].symbol + ').';
   // exit door keeps its door texture (no green/red tint, or it would not look like a door)
 }
 function showIntroLine() {

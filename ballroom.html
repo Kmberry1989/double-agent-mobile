@@ -325,21 +325,12 @@ function playGuestClip(npc, key) {
 }
 
 // ---- NPCs: original names/lines, friendly only ----
-function nameSprite(text) {
-  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 48;
-  const ctx = cv.getContext('2d'); ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, 256, 48);
-  ctx.fillStyle = '#ffd97a'; ctx.fillText(text, 128, 33);
-  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
-}
 function makeGuest(npc) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 1.05, 4, 12), new THREE.MeshStandardMaterial({ color: npc.color }));
   body.position.y = 1.0; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), new THREE.MeshStandardMaterial({ color: npc.skin }));
   head.position.y = 1.92; g.add(head); npc.capsuleParts = [body, head];
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(npc.name), transparent: true }));
-  sp.scale.set(2.2, 0.42, 1); sp.position.y = 2.45; g.add(sp);
   g.position.set(npc.x, 0, npc.z); scene.add(g);
   npc.group = g; npc.phase = Math.random() * 6.28; npc.wp = 0; npc.pause = 0;
   return npc;
@@ -421,8 +412,6 @@ function makeCat(cat) {
   collar.position.set(0, 0.34, 0.32); collar.rotation.x = 0.5; g.add(collar); cat.collarMesh = collar;
   const tag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.02), new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x00ffcc, emissiveIntensity: 1.4 }));
   tag.position.set(0, 0.22, 0.48); g.add(tag);
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(cat.name + ' 🐱'), transparent: true }));
-  sp.scale.set(2.2, 0.42, 1); sp.position.y = 0.85; g.add(sp);
   g.position.set(cat.x, 0, cat.z); scene.add(g);
   cat.group = g; cat.phase = Math.random() * 6.28; cat.wp = 0; cat.pause = 0;
   // Margo starts hidden (see below) — she only appears once Moxie and

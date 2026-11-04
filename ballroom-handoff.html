@@ -31,7 +31,7 @@
 </head>
 <body>
 <div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div></div>
-<div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span><div id="missionStatus">Walk in as Kyle — find Rochelle on the dance floor. The rendezvous starts on its own.</div></div>
+<div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>Undercover Ballroom — Handoff</h1><p>Kyle arrives at the mansion in the white Lamborghini. Walk up the drive, up the steps, through the double doors, then rendezvous with Rochelle inside.</p><button id="startBtn">Enter as Kyle</button><p><a href="ballroom.html">Back to the Kyle-player ballroom</a> · <a href="ballroom-rochelle.html">Rochelle-only version</a></p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
@@ -226,18 +226,18 @@ for (let a = 0; a < 360; a += 20) { const rad = a * Math.PI / 180; bush(13.5 * M
 for (let x = -18; x <= 18; x += 3) { if (Math.abs(x) < 3) continue; bush(x, 16.5, 0.8); }
 for (let a = 0; a < 360; a += 60) { const rad = a * Math.PI / 180; bush(3.5 * Math.cos(rad), 32 + 3.5 * Math.sin(rad), 0.7); }
 // Mansion wings + portico columns + roof
-const wingL = box(-28, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingL, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 2, 1);
-const wingR = box(28, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingR, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 2, 1);
+const wingL = box(-28.4, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingL, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 2, 1);
+const wingR = box(28.4, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingR, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 2, 1);
 // Exterior facade for the central block: a stone + windows skin just south of the
-// ballroom south wall (z 15.2, wall back is 15.0), so from outside you see windows,
-// not the interior damask wallpaper. Left/right segments + a plain lintel above the doors;
-// the door gap stays open so the double doors show through the portico.
-const facL = box(-11.25, 3, 15.2, 19.5, 6, 0.2, 0xd8c8a8); applyTex(facL, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 3, 1);
-const facR = box(11.25, 3, 15.2, 19.5, 6, 0.2, 0xd8c8a8); applyTex(facR, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 3, 1);
-box(0, 4.5, 15.2, 3, 3, 0.2, 0xd8c8a8); // lintel above the double doors, plain stone
+// ballroom south wall (z 15.4, wall back is 15.0), so from outside you see windows,
+// not the interior damask wallpaper. Planes face south only, so from inside they are
+// backface-culled and can never bleed through the south wall. Door gap stays open.
+const facL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xd8c8a8 })); facL.position.set(-11.25, 3, 15.4); scene.add(facL); applyTex(facL, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 3, 1);
+const facR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xd8c8a8 })); facR.position.set(11.25, 3, 15.4); scene.add(facR); applyTex(facR, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 3, 1);
+const facLintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ color: 0xd8c8a8 })); facLintel.position.set(0, 4.5, 15.4); scene.add(facLintel); // lintel above the double doors, plain stone, south-facing only
 cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
-box(0, 3.8, 17, 12, 0.4, 6, 0xd8c8a8);
+box(0, 3.8, 17.4, 12, 0.4, 6, 0xd8c8a8); // shifted south 0.4 so its north face is not coplanar with the south wall face at z 14
 // 6 steps, 1 m deep each, 0.25 m high each, from drive (y -1.5) to floor (y 0)
 for (let i = 0; i < 6; i++) { const st = box(0, -1.5 + (i + 1) * 0.25 - 0.125, 19.5 - i, 5, 0.25, 1, 0xb8b8b8); applyTex(st, 'assets/textures/exterior_drive_cobblestone_1024.webp', 1, 1); }
 // Double doors, hinged at the outer edges, closed at start
@@ -414,21 +414,12 @@ function playClip(key) {
 }
 
 // ---- NPCs: original names/lines, friendly only ----
-function nameSprite(text) {
-  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 48;
-  const ctx = cv.getContext('2d'); ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, 256, 48);
-  ctx.fillStyle = '#ffd97a'; ctx.fillText(text, 128, 33);
-  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
-}
 function makeGuest(npc) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 1.05, 4, 12), new THREE.MeshStandardMaterial({ color: npc.color }));
   body.position.y = 1.0; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), new THREE.MeshStandardMaterial({ color: npc.skin }));
   head.position.y = 1.92; g.add(head); npc.capsuleParts = [body, head];
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(npc.name), transparent: true }));
-  sp.scale.set(2.2, 0.42, 1); sp.position.y = 2.45; g.add(sp);
   g.position.set(npc.x, 0, npc.z); scene.add(g);
   npc.group = g; npc.phase = Math.random() * 6.28; npc.wp = 0; npc.pause = 0;
   return npc;
@@ -513,8 +504,6 @@ function makeCat(cat) {
   collar.position.set(0, 0.34, 0.32); collar.rotation.x = 0.5; g.add(collar); cat.collarMesh = collar;
   const tag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.02), new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x00ffcc, emissiveIntensity: 1.4 }));
   tag.position.set(0, 0.22, 0.48); g.add(tag);
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameSprite(cat.name + ' 🐱'), transparent: true }));
-  sp.scale.set(2.2, 0.42, 1); sp.position.y = 0.85; g.add(sp);
   g.position.set(cat.x, 0, cat.z); scene.add(g);
   cat.group = g; cat.phase = Math.random() * 6.28; cat.wp = 0; cat.pause = 0;
   // Margo starts hidden (see below) — she only appears once Moxie and
@@ -656,10 +645,9 @@ function loadCatGLB(cat) {
     cat.group.children.forEach((child) => {
       if (child.isMesh && child.geometry.type !== 'TorusGeometry' && !(child.material && child.material.emissiveIntensity === 1.4)) child.visible = false;
     });
-    // Shrink the procedural collar/tag/name to match the 0.22 m GLB cat (they were sized for the 0.5 m procedural cat).
+    // Shrink the procedural collar/tag to match the 0.22 m GLB cat (they were sized for the 0.5 m procedural cat).
     cat.group.children.forEach((child) => {
-      if (child.isSprite) { child.scale.set(0.9, 0.17, 1); child.position.y = 0.42; }
-      else if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.44); child.position.set(0, 0.15, 0.14); }
+      if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.44); child.position.set(0, 0.15, 0.14); }
       else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.44); child.position.set(0, 0.10, 0.21); }
     });
     const src = {};
@@ -944,15 +932,6 @@ function switchControl() {
 function updateMissionHUD() {
   const slots = document.getElementById('photoSlots');
   if (slots) slots.textContent = PHOTOS.map((p, i) => i < photos.length ? p.symbol : '—').join(' ');
-  const st = document.getElementById('missionStatus'); if (!st) return;
-  if (photos.length === 3) st.textContent = 'Moon, note, rose — north door open. Walk to it.';
-  else if (cinematic) st.textContent = 'Cinematic — watch the room.';
-  else if (windowOpen) st.textContent = 'Photo window open (' + Math.ceil(windowTimer) + 's) — guests are looking away. Treat ' + PHOTOS[photoIdx].cat + ', then photograph her collar.';
-  else if (missionStage === 'outside') st.textContent = 'Mansion drive — walk to the double doors.';
-  else if (missionStage === 'handoff') st.textContent = 'Walk to Rochelle on the dance floor — the rendezvous starts on its own.';
-  else if (missionStage === 'handoffCine') st.textContent = handoffPhase === 'donald' ? 'Donald stumbles through the doorway…' : handoffPhase === 'discussion' ? 'Cats talk — tap the dialogue to continue.' : handoffPhase === 'done' ? 'Rendezvous done — tap the dialogue to take over as Rochelle.' : 'Rendezvous — tap the dialogue to continue the conversation.';
-  else if (missionStage === 'intro') st.textContent = 'Kyle is on your earpiece — tap the dialogue to continue.';
-  else st.textContent = 'Next photo chance coming up — ' + PHOTOS[photoIdx].cat + ' (' + PHOTOS[photoIdx].symbol + ').';
   // exit door keeps its door texture (no green/red tint, or it would not look like a door)
 }
 function showIntroLine() {
