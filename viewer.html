@@ -393,15 +393,28 @@ let weaponPivot = null;
 // through the animation instead of sitting in world space.
 const weaponOffsets = new Map(); // weapon name -> {x, y, z, rx, ry, rz, s}
 // Default weapon offset, approved by Kyle in the viewer (hand-local metres /
-// degrees, scale factor). Applies to EVERY weapon that has no specific baked
-// entry; a per-weapon baked entry overrides it for that weapon only. Reset
-// still returns to the raw computed placement (0,0,0) for comparison, and
-// reloading re-seeds the default.
+// degrees, scale factor). This is the rifle (long gun) default AND the
+// universal fallback: it applies to every weapon with no specific baked entry
+// and no pistol class match. Reset returns to the weapon's base placement
+// (baked entry, class default, or this), and reloading re-seeds it.
 const DEFAULT_OFFSET = { x: -0.021, y: 0.014, z: 0.055, rx: -12, ry: 2, rz: 61, s: 1.32 };
+// Pistol class default, approved by Kyle in the viewer (black makarov
+// numbers): same x, rotation, and scale as the rifle default; only y and z
+// differ.
+const PISTOL_OFFSET = { x: -0.021, y: 0.059, z: 0.048, rx: -12, ry: 2, rz: 61, s: 1.32 };
+// Weapon class, by display name (case-insensitive): a pistol if the name
+// contains 'glock', 'makarov', or 'walther'; a rifle (long gun) if it
+// contains 'aks74u' or 'mp5k'. Everything else falls back to the universal
+// default, which is the rifle numbers.
+function classDefault(name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('glock') || n.includes('makarov') || n.includes('walther')) return PISTOL_OFFSET;
+  return DEFAULT_OFFSET;
+}
 // Baked weapon offsets, approved by Kyle in the viewer (hand-local metres /
 // degrees, optional scale factor). A weapon loads at its baked placement;
-// Reset returns to the raw computed placement (0,0,0) for comparison, and
-// reloading re-seeds the bake.
+// Reset returns to that baked placement (or the default), and reloading
+// re-seeds it.
 const BAKED_OFFSETS = {
   'white aks74u': { x: -0.021, y: 0.014, z: 0.055, rx: -12, ry: 2, rz: 61, s: 1.32 },
 };
@@ -422,15 +435,18 @@ const offScaleN = document.getElementById('offSn');
 const fmt3 = v => (v === 0 ? 0 : v).toFixed(3);
 function getOffset(name) {
   if (!weaponOffsets.has(name)) {
+    // Priority: per-weapon baked entry first, then the weapon's class
+    // default (pistol/rifle), then the universal default (the rifle numbers).
     const b = BAKED_OFFSETS[name] || {};
+    const c = classDefault(name);
     weaponOffsets.set(name, {
-      x: b.x ?? DEFAULT_OFFSET.x,
-      y: b.y ?? DEFAULT_OFFSET.y,
-      z: b.z ?? DEFAULT_OFFSET.z,
-      rx: b.rx ?? DEFAULT_OFFSET.rx,
-      ry: b.ry ?? DEFAULT_OFFSET.ry,
-      rz: b.rz ?? DEFAULT_OFFSET.rz,
-      s: b.s ?? DEFAULT_OFFSET.s,
+      x: b.x ?? c.x,
+      y: b.y ?? c.y,
+      z: b.z ?? c.z,
+      rx: b.rx ?? c.rx,
+      ry: b.ry ?? c.ry,
+      rz: b.rz ?? c.rz,
+      s: b.s ?? c.s,
     });
   }
   return weaponOffsets.get(name);
@@ -536,8 +552,10 @@ document.getElementById('offCopy').addEventListener('click', async e => {
   setTimeout(() => { btn.textContent = 'Copy'; }, 3000);
 });
 document.getElementById('offReset').addEventListener('click', () => {
-  const o = getOffset(curWeaponName);
-  o.x = 0; o.y = 0; o.z = 0; o.rx = 0; o.ry = 0; o.rz = 0; o.s = 1;
+  // Reset restores the weapon's base placement (its baked entry, or the
+  // default for all weapons) — not zero. Deleting the cached entry makes
+  // getOffset() re-seed it from BAKED_OFFSETS / DEFAULT_OFFSET.
+  weaponOffsets.delete(curWeaponName);
   syncOffsetUI();
   applyWeaponOffset();
   applyWeaponRotation();
