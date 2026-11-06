@@ -169,16 +169,20 @@ function stripRootTravel(c) {
 function rootTravel(c) {
   const hips = c.tracks.find(t => t.name.toLowerCase().includes('hips') && t.name.endsWith('.position'));
   if (!hips) return 'hips track: none';
-  let xs = [], zs = [];
-  for (let i = 0; i < hips.values.length; i += 3) { xs.push(hips.values[i]); zs.push(hips.values[i + 2]); }
-  return `hips X ${Math.min(...xs).toFixed(2)}..${Math.max(...xs).toFixed(2)}  Z ${Math.min(...zs).toFixed(2)}..${Math.max(...zs).toFixed(2)}`;
+  let xs = [], ys = [], zs = [];
+  for (let i = 0; i < hips.values.length; i += 3) { xs.push(hips.values[i]); ys.push(hips.values[i + 1]); zs.push(hips.values[i + 2]); }
+  return `hips X ${Math.min(...xs).toFixed(2)}..${Math.max(...xs).toFixed(2)}  Y ${Math.min(...ys).toFixed(2)}..${Math.max(...ys).toFixed(2)}  Z ${Math.min(...zs).toFixed(2)}..${Math.max(...zs).toFixed(2)}`;
 }
+// Same fit as the game's fitCharacter (ballroom): scale to height, then
+// position = (-centre.x, -bbox.min.y, -centre.z) so the feet sit on y=0.
+// (The first viewer version also subtracted the centre height, sinking
+// every model ~0.9 m below the floor.)
 function fitModel(obj, targetH) {
-  const bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size); const c = new THREE.Vector3(); bb.getCenter(c);
+  const bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
   if (!size.y) return;
-  const s = targetH / size.y; obj.scale.multiplyScalar(s);
+  obj.scale.setScalar(targetH / size.y);
   const bb2 = new THREE.Box3().setFromObject(obj); const c2 = new THREE.Vector3(); bb2.getCenter(c2); const size2 = new THREE.Vector3(); bb2.getSize(size2);
-  obj.position.sub(c2); obj.position.y -= bb2.min.y;
+  obj.position.set(-c2.x, -bb2.min.y, -c2.z);
   fitCenter.set(0, size2.y * 0.5, 0); fitDist = Math.max(size2.x, size2.y, size2.z) * 2.2 + 0.5;
   return { size: size2, center: fitCenter.clone() };
 }
