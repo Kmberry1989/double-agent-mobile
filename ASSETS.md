@@ -11,7 +11,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB
 - Weapons — player gear, throwable/placeable (systems unwired) — 10 files, 675.9 KB
 - Weapons — player gear, suppressors — 2 files, 78.8 KB
 - Weapons — player gear, accessories — 9 files, 472.1 KB
-- Weapons — enemy (unprefixed) — 8 files, 388.7 KB
+- Weapons — enemy (unprefixed) — 8 files, 388.6 KB
 - Vehicles — 3 files, 203.6 KB
 - Ballroom & office props — 20 files, 781.4 KB
 - Animations — locomotion & poses — 21 files, 9.0 MB
@@ -99,8 +99,8 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB
 | `weapons/black_aks74u.glb` | 42.3 KB |  |
 | `weapons/black_glock_threaded.glb` | 48.2 KB |  |
 | `weapons/black_makarov.glb` | 51.1 KB |  |
-| `weapons/black_mp5-k.glb` | 29.6 KB |  |
-| `weapons/black_mp5k.glb` | 46.9 KB |  |
+| `weapons/black_mp5-k.glb` | 29.5 KB |  |
+| `weapons/black_mp5k.glb` | 46.8 KB |  |
 | `weapons/black_rpg.glb` | 52.6 KB |  |
 | `weapons/black_walther.glb` | 48.3 KB |  |
 | `weapons/white_RPG7.glb` | 65.9 KB |  |
@@ -148,13 +148,13 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB
 | `weapons/white_open_glasses.glb` | 67.8 KB |  |
 | `weapons/white_pen.glb` | 35.0 KB |  |
 
-## Weapons — enemy (unprefixed) (8 files, 388.7 KB)
+## Weapons — enemy (unprefixed) (8 files, 388.6 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
 | `weapons/aks74u.glb` | 46.1 KB | Enemy weapons; unprefixed = enemies |
 | `weapons/cufflinks.glb` | 81.5 KB | Enemy weapons; unprefixed = enemies |
-| `weapons/mp5k.glb` | 32.3 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/mp5k.glb` | 32.2 KB | Enemy weapons; unprefixed = enemies |
 | `weapons/ppk.glb` | 78.2 KB | Enemy weapons; unprefixed = enemies |
 | `weapons/ppk_magazine.glb` | 51.0 KB | Enemy weapons; unprefixed = enemies |
 | `weapons/ppk_suppressor.glb` | 31.4 KB | Enemy weapons; unprefixed = enemies |
