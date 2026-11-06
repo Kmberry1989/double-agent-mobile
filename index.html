@@ -402,8 +402,13 @@ function fitWeapon(obj, targetLength){
   const longest = Math.max(size.x, size.y, size.z);
   if (!longest || longest <= 0) return false;
   obj.scale.setScalar(targetLength / longest);
-  box = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); box.getCenter(c);
-  obj.position.set(-c.x, -c.y, -c.z);
+  // Origin is the grip, set in Blender per weapon file: the pivot origin is
+  // locked to the hand, so the mesh is NEVER recentered here — scale and the
+  // Y-rotation above happen about the origin, so the grip stays exactly at
+  // the pivot. Recentering would throw the grip origin away. The muzzle
+  // offset (max Z after fitting) is kept for the suppressor, which rides at
+  // the muzzle instead of at half the length as it did under centering.
+  box = new THREE.Box3().setFromObject(obj); obj.userData.muzzleZ = box.max.z;
   return true;
 }
 
@@ -742,7 +747,7 @@ function updateWeaponVisibility(){
   const sup = suppressorGroups[playerLoadout];
   if (pivot && sup){
     pivot.add(sup);
-    sup.position.set(0, 0, weaponVariantInfo().len / 2 + 0.05);
+    sup.position.set(0, 0, (pivot.userData.muzzleZ ?? weaponVariantInfo().len / 2) + 0.05);
     sup.visible = true;
   }
   // Glasses: show only the current set's pair, only if bone-attached.
@@ -755,6 +760,7 @@ function loadPlayerWeapon(set, slot, file, targetLength){
   gltfLoader.load('assets/' + file, (gltf)=>{
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
     if (!fitWeapon(gltf.scene, targetLength)) return;
+    pivot.userData.muzzleZ = gltf.scene.userData.muzzleZ;
     pivot.position.set(0.35, 1.35, 0.5); pivot.visible = false; player.add(pivot);
     weaponPivots[set][slot] = pivot; updateWeaponVisibility();
     // If the player model (and its hand bone) is already loaded, attach

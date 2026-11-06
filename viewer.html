@@ -357,8 +357,10 @@ function fitWeapon(obj, targetLength) {
   const longest = Math.max(size.x, size.y, size.z);
   if (!longest || longest <= 0) return false;
   obj.scale.setScalar(targetLength / longest);
-  box = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); box.getCenter(c);
-  obj.position.set(-c.x, -c.y, -c.z);
+  // Origin is the grip, set in Blender per weapon file: the pivot origin is
+  // locked to the hand, so the mesh is NEVER recentered here — scale and the
+  // Y-rotation above happen about the origin, so the grip stays exactly at
+  // the pivot. Recentering would throw the grip origin away.
   return true;
 }
 let weaponPivot = null;
@@ -369,8 +371,6 @@ function loadWeapon(name) {
   gltfLoader.load(w.file + '?v=' + ASSET_V, (gltf) => {
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
     if (!fitWeapon(gltf.scene, w.len)) return;
-    // Slide the gun forward so its grip (rear of the fitted mesh), not its centre, sits at the hand.
-    gltf.scene.position.z += 0.25 * w.len;
     scene.add(pivot);
     if (!model) { pivot.removeFromParent(); return; }
     const hand = findHandBone(model);
