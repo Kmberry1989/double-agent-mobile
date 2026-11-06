@@ -404,7 +404,7 @@ function getOffset(name) {
 }
 function updateOffsetReadout() {
   const o = getOffset(curWeaponName);
-  offReadEl.textContent = `Offset: x ${fmt3(o.x)}, y ${fmt3(o.y)}, z ${fmt3(o.z)} m`;
+  offReadEl.textContent = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)} m`;
 }
 function syncOffsetUI() {
   const o = getOffset(curWeaponName);
@@ -435,7 +435,7 @@ OFF_AXES.forEach(a => {
 });
 document.getElementById('offCopy').addEventListener('click', async e => {
   const o = getOffset(curWeaponName);
-  const text = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)}`;
+  const text = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)} m`;
   let ok = false;
   try { await navigator.clipboard.writeText(text); ok = true; } catch (_) {
     const ta = document.createElement('textarea');
@@ -445,8 +445,8 @@ document.getElementById('offCopy').addEventListener('click', async e => {
     ta.remove();
   }
   const btn = e.target;
-  btn.textContent = ok ? 'Copied' : 'Copy';
-  setTimeout(() => { btn.textContent = 'Copy'; }, 1000);
+  btn.textContent = ok ? 'Copied' : 'Copy failed';
+  setTimeout(() => { btn.textContent = 'Copy'; }, 3000);
 });
 document.getElementById('offReset').addEventListener('click', () => {
   const o = getOffset(curWeaponName);
