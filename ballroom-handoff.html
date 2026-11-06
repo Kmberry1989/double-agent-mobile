@@ -298,18 +298,25 @@ let doorOpen = 0;
 let doorAnimT = -1; // >=0 while Kyle's door-opening clip is playing (movement locked)
 let doorAnimDone = false;
 function updateDoors(dt) {
-  if (missionStage !== 'outside') return;
-  const atDoors = player.position.z < 18 && Math.abs(player.position.x) < 3;
-  if (!doorAnimDone && atDoors && mxClips['openDoor']) {
-    if (doorAnimT < 0) { doorAnimT = 0; playMxCharClipOnce(player, 'openDoor'); }
-    doorAnimT += dt;
-    const dur = mxClips['openDoor'].duration || 6.37;
-    doorOpen = Math.min(1, Math.max(0, doorAnimT - 2.5)); // doors swing as he pushes, 2.5-3.5 s into the clip
-    if (doorAnimT >= dur) { doorAnimDone = true; doorAnimT = -1; }
-  } else if (!doorAnimDone && atDoors) {
-    // Clip not loaded yet: fall back to the old 1 s swing, no movement lock.
-    doorOpen = Math.min(1, doorOpen + dt);
-    if (doorOpen >= 1) doorAnimDone = true;
+  if (missionStage === 'outside') {
+    // Trigger only when he is right at the doors (top step, ~1.5 m from the
+    // door plane) so the reach in the clip lands on the door, not from 4 m away.
+    const atDoors = player.position.z < 15.5 && Math.abs(player.position.x) < 2;
+    if (!doorAnimDone && atDoors && mxClips['openDoor']) {
+      if (doorAnimT < 0) { doorAnimT = 0; playMxCharClipOnce(player, 'openDoor'); }
+      doorAnimT += dt;
+      doorOpen = Math.min(1, Math.max(0, doorAnimT - 2.5)); // doors swing as he pushes, 2.5-3.5 s into the clip
+      // End the clip once the doors are fully open (3.5 s) instead of playing
+      // out the whole 6.37 s — he walks through as they finish opening.
+      if (doorOpen >= 1) { doorAnimDone = true; doorAnimT = -1; }
+    } else if (!doorAnimDone && atDoors) {
+      // Clip not loaded yet: fall back to the old 1 s swing, no movement lock.
+      doorOpen = Math.min(1, doorOpen + dt);
+      if (doorOpen >= 1) doorAnimDone = true;
+    }
+  } else if (doorAnimDone && doorOpen > 0) {
+    // He is inside: shut the doors behind him over ~1.5 s.
+    doorOpen = Math.max(0, doorOpen - dt / 1.5);
   }
   doorL.rotation.y = -doorOpen * Math.PI / 2;
   doorR.rotation.y = doorOpen * Math.PI / 2;
