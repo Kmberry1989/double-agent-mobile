@@ -27,6 +27,7 @@
 <div id="bar">
   <select id="modelSel" aria-label="Model"></select>
   <select id="animSel" aria-label="Animation"></select>
+  <select id="weaponSel" aria-label="Weapon in right hand"></select>
   <button id="playBtn" type="button">Pause</button>
   <select id="speedSel" aria-label="Speed"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option></select>
   <button id="loopBtn" type="button" class="on">Loop</button>
@@ -58,47 +59,150 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 const MODELS = [
   { group: 'Characters (FBX)', items: [
-    ['Kyle', 'assets/models/Kyle_undercover.fbx', 'fbx', ''],
-    ['Kyle (Combat)', 'assets/models/Kyle_combat.fbx', 'fbx', ''],
-    ['Rochelle', 'assets/models/Rochelle_undercover.fbx', 'fbx', 'assets/models/textures/Rochelle_basecolor.jpg'],
-    ['Vickie', 'assets/models/Vickie.fbx', 'fbx', 'assets/models/textures/Vickie_basecolor.png'],
-    ['Eric', 'assets/models/Eric.fbx', 'fbx', 'assets/models/textures/Eric_basecolor.png'],
-    ['Kristen', 'assets/models/Kristen.fbx', 'fbx', 'assets/models/textures/Kristen_basecolor.png'],
-    ['Donald', 'assets/models/Donald.fbx', 'fbx', 'assets/models/textures/Donald_basecolor.png'],
+    ['Agent Kyle', 'assets/Agent_Kyle.fbx', 'fbx', ''],
+    ['Donald (tux FBX)', 'assets/Donald_tux.fbx', 'fbx', ''],
     ['Enemy terror 1', 'assets/enemy-terror1.fbx', 'fbx', ''],
     ['Enemy terror 2', 'assets/enemy-terror2.fbx', 'fbx', ''],
     ['Enemy terror 3', 'assets/enemy-terror3.fbx', 'fbx', ''],
     ['Enemy terror 4', 'assets/enemy-terror4.fbx', 'fbx', ''],
+    ['Donald', 'assets/models/Donald.fbx', 'fbx', 'assets/models/textures/Donald_basecolor.png'],
+    ['Eric', 'assets/models/Eric.fbx', 'fbx', 'assets/models/textures/Eric_basecolor.png'],
+    ['Kristen', 'assets/models/Kristen.fbx', 'fbx', 'assets/models/textures/Kristen_basecolor.png'],
+    ['Kyle (Combat)', 'assets/models/Kyle_combat.fbx', 'fbx', ''],
+    ['Kyle', 'assets/models/Kyle_undercover.fbx', 'fbx', ''],
+    ['Rochelle', 'assets/models/Rochelle_undercover.fbx', 'fbx', 'assets/models/textures/Rochelle_basecolor.jpg'],
+    ['Vickie', 'assets/models/Vickie.fbx', 'fbx', 'assets/models/textures/Vickie_basecolor.png']
   ]},
   { group: 'Cats (GLB, animations inside)', items: [
     ['Mabel', 'assets/models/cats/Mabel.glb', 'glb', ''],
     ['Margo', 'assets/models/cats/Margo.glb', 'glb', ''],
     ['Moxie', 'assets/models/cats/Moxie.glb', 'glb', ''],
+    ['morecatanimations', 'assets/models/cats/morecatanimations.glb', 'glb', '']
+  ]},
+  { group: 'Characters (GLB)', items: [
+    ['Donald tux', 'assets/models/Donald_tux.glb', 'glb', ''],
+    ['Eric tux', 'assets/models/Eric_tux.glb', 'glb', ''],
+    ['Kristen gown', 'assets/models/Kristen_gown.glb', 'glb', ''],
+    ['Kyle tux', 'assets/models/Kyle_tux.glb', 'glb', ''],
+    ['Rochelle gown', 'assets/models/Rochelle_gown.glb', 'glb', ''],
+    ['Rochelle undercover textured', 'assets/models/Rochelle_undercover_textured.glb', 'glb', ''],
+    ['Vickie gown', 'assets/models/Vickie_gown.glb', 'glb', '']
   ]},
   { group: 'Props (GLB)', items: [
-    ['Ballroom chandelier', 'assets/models/ballroom_chandelier.glb', 'glb', ''],
-    ['Ballroom table', 'assets/models/ballroom_table.glb', 'glb', ''],
-    ['Ballroom chair', 'assets/models/ballroom_chair.glb', 'glb', ''],
-    ['Ballroom bar', 'assets/models/ballroom_bar.glb', 'glb', ''],
-    ['Barrel', 'assets/models/barrel.glb', 'glb', ''],
-    ['Crate', 'assets/models/crate.glb', 'glb', ''],
-    ['Roadblock', 'assets/models/roadblock.glb', 'glb', ''],
-    ['Sandbags', 'assets/models/sandbags.glb', 'glb', ''],
-    ['Cat collar', 'assets/models/cat_collar.glb', 'glb', ''],
-    ['Cat scanner', 'assets/models/cat_scanner.glb', 'glb', ''],
+    ['ballroom bar', 'assets/models/ballroom_bar.glb', 'glb', ''],
+    ['ballroom bar top', 'assets/models/ballroom_bar_top.glb', 'glb', ''],
+    ['ballroom chair', 'assets/models/ballroom_chair.glb', 'glb', ''],
+    ['ballroom chandelier', 'assets/models/ballroom_chandelier.glb', 'glb', ''],
+    ['ballroom table', 'assets/models/ballroom_table.glb', 'glb', ''],
+    ['barrel', 'assets/models/barrel.glb', 'glb', ''],
+    ['cat collar', 'assets/models/cat_collar.glb', 'glb', ''],
+    ['cat scanner', 'assets/models/cat_scanner.glb', 'glb', ''],
+    ['crate', 'assets/models/crate.glb', 'glb', ''],
+    ['desk and monitor', 'assets/models/desk_and_monitor.glb', 'glb', ''],
+    ['desk binders', 'assets/models/desk_binders.glb', 'glb', ''],
+    ['desk chair', 'assets/models/desk_chair.glb', 'glb', ''],
+    ['desk keyboard', 'assets/models/desk_keyboard.glb', 'glb', ''],
+    ['desk keyboard monitor pencup', 'assets/models/desk_keyboard_monitor_pencup.glb', 'glb', ''],
+    ['desk mouse', 'assets/models/desk_mouse.glb', 'glb', ''],
+    ['desk plain', 'assets/models/desk_plain.glb', 'glb', ''],
+    ['desk plant', 'assets/models/desk_plant.glb', 'glb', ''],
+    ['filing cabinet', 'assets/models/filing_cabinet.glb', 'glb', ''],
+    ['roadblock', 'assets/models/roadblock.glb', 'glb', ''],
+    ['sandbags', 'assets/models/sandbags.glb', 'glb', '']
   ]},
-  { group: 'Weapons (GLB, Draco)', items: [
-    ['White glock', 'assets/white_glock.glb', 'glb', ''],
-    ['Black glock', 'assets/black_glock_threaded.glb', 'glb', ''],
-    ['White walther', 'assets/white_walther.glb', 'glb', ''],
-    ['White makarov', 'assets/white_makarov.glb', 'glb', ''],
-    ['White MP5K', 'assets/white_mp5k.glb', 'glb', ''],
-    ['White AKS74U', 'assets/white_aks74u.glb', 'glb', ''],
-    ['White RPG7', 'assets/white_RPG7.glb', 'glb', ''],
-  ]},
-  { group: 'Vehicle (GLB, Draco)', items: [
-    ['White Lambo', 'assets/white_lambo.glb', 'glb', ''],
-  ]},
+  { group: 'Weapons & gear (GLB)', items: [
+    ['aks74u', 'assets/aks74u.glb', 'glb', ''],
+    ['black aks74u', 'assets/black_aks74u.glb', 'glb', ''],
+    ['black bag', 'assets/black_bag.glb', 'glb', ''],
+    ['black c4', 'assets/black_c4.glb', 'glb', ''],
+    ['black claymore', 'assets/black_claymore.glb', 'glb', ''],
+    ['black glasses', 'assets/black_glasses.glb', 'glb', ''],
+    ['black glasses2', 'assets/black_glasses2.glb', 'glb', ''],
+    ['black glock threaded', 'assets/black_glock_threaded.glb', 'glb', ''],
+    ['black grenade', 'assets/black_grenade.glb', 'glb', ''],
+    ['black knife', 'assets/black_knife.glb', 'glb', ''],
+    ['black lockpicks', 'assets/black_lockpicks.glb', 'glb', ''],
+    ['black makarov', 'assets/black_makarov.glb', 'glb', ''],
+    ['black mp5 k', 'assets/black_mp5-k.glb', 'glb', ''],
+    ['black mp5k', 'assets/black_mp5k.glb', 'glb', ''],
+    ['black pen', 'assets/black_pen.glb', 'glb', ''],
+    ['black pen2', 'assets/black_pen2.glb', 'glb', ''],
+    ['black rpg', 'assets/black_rpg.glb', 'glb', ''],
+    ['black suppressor', 'assets/black_suppressor.glb', 'glb', ''],
+    ['black throwing knife', 'assets/black_throwing_knife.glb', 'glb', ''],
+    ['black walther', 'assets/black_walther.glb', 'glb', ''],
+    ['black watch', 'assets/black_watch.glb', 'glb', ''],
+    ['cufflinks', 'assets/cufflinks.glb', 'glb', ''],
+    ['mp5k', 'assets/mp5k.glb', 'glb', ''],
+    ['ppk', 'assets/ppk.glb', 'glb', ''],
+    ['ppk magazine', 'assets/ppk_magazine.glb', 'glb', ''],
+    ['ppk suppressor', 'assets/ppk_suppressor.glb', 'glb', ''],
+    ['rpg', 'assets/rpg.glb', 'glb', ''],
+    ['suppressor', 'assets/suppressor.glb', 'glb', ''],
+    ['tire', 'assets/tire.glb', 'glb', ''],
+    ['tire2', 'assets/tire2.glb', 'glb', ''],
+    ['white RPG7', 'assets/white_RPG7.glb', 'glb', ''],
+    ['white aks74u', 'assets/white_aks74u.glb', 'glb', ''],
+    ['white c4', 'assets/white_c4.glb', 'glb', ''],
+    ['white claymore', 'assets/white_claymore.glb', 'glb', ''],
+    ['white glasses2', 'assets/white_glasses2.glb', 'glb', ''],
+    ['white glock', 'assets/white_glock.glb', 'glb', ''],
+    ['white grenade', 'assets/white_grenade.glb', 'glb', ''],
+    ['white knife', 'assets/white_knife.glb', 'glb', ''],
+    ['white lambo', 'assets/white_lambo.glb', 'glb', ''],
+    ['white mac', 'assets/white_mac.glb', 'glb', ''],
+    ['white makarov', 'assets/white_makarov.glb', 'glb', ''],
+    ['white mp5k', 'assets/white_mp5k.glb', 'glb', ''],
+    ['white open glasses', 'assets/white_open_glasses.glb', 'glb', ''],
+    ['white pen', 'assets/white_pen.glb', 'glb', ''],
+    ['white suppressor', 'assets/white_suppressor.glb', 'glb', ''],
+    ['white walther', 'assets/white_walther.glb', 'glb', '']
+  ]}
+];
+const WEAPONS = [
+  { name: 'aks74u', file: 'assets/aks74u.glb', len: 0.6 },
+  { name: 'black aks74u', file: 'assets/black_aks74u.glb', len: 0.6 },
+  { name: 'black bag', file: 'assets/black_bag.glb', len: 0.32 },
+  { name: 'black c4', file: 'assets/black_c4.glb', len: 0.32 },
+  { name: 'black claymore', file: 'assets/black_claymore.glb', len: 0.32 },
+  { name: 'black glasses', file: 'assets/black_glasses.glb', len: 0.32 },
+  { name: 'black glasses2', file: 'assets/black_glasses2.glb', len: 0.32 },
+  { name: 'black glock threaded', file: 'assets/black_glock_threaded.glb', len: 0.32 },
+  { name: 'black grenade', file: 'assets/black_grenade.glb', len: 0.32 },
+  { name: 'black knife', file: 'assets/black_knife.glb', len: 0.32 },
+  { name: 'black lockpicks', file: 'assets/black_lockpicks.glb', len: 0.32 },
+  { name: 'black makarov', file: 'assets/black_makarov.glb', len: 0.32 },
+  { name: 'black mp5 k', file: 'assets/black_mp5-k.glb', len: 0.6 },
+  { name: 'black mp5k', file: 'assets/black_mp5k.glb', len: 0.6 },
+  { name: 'black pen', file: 'assets/black_pen.glb', len: 0.32 },
+  { name: 'black pen2', file: 'assets/black_pen2.glb', len: 0.32 },
+  { name: 'black rpg', file: 'assets/black_rpg.glb', len: 0.6 },
+  { name: 'black suppressor', file: 'assets/black_suppressor.glb', len: 0.32 },
+  { name: 'black throwing knife', file: 'assets/black_throwing_knife.glb', len: 0.32 },
+  { name: 'black walther', file: 'assets/black_walther.glb', len: 0.32 },
+  { name: 'black watch', file: 'assets/black_watch.glb', len: 0.32 },
+  { name: 'cufflinks', file: 'assets/cufflinks.glb', len: 0.32 },
+  { name: 'mp5k', file: 'assets/mp5k.glb', len: 0.6 },
+  { name: 'ppk', file: 'assets/ppk.glb', len: 0.32 },
+  { name: 'ppk magazine', file: 'assets/ppk_magazine.glb', len: 0.32 },
+  { name: 'ppk suppressor', file: 'assets/ppk_suppressor.glb', len: 0.32 },
+  { name: 'rpg', file: 'assets/rpg.glb', len: 0.6 },
+  { name: 'suppressor', file: 'assets/suppressor.glb', len: 0.32 },
+  { name: 'white RPG7', file: 'assets/white_RPG7.glb', len: 0.6 },
+  { name: 'white aks74u', file: 'assets/white_aks74u.glb', len: 0.6 },
+  { name: 'white c4', file: 'assets/white_c4.glb', len: 0.32 },
+  { name: 'white claymore', file: 'assets/white_claymore.glb', len: 0.32 },
+  { name: 'white glasses2', file: 'assets/white_glasses2.glb', len: 0.32 },
+  { name: 'white glock', file: 'assets/white_glock.glb', len: 0.32 },
+  { name: 'white grenade', file: 'assets/white_grenade.glb', len: 0.32 },
+  { name: 'white knife', file: 'assets/white_knife.glb', len: 0.32 },
+  { name: 'white mac', file: 'assets/white_mac.glb', len: 0.6 },
+  { name: 'white makarov', file: 'assets/white_makarov.glb', len: 0.32 },
+  { name: 'white mp5k', file: 'assets/white_mp5k.glb', len: 0.6 },
+  { name: 'white open glasses', file: 'assets/white_open_glasses.glb', len: 0.32 },
+  { name: 'white pen', file: 'assets/white_pen.glb', len: 0.32 },
+  { name: 'white suppressor', file: 'assets/white_suppressor.glb', len: 0.32 },
+  { name: 'white walther', file: 'assets/white_walther.glb', len: 0.32 }
 ];
 const ANIMS = ["Climbing_Ladder","Crawling","Crouch_Death","Crouch_Idle","Crouched_Walking","Death","Death_From_Front_Headshot","Driving","Drunk_Idle","Drunk_Stumbling_Walking","Drunk_Walk","Dying_Backwards","Entering_Car","Exiting_Car","Falling","Falling_Back_Death","Falling_Down","Female_Crouch_Pose","Firing_Rifle","Firing_Rifle_Crouch_Walking","Grabbing_Pistol","Head_Nod_Yes","Hit_Reaction","Honking_Horn","Idle_Crouching","Idle_To_Running","Jump","Knocked_Out","Landing","Looking_Around","Male_Crouch_Pose","Opening_Door_Inwards","Picking_Up_Object","Pistol_Aim","Pistol_Idle","Pistol_Kneeling_Idle","Pistol_Run","Pistol_Walk","Pistol_Walk_Arc","Pointing_Forward","Punching","Reloading_Rifle","Reloading_Walking","Rifle_Aiming_Idle","Rifle_Crouch_Walk","Rifle_Death","Rifle_Idle","Rifle_Run","Rifle_Walk","Rumba_Dancing","Running","Salsa_Dancing__1","Salsa_Dancing__4","Salsa_Dancing__5","Salsa_Dancing__6","Salsa_Dancing__7","Shaking_Head_No","Shooting_Pistol","Shrugging","Side_Kick","Sitting_Idle","Sneaking_Forward","Sprint_Forward","Standing_Idle","Standing_React_Death_Forward","Standing_Sprint_Forward","Standing_Up","Taking_Cover_Idle","Talking","Talking_On_A_Cell_Phone","Turning","Typing","Vault_Over_Box","Walking","Walking_While_Aiming_Rifle","Waving"];
 
@@ -130,7 +234,7 @@ const texLoader = new THREE.TextureLoader();
 // Bump this whenever a model, texture, or animation file is replaced in the
 // repo — asset URLs carry it, so browsers never serve a stale cached FBX/GLB
 // under the same filename (that's how the rigged Kyle_combat looked static).
-const ASSET_V = '20261106c';
+const ASSET_V = '20261106d';
 const modelSel = document.getElementById('modelSel');
 const animSel = document.getElementById('animSel');
 const statusEl = document.getElementById('status');
@@ -146,6 +250,9 @@ function setAnimOptions(names) {
   names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; animSel.appendChild(o); });
 }
 setAnimOptions(ANIMS);
+const weaponSel = document.getElementById('weaponSel');
+{ const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'No weapon'; weaponSel.appendChild(o0);
+  WEAPONS.forEach(w => { const o = document.createElement('option'); o.value = w.name; o.textContent = w.name; weaponSel.appendChild(o); }); }
 
 let model = null, mixer = null, action = null, clip = null, embeddedAnims = [];
 let playing = true, loop = true, stripRoot = true, showArrows = true, showTarget = false;
@@ -215,12 +322,65 @@ function applyPBR(obj, set) {
     m.metalness = 1; m.roughness = 1; m.needsUpdate = true;
   }); } });
 }
+// Weapon attach — same logic as the game (index.html): find the right-hand
+// bone, fit the weapon to its target length (pistol 0.32 m, rifle 0.60 m,
+// barrel along +Z), place it in the palm with the barrel forward, then
+// handBone.attach() so it follows the hand through every clip.
+function boneKey(name) {
+  if (!name) return '';
+  let base = name.split('.')[0].split('|')[0];
+  if (base.indexOf(':') >= 0) base = base.slice(base.indexOf(':') + 1);
+  return base.toLowerCase();
+}
+function findHandBone(model) {
+  let found = null;
+  model.traverse((o) => { if (!o.isBone || found) return; if (boneKey(o.name) === 'righthand') found = o; });
+  if (!found) model.traverse((o) => { if (!o.isBone || found) return; if (boneKey(o.name).indexOf('righthand') >= 0) found = o; });
+  return found;
+}
+function fitWeapon(obj, targetLength) {
+  let box = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); box.getSize(size);
+  if (size.x > size.z && size.x >= size.y) obj.rotation.y = Math.PI / 2;
+  box = new THREE.Box3().setFromObject(obj); box.getSize(size);
+  const longest = Math.max(size.x, size.y, size.z);
+  if (!longest || longest <= 0) return false;
+  obj.scale.setScalar(targetLength / longest);
+  box = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); box.getCenter(c);
+  obj.position.set(-c.x, -c.y, -c.z);
+  return true;
+}
+let weaponPivot = null;
+function loadWeapon(name) {
+  if (weaponPivot) { weaponPivot.removeFromParent(); weaponPivot = null; }
+  if (!name) return;
+  const w = WEAPONS.find(x => x.name === name); if (!w) return;
+  gltfLoader.load(w.file + '?v=' + ASSET_V, (gltf) => {
+    const pivot = new THREE.Group(); pivot.add(gltf.scene);
+    if (!fitWeapon(gltf.scene, w.len)) return;
+    scene.add(pivot);
+    if (!model) { pivot.removeFromParent(); return; }
+    const hand = findHandBone(model);
+    if (!hand) { pivot.removeFromParent(); statusEl.textContent += ' / no right-hand bone — weapon not attached'; return; }
+    try {
+      model.updateMatrixWorld(true);
+      const hp = new THREE.Vector3(); hand.getWorldPosition(hp);
+      scene.attach(pivot);
+      pivot.position.copy(hp).add(new THREE.Vector3(0, 0, 0.08));
+      pivot.quaternion.setFromEuler(new THREE.Euler(0, 0, 0));
+      pivot.scale.setScalar(1);
+      hand.attach(pivot);
+      weaponPivot = pivot;
+    } catch (e) { pivot.removeFromParent(); }
+  }, undefined, () => { statusEl.textContent += ' / weapon failed to load: ' + w.file; });
+}
+weaponSel.addEventListener('change', () => loadWeapon(weaponSel.value));
 function applyBasecolor(obj, texPath) {
   if (!texPath) return;
   const tex = texLoader.load(texPath + '?v=' + ASSET_V); tex.colorSpace = THREE.SRGBColorSpace;
   obj.traverse(o => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach(m => { m.map = tex; m.color.set(0xffffff); m.needsUpdate = true; }); } });
 }
 function clearModel() {
+  if (weaponPivot) { weaponPivot.removeFromParent(); weaponPivot = null; }
   if (model) { scene.remove(model); model = null; }
   if (mixer) { mixer.stopAllAction(); mixer = null; }
   action = null; clip = null; embeddedAnims = []; hipsArrow.visible = torsoArrow.visible = false;
@@ -239,6 +399,7 @@ function afterModel(obj, info) {
   else if (embeddedAnims.length) playAnim(embeddedAnims[0].name);
   else if (info[2] === 'fbx' && hasBones) playAnim('Standing_Idle');
   resetView();
+  if (weaponSel.value) loadWeapon(weaponSel.value);
   setStatus(`${info[0]} — ${info[1]}\nsize ${(fit.size.x).toFixed(2)} x ${(fit.size.y).toFixed(2)} x ${(fit.size.z).toFixed(2)} m, ${boneCount} bones${hasBones ? '' : '\nSTATIC MODEL — no skeleton, so no animation can play on it'}${bones.hips ? '' : '\n(no Hips bone found)'}`);
 }
 function loadModel(name) {
@@ -317,7 +478,7 @@ document.getElementById('backBtn').addEventListener('click', () => setView('back
 document.getElementById('topBtn').addEventListener('click', () => setView('top'));
 document.getElementById('resetBtn').addEventListener('click', resetView);
 document.getElementById('shootBtn').addEventListener('click', () => {
-  pendingAnim = 'Shooting_Pistol'; modelSel.value = 'Kyle'; loadModel('Kyle');
+  pendingAnim = 'Shooting_Pistol'; modelSel.value = 'Kyle'; weaponSel.value = 'White glock'; loadModel('Kyle');
 });
 document.getElementById('camBtn').addEventListener('click', e => {
   camMode = camMode === 'orbit' ? 'free' : 'orbit';
