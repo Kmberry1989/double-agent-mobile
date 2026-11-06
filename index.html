@@ -1267,6 +1267,7 @@ addEventListener('mousedown', e=>{
 addEventListener('mouseup', e=>{ if (e.button===2) aiming=false; });
 addEventListener('contextmenu', e=>e.preventDefault());
 document.getElementById('startBtn').addEventListener('click', ()=>{
+  ensureAudio(); // unlock audio on the same gesture that starts the game
   document.getElementById('overlay').style.display='none';
   // Mobile: start directly with touch controls — do NOT require pointer lock,
   // which phones do not support. Desktop keeps the existing pointer-lock flow.
@@ -1375,6 +1376,66 @@ function noiseAlert(radius, isGun){
     if (d<radius){ g.state='SEARCH'; g.lastKnown = player.position.clone(); g.searchT=0; if (isGun) g.meter=100; }
   });
 }
+// ---------- Gunshot / slash sounds (Web Audio, mono AAC) ----------
+// All game audio is mono. Each playback gets a fresh BufferSource (so
+// rapid shots overlap instead of cutting each other off) plus random
+// pitch (playbackRate 0.92–1.08) and a randomized peaking filter
+// (formant shift, 600–3000 Hz, ±6 dB) so no two shots sound identical.
+const SFX_FILES = {
+  pistol: 'assets/audio/pistol-gunshot.m4a',
+  suppressedPistol: 'assets/audio/suppressed-pistol.m4a',
+  suppressedWalther: 'assets/audio/suppressedwalther.m4a',
+  ak74: 'assets/audio/ak74.m4a',
+  rifle: 'assets/audio/rifle-gunshots.m4a',
+  hit: ['assets/audio/gunshot-hit.m4a', 'assets/audio/gunshot-hit2.m4a'],
+  slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
+  slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
+};
+let audioCtx = null, sfxBufs = {}, sfxMaster = null;
+function ensureAudio(){
+  if (!audioCtx){
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      sfxMaster = audioCtx.createGain(); sfxMaster.gain.value = 0.7; sfxMaster.connect(audioCtx.destination);
+      // Preload + decode every sound file. Decoding works while the
+      // context is suspended; it is resumed on user gestures below.
+      const all = new Set();
+      Object.values(SFX_FILES).flat().forEach(f=>all.add(f));
+      all.forEach(f=>{
+        fetch(f).then(r=>r.arrayBuffer()).then(ab=>audioCtx.decodeAudioData(ab)).then(buf=>{ sfxBufs[f]=buf; }).catch(e=>console.warn('[double-agent] sfx failed to load:', f, e));
+      });
+    } catch(e){ console.warn('[double-agent] audio unavailable:', e); }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+  return audioCtx;
+}
+function playSfx(file){
+  const ctx = ensureAudio();
+  const buf = ctx && sfxBufs[file];
+  if (!buf) return; // not decoded yet (or failed) — skip silently
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.playbackRate.value = 0.92 + Math.random() * 0.16; // ±8% pitch
+  const filt = ctx.createBiquadFilter();
+  filt.type = 'peaking';
+  filt.frequency.value = 600 + Math.random() * 2400; // 600–3000 Hz formant
+  filt.Q.value = 1;
+  filt.gain.value = -6 + Math.random() * 12; // ±6 dB
+  const g = ctx.createGain(); g.gain.value = 1;
+  src.connect(filt); filt.connect(g); g.connect(sfxMaster);
+  src.start();
+}
+function pickSfx(arr){ return arr[(Math.random()*arr.length)|0]; }
+function playShotSound(){
+  if (weapon === 'rifle'){
+    if (weaponVariant === 'AKS74U') playSfx(SFX_FILES.ak74);
+    else playSfx(SFX_FILES.rifle); // MP5K, and RPG7 (no RPG sound in the set)
+  } else {
+    if (weaponVariant === 'Walther') playSfx(SFX_FILES.suppressedWalther);
+    else if (weaponVariant === 'Glock' && playerLoadout === 'black') playSfx(SFX_FILES.suppressedPistol);
+    else playSfx(SFX_FILES.pistol);
+  }
+}
 function tryShoot(){
   const now = performance.now();
   if (gameOver || won) return;
@@ -1384,6 +1445,7 @@ function tryShoot(){
   if (ammoInMag<=0){ showMsg('Empty — press R to reload',1200); return; }
   lastShot = now; ammoInMag--;
   ejectCasing();
+  playShotSound();
   playPlayerOneShot(weapon==='rifle' ? (crouching ? 'fireRifleCrouch' : 'fireRifle') : 'firePistol');
   // Ray from camera centre.
   const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
@@ -1397,6 +1459,7 @@ function tryShoot(){
     let node = hits[0].object; let g = null;
     while (node){ g = guards.find(x=>x.group===node); if (g) break; node = node.parent; }
     if (g){ guardHit = true; g.hp -= w.dmg; g.meter = 100; g.state='ALERT'; g.lastKnown = player.position.clone();
+      playSfx(pickSfx(SFX_FILES.hit));
       spawnHitSpray(hits[0].point.clone());
       addDecal(new THREE.Vector3(g.group.position.x, 0.02, g.group.position.z), new THREE.Vector3(0, 1, 0), 'blood');
       if (g.hp<=0){ g.dead=true; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g); showMsg('Guard down',1400); }
@@ -1433,9 +1496,10 @@ function tryTakedown(){
     const behind = fwd.dot(toPlayer) < -0.6;
     if (behind && g.state!=='ALERT' && g.meter<80){
       g.dead=true; g.hp=0; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g);
+      playSfx(pickSfx(SFX_FILES.slashHit));
       showMsg('Silent takedown — no alarm',1800); return;
     }
-    if (behind) showMsg('Guard is alert — takedown blocked',1400); else showMsg('Get behind an unaware guard for a takedown',1400);
+    if (behind){ playSfx(pickSfx(SFX_FILES.slashMiss)); showMsg('Guard is alert — takedown blocked',1400); } else showMsg('Get behind an unaware guard for a takedown',1400);
     return;
   }
   showMsg('No guard in takedown range',1000);
