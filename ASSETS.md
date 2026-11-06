@@ -323,20 +323,20 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 251 files, 212.5 MB
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/ballroom/ballroom_bar_counter_wood_marble_1024.webp` | 356.7 KB |  |
-| `textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp` | 649.9 KB |  |
-| `textures/ballroom/ballroom_ceiling_plaster_moulding_1024.webp` | 727.3 KB |  |
-| `textures/ballroom/ballroom_chair_upholstery_velvet_brocade_1024.webp` | 1.3 MB |  |
-| `textures/ballroom/ballroom_chandelier_crystal_glass_1024.webp` | 1004.3 KB |  |
-| `textures/ballroom/ballroom_curtain_velvet_1024.webp` | 1.0 MB |  |
+| `textures/ballroom/ballroom_bar_counter_wood_marble_1024.webp` | 417.4 KB |  |
+| `textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp` | 1.0 MB |  |
+| `textures/ballroom/ballroom_ceiling_plaster_moulding_1024.webp` | 1004.3 KB |  |
+| `textures/ballroom/ballroom_chair_upholstery_velvet_brocade_1024.webp` | 1.1 MB |  |
+| `textures/ballroom/ballroom_chandelier_crystal_glass_1024.webp` | 649.9 KB |  |
+| `textures/ballroom/ballroom_curtain_velvet_1024.webp` | 389.9 KB |  |
 | `textures/ballroom/ballroom_door_double_mahogany_1024.webp` | 83.9 KB |  |
-| `textures/ballroom/ballroom_door_entrance_mahogany_1024.webp` | 793.4 KB |  |
-| `textures/ballroom/ballroom_floor_herringbone_marble_border_1024.webp` | 389.9 KB |  |
+| `textures/ballroom/ballroom_door_entrance_mahogany_1024.webp` | 383.5 KB |  |
+| `textures/ballroom/ballroom_floor_herringbone_marble_border_1024.webp` | 793.4 KB |  |
 | `textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp` | 573.7 KB |  |
-| `textures/ballroom/ballroom_rug_medallion_large_1024.webp` | 383.5 KB |  |
-| `textures/ballroom/ballroom_tablecloth_linen_cream_1024.webp` | 1.1 MB |  |
+| `textures/ballroom/ballroom_rug_medallion_large_1024.webp` | 1.3 MB |  |
+| `textures/ballroom/ballroom_tablecloth_linen_cream_1024.webp` | 727.3 KB |  |
 | `textures/ballroom/ballroom_wall_damask_burgundy_gold_1024.webp` | 1.2 MB |  |
-| `textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp` | 417.4 KB |  |
+| `textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp` | 356.7 KB |  |
 
 ## Textures — exterior (mansion/drive) (7 files, 1.5 MB)
 
@@ -345,7 +345,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 251 files, 212.5 MB
 | `textures/exterior/exterior_drive_asphalt_1024.webp` | 355.5 KB |  |
 | `textures/exterior/exterior_drive_cobblestone_1024.webp` | 293.2 KB |  |
 | `textures/exterior/exterior_lawn_grass_clover_1024.webp` | 468.0 KB |  |
-| `textures/exterior/exterior_mansion_entrance_dark_stone_1024.webp` | 152.1 KB |  |
+| `textures/exterior/exterior_mansion_entrance_dark_brick_1024.webp` | 152.1 KB |  |
 | `textures/exterior/exterior_mansion_entrance_ivory_1024.webp` | 93.2 KB |  |
 | `textures/exterior/exterior_mansion_entrance_ivory_wide_2080.webp` | 95.0 KB |  |
 | `textures/exterior/exterior_mansion_facade_windows_1024.webp` | 112.5 KB |  |
