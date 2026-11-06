@@ -69,6 +69,7 @@ const MODELS = [
     ['Eric', 'assets/models/Eric.fbx', 'fbx', 'assets/models/textures/Eric_basecolor.png'],
     ['Kristen', 'assets/models/Kristen.fbx', 'fbx', 'assets/models/textures/Kristen_basecolor.png'],
     ['Kyle (Combat)', 'assets/models/Kyle_combat.fbx', 'fbx', ''],
+    ['Rochelle (Combat)', 'assets/models/Rochelle_combat.fbx', 'fbx', ''],
     ['Kyle', 'assets/models/Kyle_undercover.fbx', 'fbx', ''],
     ['Rochelle', 'assets/models/Rochelle_undercover.fbx', 'fbx', 'assets/models/textures/Rochelle_basecolor.jpg'],
     ['Vickie', 'assets/models/Vickie.fbx', 'fbx', 'assets/models/textures/Vickie_basecolor.png']
@@ -234,7 +235,7 @@ const texLoader = new THREE.TextureLoader();
 // Bump this whenever a model, texture, or animation file is replaced in the
 // repo — asset URLs carry it, so browsers never serve a stale cached FBX/GLB
 // under the same filename (that's how the rigged Kyle_combat looked static).
-const ASSET_V = '20261106d';
+const ASSET_V = '20261106e';
 const modelSel = document.getElementById('modelSel');
 const animSel = document.getElementById('animSel');
 const statusEl = document.getElementById('status');
@@ -310,6 +311,12 @@ const PBR = {
     metal: 'assets/models/tactical_combat_suit_3d_model_metallic.JPEG',
     rough: 'assets/models/tactical_combat_suit_3d_model_roughness.JPEG',
     normal: 'assets/models/tactical_combat_suit_3d_model_normal.PNG',
+  },
+  'Rochelle (Combat)': {
+    base: 'assets/models/cyberpunk_warrior_3d_model_basecolor.JPEG',
+    metal: 'assets/models/cyberpunk_warrior_3d_model_metallic.JPEG',
+    rough: 'assets/models/cyberpunk_warrior_3d_model_roughness.JPEG',
+    normal: 'assets/models/cyberpunk_warrior_3d_model_normal.PNG',
   },
 };
 function applyPBR(obj, set) {
