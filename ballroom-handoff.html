@@ -137,9 +137,10 @@ walls.forEach((w)=>applyTex(w, 'assets/textures/ballroom/ballroom_wall_damask_bu
 // balcony at y=6 has headroom. Same damask, same footprint as below.
 const upperWalls = [
   box(0, 9, -HALL_Z - 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // north wall, upper
-  box(-11.25, 9, HALL_Z + 0.5, 19.5, 6, 1, 0x5a2f22), // south wall, upper left
-  box(11.25, 9, HALL_Z + 0.5, 19.5, 6, 1, 0x5a2f22), // south wall, upper right
-  box(0, 9, HALL_Z + 0.5, 3, 6, 1, 0x5a2f22), // upper lintel above the double doors
+  box(-11.5, 9, HALL_Z + 0.5, 19, 6, 1, 0x5a2f22), // south wall, upper left (ends at x -2 for the balcony window)
+  box(11.5, 9, HALL_Z + 0.5, 19, 6, 1, 0x5a2f22), // south wall, upper right (starts at x 2)
+  box(0, 6.5, HALL_Z + 0.5, 4, 1, 1.1, 0x5a2f22), // sill below the balcony window (y 6-7, proud 0.05 so no face is coplanar)
+  box(0, 10.75, HALL_Z + 0.5, 4, 2.5, 1.1, 0x5a2f22), // lintel above the balcony window (y 9.5-12)
   box(-HALL_X - 0.5, 9, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
   box(HALL_X + 0.5, 9, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
 ];
@@ -375,9 +376,19 @@ const facLintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshSt
 // y 6, where the ground-floor skin ends; the roof (ridge y 16) now sits above them.
 const wingUL = box(-28.4, 9.25, 14, 16, 6, 12, 0xd8c8a8); applyTex(wingUL, 'assets/textures/exterior/exterior_mansion_facade_windows_1024x768.webp', 2, 1);
 const wingUR = box(28.4, 9.25, 14, 16, 6, 12, 0xd8c8a8); applyTex(wingUR, 'assets/textures/exterior/exterior_mansion_facade_windows_1024x768.webp', 2, 1);
-const facUL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facUL.position.set(-11.25, 9, 15.4); scene.add(facUL); applyTex(facUL, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080x640.webp', 1, 1);
-const facUR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facUR.position.set(11.25, 9, 15.4); scene.add(facUR); applyTex(facUR, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080x640.webp', 1, 1);
-const facULintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facULintel.position.set(0, 9, 15.4); scene.add(facULintel); // upper lintel, ivory stone, south-facing only
+const facUL = new THREE.Mesh(new THREE.PlaneGeometry(19, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facUL.position.set(-11.5, 9, 15.4); scene.add(facUL); applyTex(facUL, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080x640.webp', 1, 1); // narrowed 19.5->19 so it ends at x -2 (balcony window); 2.6% squeeze, windows/quoins still read
+const facUR = new THREE.Mesh(new THREE.PlaneGeometry(19, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facUR.position.set(11.5, 9, 15.4); scene.add(facUR); applyTex(facUR, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080x640.webp', 1, 1);
+const facUSill = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facUSill.position.set(0, 6.5, 15.4); scene.add(facUSill); // sill below the balcony window, plain ivory (the full texture would squash into 4 m)
+const facULintel = new THREE.Mesh(new THREE.PlaneGeometry(4, 2.5), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facULintel.position.set(0, 10.75, 15.4); scene.add(facULintel); // lintel above the balcony window, plain ivory
+// Balcony window frame + sill ledge (2026-11-06): pale limestone trim lining
+// the opening (x -2..2, y 7..9.5), proud 0.05 on both faces so no face is
+// coplanar with the wall. The sill ledge juts 0.1 into the room and 0.1
+// outside. Safety: the player clamp keeps him at z <= 13 inside, so he can
+// look through the opening but never reach it — no collider needed here.
+box(-2, 8.25, 14.7, 0.15, 2.5, 1.5, 0xf5f0e0); // west jamb, y 7..9.5
+box(2, 8.25, 14.7, 0.15, 2.5, 1.5, 0xf5f0e0); // east jamb, y 7..9.5
+box(0, 9.5, 14.7, 4.15, 0.15, 1.5, 0xf5f0e0); // head, y 9.425..9.575
+box(0, 7, 14.7, 4.3, 0.12, 1.6, 0xf5f0e0); // sill ledge, y 6.94..7.06, z 13.9..15.5
 cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 // Pillar bases + capitals (2026-11-06): a slightly larger cube at the foot
