@@ -258,9 +258,9 @@ const wingR = box(28.4, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingR, 'assets/t
 // ballroom south wall (z 15.4, wall back is 15.0), so from outside you see windows,
 // not the interior damask wallpaper. Planes face south only, so from inside they are
 // backface-culled and can never bleed through the south wall. Door gap stays open.
-const facL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0x4a2e1a })); facL.position.set(-11.25, 3, 15.4); scene.add(facL); applyTex(facL, 'assets/textures/exterior_mansion_entrance_dark_stone_1024.webp', 3, 1); // central entrance walls: darker stone, distinct from the light wings
-const facR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0x4a2e1a })); facR.position.set(11.25, 3, 15.4); scene.add(facR); applyTex(facR, 'assets/textures/exterior_mansion_entrance_dark_stone_1024.webp', 3, 1);
-const facLintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ color: 0x4a2e1a })); facLintel.position.set(0, 4.5, 15.4); scene.add(facLintel); // lintel above the double doors, dark stone to match the entrance walls, south-facing only
+const facL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facL.position.set(-11.25, 3, 15.4); scene.add(facL); applyTex(facL, 'assets/textures/exterior_mansion_entrance_ivory_1024.webp', 3, 1); // central entrance walls v2: pale ivory limestone with arched windows, distinct from the beige wings
+const facR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facR.position.set(11.25, 3, 15.4); scene.add(facR); applyTex(facR, 'assets/textures/exterior_mansion_entrance_ivory_1024.webp', 3, 1);
+const facLintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facLintel.position.set(0, 4.5, 15.4); scene.add(facLintel); // lintel above the double doors, ivory stone to match the entrance walls, south-facing only
 cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 box(0, 3.8, 17.4, 12, 0.4, 6, 0xd8c8a8); // shifted south 0.4 so its north face is not coplanar with the south wall face at z 14
