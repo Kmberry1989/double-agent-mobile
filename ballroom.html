@@ -284,7 +284,7 @@ function stripRootTravel(clip) {
   });
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx'], ['idleLook', 'Looking_Around.fbx'], ['idleShrug', 'Shrugging.fbx'], ['idleNod', 'Head_Nod_Yes.fbx'], ['idleShake', 'Shaking_Head_No.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -296,6 +296,20 @@ function playMxClip(key) {
   if (player._cur === act && act.isRunning()) return;
   if (player._cur && player._cur !== act) player._cur.fadeOut(0.15);
   act.reset().fadeIn(0.15).play(); player._cur = act;
+}
+// Idle variations: after ~5 s standing still, Kyle does something small —
+// looks around, shrugs, nods, or shakes his head — then back to idle.
+// Same once-and-hold pattern as playMxCharClipOnce; the loop below drives
+// the timing, and moving or talking interrupts the variation cleanly.
+const IDLE_VARS = ['idleLook', 'idleShrug', 'idleNod', 'idleShake'];
+let idleTimer = 4 + Math.random() * 2, idleVarKey = null, idleVarEnd = 0;
+function playMxClipOnce(key) {
+  if (!player.mixer || !mxClips[key]) return false;
+  const act = player.mixer.clipAction(mxClips[key]);
+  if (player._cur === act) return false;
+  if (player._cur && player._cur !== act) player._cur.fadeOut(0.15);
+  act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); player._cur = act;
+  return true;
 }
 fbxLoader.load('assets/characters/Kyle_undercover.fbx', (obj) => {
   fitCharacter(obj, 1.8);
@@ -659,7 +673,20 @@ function animate() {
       if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
     }
     player.rotation.y = yaw;
-    if (mixer) { mixer.update(dt); if (!talking) playClip(ml > 0.1 ? 'walk' : 'idle'); }
+    if (mixer) {
+      mixer.update(dt);
+      if (talking) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; }
+      else if (ml > 0.1) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playClip('walk'); }
+      else if (idleVarKey) { if (t >= idleVarEnd) { idleVarKey = null; playClip('idle'); } }
+      else {
+        idleTimer -= dt;
+        if (idleTimer <= 0) {
+          const k = IDLE_VARS[Math.floor(Math.random() * IDLE_VARS.length)];
+          if (mxClips[k] && playMxClipOnce(k)) { idleVarKey = k; idleVarEnd = t + mxClips[k].duration; }
+          idleTimer = 4 + Math.random() * 2;
+        } else playClip('idle');
+      }
+    }
     // Guest/contact bone animation: talk while talking, walk while moving, else idle.
     for (const n of NPCS) {
       if (!n.mixer || n.role === 'cat') continue;
