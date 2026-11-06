@@ -221,9 +221,26 @@ applyTex(islandMesh, 'assets/textures/exterior_lawn_grass_clover_1024.webp', 2, 
 // Road leading off the driveway, south beyond where the player can walk (player limit z 45).
 // A thin asphalt box, z 45-75, top at -1.43 to match the round drive top; it only touches the drive at the z 45 edge, so no coplanar overlap.
 const roadMesh = box(0, -1.48, 60, 8, 0.1, 30, 0x333333); applyTex(roadMesh, 'assets/textures/exterior_drive_asphalt_1024.webp', 1, 4);
+// Bushes, rebuilt 2026-11-05: each bush is a cluster of faceted lobes, not one smooth sphere.
+// 3 shapes (round / wide / tall), picked by position so the same bush looks the same every load.
+// Lobes use flat-shaded icosahedra in varied greens, with the lawn grass/clover texture shared across all lobes for a mottled leafy look.
+const bushTex = texLoader.load('assets/textures/exterior_lawn_grass_clover_1024.webp', (tex) => { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2); tex.colorSpace = THREE.SRGBColorSpace; });
+const BUSH_GREENS = [0x1e4d1e, 0x2a6b2a, 0x3a7d3a, 0x1a421a, 0x2f5e1f];
+function bushRand(seed) { const s = Math.sin(seed) * 43758.5453; return s - Math.floor(s); }
 function bush(x, z, r) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshStandardMaterial({ color: 0x1e4d1e }));
-  m.position.set(x, -1.5 + r * 0.7, z); scene.add(m); return m;
+  const g = new THREE.Group();
+  const variant = Math.floor(bushRand(x * 12.9898 + z * 78.233) * 3); // 0 round, 1 wide, 2 tall
+  const lobes = variant === 0
+    ? [[0, 0.7, 0, 1.0], [0.5, 0.5, 0.2, 0.65], [-0.45, 0.55, -0.15, 0.6], [0.1, 0.95, -0.3, 0.55], [-0.2, 0.4, 0.45, 0.55]]
+    : variant === 1
+    ? [[0, 0.55, 0, 0.9], [0.7, 0.45, 0.1, 0.6], [-0.65, 0.5, -0.1, 0.65], [0.2, 0.75, -0.25, 0.5], [-0.3, 0.35, 0.4, 0.5]]
+    : [[0, 0.85, 0, 0.9], [0.4, 0.5, 0.15, 0.55], [-0.35, 0.6, -0.2, 0.6], [0.05, 1.25, 0.1, 0.5], [-0.1, 0.35, 0.35, 0.5]];
+  lobes.forEach(([lx, ly, lz, lr], i) => {
+    const mat = new THREE.MeshStandardMaterial({ color: BUSH_GREENS[i % BUSH_GREENS.length], roughness: 1, flatShading: true, map: bushTex });
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r * lr, 1), mat);
+    m.position.set(lx * r, -1.5 + ly * r, lz * r); g.add(m);
+  });
+  g.position.set(x, 0, z); scene.add(g); return g;
 }
 for (let a = 0; a < 360; a += 20) { const rad = a * Math.PI / 180; bush(13.5 * Math.cos(rad), 32 + 13.5 * Math.sin(rad), 0.9); }
 for (let x = -18; x <= 18; x += 3) { if (Math.abs(x) < 3) continue; bush(x, 16.5, 0.8); }
