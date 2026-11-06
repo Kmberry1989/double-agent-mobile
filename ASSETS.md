@@ -1,22 +1,18 @@
 # Double Agent — Asset Inventory
 
-Generated from `assets/` in Kmberry1989/double-agent-mobile. 250 files, 212.4 MB total. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
+Generated from `assets/` in Kmberry1989/double-agent-mobile. 250 files, 212.4 MB total. The folders are the categories: characters, cats, weapons, vehicles, props, animations, textures (with subfolders), audio. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
 
 ## Contents
-- Characters — Mixamo FBX — 9 files, 10.8 MB
+- Characters — 17 files, 62.7 MB
 - Characters — enemies — 4 files, 10.5 MB
-- Characters — ActionForge FBX (unreferenced) — 1 files, 3.1 MB
-- Characters — ActionForge GLB (unreferenced) — 7 files, 48.8 MB
-- Character textures — basecolor — 5 files, 13.8 MB
-- Character textures — PBR sets — 8 files, 9.2 MB
+- Character textures — 13 files, 23.0 MB
 - Cats — 4 files, 19.2 MB
-- Weapons & gear — Player weapon — 15 files, 785.5 KB
-- Weapons & gear — Player gear — throwable/placeable (systems unwired) — 10 files, 523.3 KB
-- Weapons & gear — Player gear — suppressor — 2 files, 65.7 KB
-- Weapons & gear — Player gear — accessories — 10 files, 450.4 KB
-- Weapons & gear — enemy (unprefixed) — 7 files, 263.1 KB
-- Vehicles — 1 files, 77.4 KB
-- Vehicles & parts — 2 files, 126.1 KB
+- Weapons — player (white/black sets) — 15 files, 785.5 KB
+- Weapons — player gear, throwable/placeable (systems unwired) — 10 files, 523.3 KB
+- Weapons — player gear, suppressors — 2 files, 65.7 KB
+- Weapons — player gear, accessories — 9 files, 384.0 KB
+- Weapons — enemy (unprefixed) — 8 files, 329.5 KB
+- Vehicles — 3 files, 203.6 KB
 - Ballroom & office props — 20 files, 781.4 KB
 - Animations — locomotion & poses — 21 files, 9.0 MB
 - Animations — combat — 21 files, 9.6 MB
@@ -36,187 +32,167 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 250 files, 212.4 MB
 - Textures — decals (unused) — 5 files, 6.4 MB
 - Textures — raw photo JPGs — 17 files, 11.2 MB
 - Audio — 1 files, 429.0 KB
-- Data — 1 files, 4.8 KB
+- Data — 1 files, 4.9 KB
 
-## Characters — Mixamo FBX (9 files, 10.8 MB)
+## Characters (17 files, 62.7 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `Agent_Kyle.fbx` | 1.5 MB | PLAYER model (loader tries this first) |
-| `models/Donald.fbx` | 1.1 MB |  |
-| `models/Eric.fbx` | 1.2 MB |  |
-| `models/Kristen.fbx` | 1.1 MB |  |
-| `models/Kyle_combat.fbx` | 1.2 MB |  |
-| `models/Kyle_undercover.fbx` | 1.5 MB |  |
-| `models/Rochelle_combat.fbx` | 1.0 MB |  |
-| `models/Rochelle_undercover.fbx` | 977.1 KB |  |
-| `models/Vickie.fbx` | 1.1 MB |  |
+| `characters/Agent_Kyle.fbx` | 1.5 MB | PLAYER model (loader tries this first) |
+| `characters/Donald.fbx` | 1.1 MB |  |
+| `characters/Donald_tux.fbx` | 3.1 MB | Old ActionForge export, no page loads it |
+| `characters/Donald_tux.glb` | 2.4 MB | ActionForge, unreferenced by game pages |
+| `characters/Eric.fbx` | 1.2 MB |  |
+| `characters/Eric_tux.glb` | 8.4 MB | ActionForge, unreferenced by game pages |
+| `characters/Kristen.fbx` | 1.1 MB |  |
+| `characters/Kristen_gown.glb` | 10.9 MB | ActionForge, unreferenced by game pages |
+| `characters/Kyle_combat.fbx` | 1.2 MB |  |
+| `characters/Kyle_tux.glb` | 2.8 MB | ActionForge, unreferenced by game pages |
+| `characters/Kyle_undercover.fbx` | 1.5 MB |  |
+| `characters/Rochelle_combat.fbx` | 1.0 MB |  |
+| `characters/Rochelle_gown.glb` | 9.4 MB | ActionForge, unreferenced by game pages |
+| `characters/Rochelle_undercover.fbx` | 977.1 KB |  |
+| `characters/Rochelle_undercover_textured.glb` | 4.9 MB | Caused the 2026-11-03 gigantic-Rochelle bug; unreferenced |
+| `characters/Vickie.fbx` | 1.1 MB |  |
+| `characters/Vickie_gown.glb` | 10.0 MB | ActionForge, unreferenced by game pages |
 
 ## Characters — enemies (4 files, 10.5 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `enemy-terror1.fbx` | 3.6 MB | Terror rigs, courtyard guards |
-| `enemy-terror2.fbx` | 3.5 MB | Terror rigs, courtyard guards |
-| `enemy-terror3.fbx` | 1.7 MB | Terror rigs, courtyard guards |
-| `enemy-terror4.fbx` | 1.7 MB | Terror rigs, courtyard guards |
+| `characters/enemy-terror1.fbx` | 3.6 MB |  |
+| `characters/enemy-terror2.fbx` | 3.5 MB |  |
+| `characters/enemy-terror3.fbx` | 1.7 MB |  |
+| `characters/enemy-terror4.fbx` | 1.7 MB |  |
 
-## Characters — ActionForge FBX (unreferenced) (1 files, 3.1 MB)
-
-| File | Size | Note |
-| --- | --- | --- |
-| `Donald_tux.fbx` | 3.1 MB | Old ActionForge export, no page loads it |
-
-## Characters — ActionForge GLB (unreferenced) (7 files, 48.8 MB)
+## Character textures (13 files, 23.0 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `models/Donald_tux.glb` | 2.4 MB | Kept in repo, no game page loads these |
-| `models/Eric_tux.glb` | 8.4 MB | Kept in repo, no game page loads these |
-| `models/Kristen_gown.glb` | 10.9 MB | Kept in repo, no game page loads these |
-| `models/Kyle_tux.glb` | 2.8 MB | Kept in repo, no game page loads these |
-| `models/Rochelle_gown.glb` | 9.4 MB | Kept in repo, no game page loads these |
-| `models/Rochelle_undercover_textured.glb` | 4.9 MB | Kept in repo, no game page loads these |
-| `models/Vickie_gown.glb` | 10.0 MB | Kept in repo, no game page loads these |
-
-## Character textures — basecolor (5 files, 13.8 MB)
-
-| File | Size | Note |
-| --- | --- | --- |
-| `models/textures/Donald_basecolor.png` | 2.2 MB | Single basecolor per Mixamo guest |
-| `models/textures/Eric_basecolor.png` | 2.9 MB | Single basecolor per Mixamo guest |
-| `models/textures/Kristen_basecolor.png` | 4.0 MB | Single basecolor per Mixamo guest |
-| `models/textures/Rochelle_basecolor.jpg` | 581.1 KB | Single basecolor per Mixamo guest |
-| `models/textures/Vickie_basecolor.png` | 4.1 MB | Single basecolor per Mixamo guest |
-
-## Character textures — PBR sets (8 files, 9.2 MB)
-
-| File | Size | Note |
-| --- | --- | --- |
-| `models/cyberpunk_warrior_3d_model_basecolor.JPEG` | 1.5 MB | Rochelle (Combat), basecolor map (2048px) |
-| `models/cyberpunk_warrior_3d_model_metallic.JPEG` | 971.2 KB | Rochelle (Combat), metallic map (2048px) |
-| `models/cyberpunk_warrior_3d_model_normal.PNG` | 2.5 MB | Rochelle (Combat), normal map (2048px) |
-| `models/cyberpunk_warrior_3d_model_roughness.JPEG` | 867.8 KB | Rochelle (Combat), roughness map (2048px) |
-| `models/tactical_combat_suit_3d_model_basecolor.JPEG` | 801.8 KB | Kyle (Combat), basecolor map (2048px) |
-| `models/tactical_combat_suit_3d_model_metallic.JPEG` | 346.2 KB | Kyle (Combat), metallic map (2048px) |
-| `models/tactical_combat_suit_3d_model_normal.PNG` | 2.0 MB | Kyle (Combat), normal map (2048px) |
-| `models/tactical_combat_suit_3d_model_roughness.JPEG` | 356.4 KB | Kyle (Combat), roughness map (2048px) |
+| `characters/textures/Donald_basecolor.png` | 2.2 MB |  |
+| `characters/textures/Eric_basecolor.png` | 2.9 MB |  |
+| `characters/textures/Kristen_basecolor.png` | 4.0 MB |  |
+| `characters/textures/Rochelle_basecolor.jpg` | 581.1 KB |  |
+| `characters/textures/Vickie_basecolor.png` | 4.1 MB |  |
+| `characters/textures/cyberpunk_warrior_3d_model_basecolor.JPEG` | 1.5 MB |  |
+| `characters/textures/cyberpunk_warrior_3d_model_metallic.JPEG` | 971.2 KB |  |
+| `characters/textures/cyberpunk_warrior_3d_model_normal.PNG` | 2.5 MB |  |
+| `characters/textures/cyberpunk_warrior_3d_model_roughness.JPEG` | 867.8 KB |  |
+| `characters/textures/tactical_combat_suit_3d_model_basecolor.JPEG` | 801.8 KB |  |
+| `characters/textures/tactical_combat_suit_3d_model_metallic.JPEG` | 346.2 KB |  |
+| `characters/textures/tactical_combat_suit_3d_model_normal.PNG` | 2.0 MB |  |
+| `characters/textures/tactical_combat_suit_3d_model_roughness.JPEG` | 356.4 KB |  |
 
 ## Cats (4 files, 19.2 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `models/cats/Mabel.glb` | 4.4 MB | Rigged + skinned GLB, shared 33-bone rig |
-| `models/cats/Margo.glb` | 7.0 MB | Rigged + skinned GLB, shared 33-bone rig |
-| `models/cats/Moxie.glb` | 3.8 MB | Rigged + skinned GLB, shared 33-bone rig |
-| `models/cats/morecatanimations.glb` | 4.1 MB | Animation-only GLB (clips for the cats, model not used) |
+| `cats/Mabel.glb` | 4.4 MB | Rigged + skinned GLB, shared 33-bone rig |
+| `cats/Margo.glb` | 7.0 MB | Rigged + skinned GLB, shared 33-bone rig |
+| `cats/Moxie.glb` | 3.8 MB | Rigged + skinned GLB, shared 33-bone rig |
+| `cats/morecatanimations.glb` | 4.1 MB | Animation-only GLB (clips for the cats, model not used) |
 
-## Weapons & gear — Player weapon (15 files, 785.5 KB)
-
-| File | Size | Note |
-| --- | --- | --- |
-| `black_aks74u.glb` | 38.4 KB | black set |
-| `black_glock_threaded.glb` | 39.9 KB | black set |
-| `black_makarov.glb` | 40.7 KB | black set |
-| `black_mp5-k.glb` | 25.0 KB | black set |
-| `black_mp5k.glb` | 40.8 KB | black set |
-| `black_rpg.glb` | 46.4 KB | black set |
-| `black_walther.glb` | 39.3 KB | black set |
-| `white_RPG7.glb` | 61.1 KB | white set |
-| `white_aks74u.glb` | 59.4 KB | white set |
-| `white_glock.glb` | 46.8 KB | white set |
-| `white_glock_nodraco.glb` | 99.6 KB | white set (de-Draco copy for Blender import) |
-| `white_mac.glb` | 55.9 KB | white set |
-| `white_makarov.glb` | 67.3 KB | white set |
-| `white_mp5k.glb` | 58.4 KB | white set |
-| `white_walther.glb` | 66.6 KB | white set |
-
-## Weapons & gear — Player gear — throwable/placeable (systems unwired) (10 files, 523.3 KB)
+## Weapons — player (white/black sets) (15 files, 785.5 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `black_c4.glb` | 52.2 KB | black set |
-| `black_claymore.glb` | 40.0 KB | black set |
-| `black_grenade.glb` | 61.5 KB | black set |
-| `black_knife.glb` | 32.3 KB | black set |
-| `black_lockpicks.glb` | 66.7 KB | black set |
-| `black_throwing_knife.glb` | 36.5 KB | black set |
-| `white_c4.glb` | 57.4 KB | white set |
-| `white_claymore.glb` | 65.9 KB | white set |
-| `white_grenade.glb` | 74.0 KB | white set |
-| `white_knife.glb` | 36.8 KB | white set |
+| `weapons/black_aks74u.glb` | 38.4 KB |  |
+| `weapons/black_glock_threaded.glb` | 39.9 KB |  |
+| `weapons/black_makarov.glb` | 40.7 KB |  |
+| `weapons/black_mp5-k.glb` | 25.0 KB |  |
+| `weapons/black_mp5k.glb` | 40.8 KB |  |
+| `weapons/black_rpg.glb` | 46.4 KB |  |
+| `weapons/black_walther.glb` | 39.3 KB |  |
+| `weapons/white_RPG7.glb` | 61.1 KB |  |
+| `weapons/white_aks74u.glb` | 59.4 KB |  |
+| `weapons/white_glock.glb` | 46.8 KB |  |
+| `weapons/white_glock_nodraco.glb` | 99.6 KB | De-Draco copy for Blender import (set grip origin there) |
+| `weapons/white_mac.glb` | 55.9 KB |  |
+| `weapons/white_makarov.glb` | 67.3 KB |  |
+| `weapons/white_mp5k.glb` | 58.4 KB |  |
+| `weapons/white_walther.glb` | 66.6 KB |  |
 
-## Weapons & gear — Player gear — suppressor (2 files, 65.7 KB)
-
-| File | Size | Note |
-| --- | --- | --- |
-| `black_suppressor.glb` | 21.6 KB | black set |
-| `white_suppressor.glb` | 44.0 KB | white set |
-
-## Weapons & gear — Player gear — accessories (10 files, 450.4 KB)
+## Weapons — player gear, throwable/placeable (systems unwired) (10 files, 523.3 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `black_bag.glb` | 60.0 KB | black set |
-| `black_glasses.glb` | 39.2 KB | black set |
-| `black_glasses2.glb` | 37.4 KB | black set |
-| `black_pen.glb` | 37.8 KB | black set |
-| `black_pen2.glb` | 17.0 KB | black set |
-| `black_watch.glb` | 46.4 KB | black set |
-| `cufflinks.glb` | 66.4 KB | Tuxedo accessory, unprefixed |
-| `white_glasses2.glb` | 55.3 KB | white set |
-| `white_open_glasses.glb` | 59.8 KB | white set |
-| `white_pen.glb` | 31.0 KB | white set |
+| `weapons/black_c4.glb` | 52.2 KB |  |
+| `weapons/black_claymore.glb` | 40.0 KB |  |
+| `weapons/black_grenade.glb` | 61.5 KB |  |
+| `weapons/black_knife.glb` | 32.3 KB |  |
+| `weapons/black_lockpicks.glb` | 66.7 KB |  |
+| `weapons/black_throwing_knife.glb` | 36.5 KB |  |
+| `weapons/white_c4.glb` | 57.4 KB |  |
+| `weapons/white_claymore.glb` | 65.9 KB |  |
+| `weapons/white_grenade.glb` | 74.0 KB |  |
+| `weapons/white_knife.glb` | 36.8 KB |  |
 
-## Weapons & gear — enemy (unprefixed) (7 files, 263.1 KB)
-
-| File | Size | Note |
-| --- | --- | --- |
-| `aks74u.glb` | 42.4 KB | Enemy weapons; unprefixed = enemies |
-| `mp5k.glb` | 26.6 KB | Enemy weapons; unprefixed = enemies |
-| `ppk.glb` | 69.4 KB | Enemy weapons; unprefixed = enemies |
-| `ppk_magazine.glb` | 40.9 KB | Enemy weapons; unprefixed = enemies |
-| `ppk_suppressor.glb` | 26.4 KB | Enemy weapons; unprefixed = enemies |
-| `rpg.glb` | 36.2 KB | Enemy weapons; unprefixed = enemies |
-| `suppressor.glb` | 21.1 KB | Enemy weapons; unprefixed = enemies |
-
-## Vehicles (1 files, 77.4 KB)
+## Weapons — player gear, suppressors (2 files, 65.7 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `white_lambo.glb` | 77.4 KB | Draco GLB, curbside in the handoff exterior |
+| `weapons/black_suppressor.glb` | 21.6 KB |  |
+| `weapons/white_suppressor.glb` | 44.0 KB |  |
 
-## Vehicles & parts (2 files, 126.1 KB)
+## Weapons — player gear, accessories (9 files, 384.0 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `tire.glb` | 62.1 KB |  |
-| `tire2.glb` | 64.0 KB |  |
+| `weapons/black_bag.glb` | 60.0 KB |  |
+| `weapons/black_glasses.glb` | 39.2 KB |  |
+| `weapons/black_glasses2.glb` | 37.4 KB |  |
+| `weapons/black_pen.glb` | 37.8 KB |  |
+| `weapons/black_pen2.glb` | 17.0 KB |  |
+| `weapons/black_watch.glb` | 46.4 KB |  |
+| `weapons/white_glasses2.glb` | 55.3 KB |  |
+| `weapons/white_open_glasses.glb` | 59.8 KB |  |
+| `weapons/white_pen.glb` | 31.0 KB |  |
+
+## Weapons — enemy (unprefixed) (8 files, 329.5 KB)
+
+| File | Size | Note |
+| --- | --- | --- |
+| `weapons/aks74u.glb` | 42.4 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/cufflinks.glb` | 66.4 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/mp5k.glb` | 26.6 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/ppk.glb` | 69.4 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/ppk_magazine.glb` | 40.9 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/ppk_suppressor.glb` | 26.4 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/rpg.glb` | 36.2 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/suppressor.glb` | 21.1 KB | Enemy weapons; unprefixed = enemies |
+
+## Vehicles (3 files, 203.6 KB)
+
+| File | Size | Note |
+| --- | --- | --- |
+| `vehicles/tire.glb` | 62.1 KB | white_lambo is the curbside Lambo in the handoff exterior |
+| `vehicles/tire2.glb` | 64.0 KB | white_lambo is the curbside Lambo in the handoff exterior |
+| `vehicles/white_lambo.glb` | 77.4 KB | white_lambo is the curbside Lambo in the handoff exterior |
 
 ## Ballroom & office props (20 files, 781.4 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `models/ballroom_bar.glb` | 35.1 KB |  |
-| `models/ballroom_bar_top.glb` | 23.6 KB |  |
-| `models/ballroom_chair.glb` | 30.1 KB |  |
-| `models/ballroom_chandelier.glb` | 102.3 KB |  |
-| `models/ballroom_table.glb` | 63.0 KB |  |
-| `models/barrel.glb` | 41.3 KB |  |
-| `models/cat_collar.glb` | 30.9 KB |  |
-| `models/cat_scanner.glb` | 20.4 KB |  |
-| `models/crate.glb` | 32.8 KB |  |
-| `models/desk_and_monitor.glb` | 53.2 KB |  |
-| `models/desk_binders.glb` | 34.3 KB |  |
-| `models/desk_chair.glb` | 32.8 KB |  |
-| `models/desk_keyboard.glb` | 27.7 KB |  |
-| `models/desk_keyboard_monitor_pencup.glb` | 22.1 KB |  |
-| `models/desk_mouse.glb` | 14.2 KB |  |
-| `models/desk_plain.glb` | 45.6 KB |  |
-| `models/desk_plant.glb` | 71.0 KB |  |
-| `models/filing_cabinet.glb` | 18.3 KB |  |
-| `models/roadblock.glb` | 30.4 KB |  |
-| `models/sandbags.glb` | 52.4 KB |  |
+| `props/ballroom_bar.glb` | 35.1 KB |  |
+| `props/ballroom_bar_top.glb` | 23.6 KB |  |
+| `props/ballroom_chair.glb` | 30.1 KB |  |
+| `props/ballroom_chandelier.glb` | 102.3 KB |  |
+| `props/ballroom_table.glb` | 63.0 KB |  |
+| `props/barrel.glb` | 41.3 KB |  |
+| `props/cat_collar.glb` | 30.9 KB |  |
+| `props/cat_scanner.glb` | 20.4 KB |  |
+| `props/crate.glb` | 32.8 KB |  |
+| `props/desk_and_monitor.glb` | 53.2 KB |  |
+| `props/desk_binders.glb` | 34.3 KB |  |
+| `props/desk_chair.glb` | 32.8 KB |  |
+| `props/desk_keyboard.glb` | 27.7 KB |  |
+| `props/desk_keyboard_monitor_pencup.glb` | 22.1 KB |  |
+| `props/desk_mouse.glb` | 14.2 KB |  |
+| `props/desk_plain.glb` | 45.6 KB |  |
+| `props/desk_plant.glb` | 71.0 KB |  |
+| `props/filing_cabinet.glb` | 18.3 KB |  |
+| `props/roadblock.glb` | 30.4 KB |  |
+| `props/sandbags.glb` | 52.4 KB |  |
 
 ## Animations — locomotion & poses (21 files, 9.0 MB)
 
@@ -347,104 +323,104 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 250 files, 212.4 MB
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/ballroom_bar_counter_wood_marble_1024.webp` | 356.7 KB |  |
-| `textures/ballroom_carpet_runner_red_gold_border_1024.webp` | 649.9 KB |  |
-| `textures/ballroom_ceiling_plaster_moulding_1024.webp` | 727.3 KB |  |
-| `textures/ballroom_chair_upholstery_velvet_brocade_1024.webp` | 1.3 MB |  |
-| `textures/ballroom_chandelier_crystal_glass_1024.webp` | 1004.3 KB |  |
-| `textures/ballroom_curtain_velvet_1024.webp` | 1.0 MB |  |
-| `textures/ballroom_door_double_mahogany_1024.webp` | 83.9 KB |  |
-| `textures/ballroom_door_entrance_mahogany_1024.webp` | 793.4 KB |  |
-| `textures/ballroom_floor_herringbone_marble_border_1024.webp` | 389.9 KB |  |
-| `textures/ballroom_floor_polished_wood_honey_brown_1024.webp` | 573.7 KB |  |
-| `textures/ballroom_rug_medallion_large_1024.webp` | 383.5 KB |  |
-| `textures/ballroom_tablecloth_linen_cream_1024.webp` | 1.1 MB |  |
-| `textures/ballroom_wall_damask_burgundy_gold_1024.webp` | 1.2 MB |  |
-| `textures/ballroom_wall_wood_wainscoting_dark_1024.webp` | 417.4 KB |  |
+| `textures/ballroom/ballroom_bar_counter_wood_marble_1024.webp` | 356.7 KB |  |
+| `textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp` | 649.9 KB |  |
+| `textures/ballroom/ballroom_ceiling_plaster_moulding_1024.webp` | 727.3 KB |  |
+| `textures/ballroom/ballroom_chair_upholstery_velvet_brocade_1024.webp` | 1.3 MB |  |
+| `textures/ballroom/ballroom_chandelier_crystal_glass_1024.webp` | 1004.3 KB |  |
+| `textures/ballroom/ballroom_curtain_velvet_1024.webp` | 1.0 MB |  |
+| `textures/ballroom/ballroom_door_double_mahogany_1024.webp` | 83.9 KB |  |
+| `textures/ballroom/ballroom_door_entrance_mahogany_1024.webp` | 793.4 KB |  |
+| `textures/ballroom/ballroom_floor_herringbone_marble_border_1024.webp` | 389.9 KB |  |
+| `textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp` | 573.7 KB |  |
+| `textures/ballroom/ballroom_rug_medallion_large_1024.webp` | 383.5 KB |  |
+| `textures/ballroom/ballroom_tablecloth_linen_cream_1024.webp` | 1.1 MB |  |
+| `textures/ballroom/ballroom_wall_damask_burgundy_gold_1024.webp` | 1.2 MB |  |
+| `textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp` | 417.4 KB |  |
 
 ## Textures — exterior (mansion/drive) (6 files, 1.4 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/exterior_drive_asphalt_1024.webp` | 355.5 KB |  |
-| `textures/exterior_drive_cobblestone_1024.webp` | 293.2 KB |  |
-| `textures/exterior_lawn_grass_clover_1024.webp` | 468.0 KB |  |
-| `textures/exterior_mansion_entrance_dark_stone_1024.webp` | 152.1 KB |  |
-| `textures/exterior_mansion_entrance_ivory_1024.webp` | 93.2 KB |  |
-| `textures/exterior_mansion_facade_windows_1024.webp` | 112.5 KB |  |
+| `textures/exterior/exterior_drive_asphalt_1024.webp` | 355.5 KB |  |
+| `textures/exterior/exterior_drive_cobblestone_1024.webp` | 293.2 KB |  |
+| `textures/exterior/exterior_lawn_grass_clover_1024.webp` | 468.0 KB |  |
+| `textures/exterior/exterior_mansion_entrance_dark_stone_1024.webp` | 152.1 KB |  |
+| `textures/exterior/exterior_mansion_entrance_ivory_1024.webp` | 93.2 KB |  |
+| `textures/exterior/exterior_mansion_facade_windows_1024.webp` | 112.5 KB |  |
 
 ## Textures — ground (6 files, 7.7 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/ground_asphalt_1024.webp` | 1.2 MB |  |
-| `textures/ground_asphalt_tire_marks_oil_stains_1024.webp` | 1.1 MB |  |
-| `textures/ground_concrete_slab_1024.webp` | 969.1 KB |  |
-| `textures/ground_dirt_path_1024.webp` | 1.2 MB |  |
-| `textures/ground_grass_1024.webp` | 1.7 MB |  |
-| `textures/ground_gravel_1024.webp` | 1.6 MB |  |
+| `textures/ground/ground_asphalt_1024.webp` | 1.2 MB |  |
+| `textures/ground/ground_asphalt_tire_marks_oil_stains_1024.webp` | 1.1 MB |  |
+| `textures/ground/ground_concrete_slab_1024.webp` | 969.1 KB |  |
+| `textures/ground/ground_dirt_path_1024.webp` | 1.2 MB |  |
+| `textures/ground/ground_grass_1024.webp` | 1.7 MB |  |
+| `textures/ground/ground_gravel_1024.webp` | 1.6 MB |  |
 
 ## Textures — props (9 files, 7.8 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/prop_barrel_metal_faded_blue_1024.webp` | 770.5 KB |  |
-| `textures/prop_barrel_metal_olive_drab_1024.webp` | 362.1 KB |  |
-| `textures/prop_barrel_metal_rusty_red_1024.webp` | 498.0 KB |  |
-| `textures/prop_concrete_barrier_weathered_1024.webp` | 890.4 KB |  |
-| `textures/prop_crate_wood_pine_diagonal_brace_1024.webp` | 1.1 MB |  |
-| `textures/prop_crate_wood_pine_no_nails_1024.webp` | 945.1 KB |  |
-| `textures/prop_crate_wood_pine_no_stains_1024.webp` | 938.0 KB |  |
-| `textures/prop_sandbag_wall_hessian_1024.webp` | 1.2 MB |  |
-| `textures/prop_sandbag_wall_sagging_spill_1024.webp` | 1.2 MB |  |
+| `textures/props/prop_barrel_metal_faded_blue_1024.webp` | 770.5 KB |  |
+| `textures/props/prop_barrel_metal_olive_drab_1024.webp` | 362.1 KB |  |
+| `textures/props/prop_barrel_metal_rusty_red_1024.webp` | 498.0 KB |  |
+| `textures/props/prop_concrete_barrier_weathered_1024.webp` | 890.4 KB |  |
+| `textures/props/prop_crate_wood_pine_diagonal_brace_1024.webp` | 1.1 MB |  |
+| `textures/props/prop_crate_wood_pine_no_nails_1024.webp` | 945.1 KB |  |
+| `textures/props/prop_crate_wood_pine_no_stains_1024.webp` | 938.0 KB |  |
+| `textures/props/prop_sandbag_wall_hessian_1024.webp` | 1.2 MB |  |
+| `textures/props/prop_sandbag_wall_sagging_spill_1024.webp` | 1.2 MB |  |
 
 ## Textures — walls (3 files, 1.8 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/wall_brick_running_bond_red_brown_1024.webp` | 1020.9 KB |  |
-| `textures/wall_metal_cladding_sage_green_corrugated_1024.webp` | 277.0 KB |  |
-| `textures/wall_metal_vent_grille_dark_louvre_1024.webp` | 549.7 KB |  |
+| `textures/walls/wall_brick_running_bond_red_brown_1024.webp` | 1020.9 KB |  |
+| `textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp` | 277.0 KB |  |
+| `textures/walls/wall_metal_vent_grille_dark_louvre_1024.webp` | 549.7 KB |  |
 
 ## Textures — facility (unwired) (3 files, 1.4 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/facility_concrete_barrier_weathered_copy_1024.webp` | 890.4 KB | Obtained but unreferenced by any page |
-| `textures/facility_door_exfil_gate_dark_green_rivets_1024.webp` | 338.4 KB | Obtained but unreferenced by any page |
-| `textures/facility_window_tinted_smoky_grey_blue_mullions_1024.webp` | 175.4 KB | Obtained but unreferenced by any page |
+| `textures/facility/facility_concrete_barrier_weathered_copy_1024.webp` | 890.4 KB |  |
+| `textures/facility/facility_door_exfil_gate_dark_green_rivets_1024.webp` | 338.4 KB |  |
+| `textures/facility/facility_window_tinted_smoky_grey_blue_mullions_1024.webp` | 175.4 KB |  |
 
 ## Textures — decals (unused) (5 files, 6.4 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/decal_blood_spatter_heavy_smear_1024.png` | 1.6 MB | Need a decal system; no page uses them |
-| `textures/decal_blood_spatter_pool_drips_1024.png` | 1.4 MB | Need a decal system; no page uses them |
-| `textures/decal_blood_spatter_small_splatter_1024.png` | 939.3 KB | Need a decal system; no page uses them |
-| `textures/decal_bullet_hole_64px.png` | 2.7 KB | Need a decal system; no page uses them |
-| `textures/decal_chainlink_fence_flat_highlights.png` | 2.5 MB | Need a decal system; no page uses them |
+| `textures/decals/decal_blood_spatter_heavy_smear_1024.png` | 1.6 MB |  |
+| `textures/decals/decal_blood_spatter_pool_drips_1024.png` | 1.4 MB |  |
+| `textures/decals/decal_blood_spatter_small_splatter_1024.png` | 939.3 KB |  |
+| `textures/decals/decal_bullet_hole_64px.png` | 2.7 KB |  |
+| `textures/decals/decal_chainlink_fence_flat_highlights.png` | 2.5 MB |  |
 
 ## Textures — raw photo JPGs (17 files, 11.2 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/asphalt.jpg` | 723.2 KB | Source/legacy textures |
-| `textures/brick.jpg` | 595.6 KB | Source/legacy textures |
-| `textures/chain-link-fence.jpg` | 472.1 KB | Source/legacy textures |
-| `textures/chain-link-fence.png` | 1.7 MB | Source/legacy textures |
-| `textures/concrete-slabs.jpg` | 591.8 KB | Source/legacy textures |
-| `textures/corrugated-metal.jpg` | 295.3 KB | Source/legacy textures |
-| `textures/dirt-path.jpg` | 700.9 KB | Source/legacy textures |
-| `textures/grass.jpg` | 998.7 KB | Source/legacy textures |
-| `textures/gravel.jpg` | 1.0 MB | Source/legacy textures |
-| `textures/painted-metal-blue.jpg` | 493.3 KB | Source/legacy textures |
-| `textures/painted-metal-olive.jpg` | 280.1 KB | Source/legacy textures |
-| `textures/painted-metal-red.jpg` | 339.5 KB | Source/legacy textures |
-| `textures/sandbags-1.jpg` | 767.2 KB | Source/legacy textures |
-| `textures/sandbags-2.jpg` | 734.9 KB | Source/legacy textures |
-| `textures/vent-grille.jpg` | 405.3 KB | Source/legacy textures |
-| `textures/wood-planks-1.jpg` | 624.5 KB | Source/legacy textures |
-| `textures/wood-planks-2.jpg` | 687.9 KB | Source/legacy textures |
+| `textures/raw/asphalt.jpg` | 723.2 KB |  |
+| `textures/raw/brick.jpg` | 595.6 KB |  |
+| `textures/raw/chain-link-fence.jpg` | 472.1 KB |  |
+| `textures/raw/chain-link-fence.png` | 1.7 MB |  |
+| `textures/raw/concrete-slabs.jpg` | 591.8 KB |  |
+| `textures/raw/corrugated-metal.jpg` | 295.3 KB |  |
+| `textures/raw/dirt-path.jpg` | 700.9 KB |  |
+| `textures/raw/grass.jpg` | 998.7 KB |  |
+| `textures/raw/gravel.jpg` | 1.0 MB |  |
+| `textures/raw/painted-metal-blue.jpg` | 493.3 KB |  |
+| `textures/raw/painted-metal-olive.jpg` | 280.1 KB |  |
+| `textures/raw/painted-metal-red.jpg` | 339.5 KB |  |
+| `textures/raw/sandbags-1.jpg` | 767.2 KB |  |
+| `textures/raw/sandbags-2.jpg` | 734.9 KB |  |
+| `textures/raw/vent-grille.jpg` | 405.3 KB |  |
+| `textures/raw/wood-planks-1.jpg` | 624.5 KB |  |
+| `textures/raw/wood-planks-2.jpg` | 687.9 KB |  |
 
 ## Audio (1 files, 429.0 KB)
 
@@ -452,8 +428,8 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 250 files, 212.4 MB
 | --- | --- | --- |
 | `audio/ballroom_waltz.m4a` | 429.0 KB | Mono AAC ballroom waltz, loops in rochelle + handoff pages |
 
-## Data (1 files, 4.8 KB)
+## Data (1 files, 4.9 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `animation-manifest.json` | 4.8 KB | Clip manifest for the animation library |
+| `animation-manifest.json` | 4.9 KB | Clip manifest for the animation library |

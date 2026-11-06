@@ -377,7 +377,7 @@ window.__doubleAgentFBX = { ANIM_MAP, tryLoadFBXAnimations, fbxClips, playPlayer
 // - Every loader below has an onError fallback that keeps the existing
 //   procedural capsule / box gun, so a missing or bad file never breaks
 //   the game. The ONLY file that may legitimately be missing is
-//   assets/Agent_Kyle.fbx (present in assets/, 1.6 MB).
+//   assets/characters/Agent_Kyle.fbx (present in assets/, 1.6 MB).
 const gltfLoader = new GLTFLoader();
 // Draco decoder: most GLBs in this repo are Draco-compressed (white_lambo, weapons, ballroom props, cats).
 // Without this, GLTFLoader throws 'No DRACOLoader instance provided' and the model silently fails to load.
@@ -465,20 +465,20 @@ function box(x,z,w,d,h,color,y,opts){
     material: opts.material || 'concrete', destructible: !!opts.destructible, hp: opts.hp || 0, maxHp: opts.hp || 0, baseColor: color, textured: !!opts.texture };
   obstacles.push(o); losMeshes.push(m); return o;
 }
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(90,90), texturedMat(0x6f7d5a, 'assets/textures/ground_concrete_slab_1024.webp', 12, 12));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(90,90), texturedMat(0x6f7d5a, 'assets/textures/ground/ground_concrete_slab_1024.webp', 12, 12));
 ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 // Perimeter + courtyard structures. Coordinates are in metres, centre is (0,0).
-box(0,-42,90,2,4,0x555a55,undefined,{texture:'assets/textures/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(0,42,90,2,4,0x555a55,undefined,{texture:'assets/textures/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(-42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]});
-box(-20,-18,14,2,3,0x8a7a5a,undefined,{texture:'assets/textures/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(18,-12,2,16,3,0x8a7a5a,undefined,{texture:'assets/textures/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/prop_sandbag_wall_hessian_1024.webp',texRepeat:[5,1]});
-box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/prop_sandbag_wall_sagging_spill_1024.webp',texRepeat:[5,1]}); box(-28,24,2,12,3,0x8a7a5a,undefined,{texture:'assets/textures/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(8,-26,18,2,3,0x777777,undefined,{texture:'assets/textures/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[4,1]});
-box(-14,0,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(-10,2,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(12,6,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]});
-box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-blue.jpg',texRepeat:[2,1]});
-box(-32,8,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-red.jpg',texRepeat:[2,1]}); box(34,28,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/painted-metal-olive.jpg',texRepeat:[2,1]});
+box(0,-42,90,2,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(0,42,90,2,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(-42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]});
+box(-20,-18,14,2,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(18,-12,2,16,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/props/prop_sandbag_wall_hessian_1024.webp',texRepeat:[5,1]});
+box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/props/prop_sandbag_wall_sagging_spill_1024.webp',texRepeat:[5,1]}); box(-28,24,2,12,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(8,-26,18,2,3,0x777777,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[4,1]});
+box(-14,0,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(-10,2,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(12,6,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]});
+box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/raw/painted-metal-blue.jpg',texRepeat:[2,1]});
+box(-32,8,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/raw/painted-metal-red.jpg',texRepeat:[2,1]}); box(34,28,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/raw/painted-metal-olive.jpg',texRepeat:[2,1]});
 // SILENT START: a walled alcove in the southwest corner. The player spawns here,
 // alone — no guard patrol waypoint and no security camera is within 30 m of it.
 // The only way out is east, around the end of the north wall, into the courtyard.
 box(-38,32,12,2,3,0x777777);
-// ---------- Environment GLBs (user uploads, assets/models/) ----------
+// ---------- Environment GLBs (user uploads, assets/props/) ----------
 // Pattern: the existing box() obstacle stays as the gameplay mesh (collision,
 // LOS, destructible damage — its scale and removal already drive those), and
 // the GLB is added as its child. On a successful load the box material goes
@@ -511,76 +511,76 @@ function addGLBToObstacle(obstacle, path, targetW, targetH, targetD, placements)
   const o = obstacles.find((x)=>x.cx === cx && x.cz === cz); if (!o) return;
   const placements = [];
   for (let i = 0; i < w / 2; i++) for (let r = 0; r < 3; r++) placements.push([-w / 2 + (i + 0.5) * 2, -1 + r, 0, 0]);
-  addGLBToObstacle(o, 'assets/models/sandbags.glb', 2, 1, 2, placements);
+  addGLBToObstacle(o, 'assets/props/sandbags.glb', 2, 1, 2, placements);
 });
 // Destructible crates: 3x3x1.2 at (-14,0), (-10,2), (12,6) and 4x4x2 at (30,-24), (-34,-28).
 [[-14, 0], [-10, 2], [12, 6], [30, -24], [-34, -28]].forEach(([cx, cz])=>{
   const o = obstacles.find((x)=>x.cx === cx && x.cz === cz); if (!o) return;
-  addGLBToObstacle(o, 'assets/models/crate.glb', o.ow, o.oh, o.od);
+  addGLBToObstacle(o, 'assets/props/crate.glb', o.ow, o.oh, o.od);
 });
 // Barrels: a cluster against the east face of the blue building (0,-34).
 [[7, -34], [8, -32.5], [7, -36]].forEach(([x, z])=>{
   const o = box(x, z, 0.7, 0.7, 0.9, 0x5a6a7a, undefined, { material: 'metal' });
-  addGLBToObstacle(o, 'assets/models/barrel.glb', 0.7, 0.9, 0.7);
+  addGLBToObstacle(o, 'assets/props/barrel.glb', 0.7, 0.9, 0.7);
 });
 // Roadblocks: flanking the perimeter, not blocking the EXFIL path — one by
 // the north wall, one by the west wall.
 [[0, -40], [-40, 0]].forEach(([x, z])=>{
   const o = box(x, z, 2, 0.8, 1.3, 0xcc8822, undefined, { material: 'metal' });
-  addGLBToObstacle(o, 'assets/models/roadblock.glb', 2, 1.3, 0.8);
+  addGLBToObstacle(o, 'assets/props/roadblock.glb', 2, 1.3, 0.8);
 });
 // Office cluster: a workstation row in front of the blue building's south
 // face (z=-31), so desks, chairs and a filing cabinet form new cover there.
 // Keyboard/mouse/binders sit on top of the plain desk, not as obstacles.
 const desk1 = box(-4, -29, 1.6, 0.8, 0.75, 0x6a4a2a, undefined, { material: 'wood' });
-addGLBToObstacle(desk1, 'assets/models/desk_plain.glb', 1.6, 0.75, 0.8);
-gltfLoader.load('assets/models/desk_keyboard.glb', (gltf)=>{
+addGLBToObstacle(desk1, 'assets/props/desk_plain.glb', 1.6, 0.75, 0.8);
+gltfLoader.load('assets/props/desk_keyboard.glb', (gltf)=>{
   const c = fitPropChild(gltf.scene, 0.5, 0.05, 0.25); if (!c) return;
   const g = new THREE.Group(); g.add(c); g.position.set(0, 0.4, 0.1); desk1.mesh.add(g);
 }, undefined, ()=>{});
-gltfLoader.load('assets/models/desk_mouse.glb', (gltf)=>{
+gltfLoader.load('assets/props/desk_mouse.glb', (gltf)=>{
   const c = fitPropChild(gltf.scene, 0.12, 0.03, 0.08); if (!c) return;
   const g = new THREE.Group(); g.add(c); g.position.set(0.55, 0.4, 0.1); desk1.mesh.add(g);
 }, undefined, ()=>{});
-gltfLoader.load('assets/models/desk_binders.glb', (gltf)=>{
+gltfLoader.load('assets/props/desk_binders.glb', (gltf)=>{
   const c = fitPropChild(gltf.scene, 0.35, 0.25, 0.3); if (!c) return;
   const g = new THREE.Group(); g.add(c); g.position.set(-0.55, 0.5, -0.1); desk1.mesh.add(g);
 }, undefined, ()=>{});
 const desk2 = box(0, -29, 1.6, 0.8, 0.75, 0x6a4a2a, undefined, { material: 'wood' });
-addGLBToObstacle(desk2, 'assets/models/desk_and_monitor.glb', 1.6, 0.9, 0.8);
+addGLBToObstacle(desk2, 'assets/props/desk_and_monitor.glb', 1.6, 0.9, 0.8);
 const desk3 = box(4, -29, 1.6, 0.8, 0.75, 0x6a4a2a, undefined, { material: 'wood' });
-addGLBToObstacle(desk3, 'assets/models/desk_keyboard_monitor_pencup.glb', 1.6, 0.8, 0.8);
+addGLBToObstacle(desk3, 'assets/props/desk_keyboard_monitor_pencup.glb', 1.6, 0.8, 0.8);
 [[-4, -27.5], [0, -27.5], [4, -27.5]].forEach(([x, z])=>{
   const o = box(x, z, 0.6, 0.6, 1.0, 0x333333, undefined, {});
-  addGLBToObstacle(o, 'assets/models/desk_chair.glb', 0.6, 1.0, 0.6, [[0, 0, 0, Math.PI]]);
+  addGLBToObstacle(o, 'assets/props/desk_chair.glb', 0.6, 1.0, 0.6, [[0, 0, 0, Math.PI]]);
 });
 [[-6.5, -29], [6.5, -29]].forEach(([x, z])=>{
   const o = box(x, z, 0.8, 0.8, 1.0, 0x2a5a2a, undefined, {});
-  addGLBToObstacle(o, 'assets/models/desk_plant.glb', 0.8, 1.0, 0.8);
+  addGLBToObstacle(o, 'assets/props/desk_plant.glb', 0.8, 1.0, 0.8);
 });
 const filing = box(8, -29, 0.8, 0.5, 1.2, 0x777777, undefined, { material: 'metal' });
-addGLBToObstacle(filing, 'assets/models/filing_cabinet.glb', 0.8, 1.2, 0.5);
+addGLBToObstacle(filing, 'assets/props/filing_cabinet.glb', 0.8, 1.2, 0.5);
 // Visual-only ground patches (no collision, no LOS, no shooting — see groundPatch).
 // They sit on open ground, clear of walls, crates, and buildings.
-groundPatch(0, 36, 40, 3, 0x8a7a5a, 'assets/textures/ground_dirt_path_1024.webp', 10, 1);      // south dirt path
-groundPatch(31, -32, 14, 12, 0x6f7d5a, 'assets/textures/ground_grass_1024.webp', 3, 3);         // NE grass
-groundPatch(-31, -31, 14, 14, 0x8a857a, 'assets/textures/ground_gravel_1024.webp', 4, 4);       // NW gravel
-groundPatch(8, -14, 16, 12, 0x333333, 'assets/textures/ground_asphalt_1024.webp', 4, 3);       // central asphalt pad
+groundPatch(0, 36, 40, 3, 0x8a7a5a, 'assets/textures/ground/ground_dirt_path_1024.webp', 10, 1);      // south dirt path
+groundPatch(31, -32, 14, 12, 0x6f7d5a, 'assets/textures/ground/ground_grass_1024.webp', 3, 3);         // NE grass
+groundPatch(-31, -31, 14, 14, 0x8a857a, 'assets/textures/ground/ground_gravel_1024.webp', 4, 4);       // NW gravel
+groundPatch(8, -14, 16, 12, 0x333333, 'assets/textures/ground/ground_asphalt_1024.webp', 4, 3);       // central asphalt pad
 // Vent grille: flat panel on the south face of the blue building (0,-34; face z=-31).
 (function ventPanel(){
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), texturedMat(0x888888, 'assets/textures/wall_metal_vent_grille_dark_louvre_1024.webp', 1, 1));
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), texturedMat(0x888888, 'assets/textures/walls/wall_metal_vent_grille_dark_louvre_1024.webp', 1, 1));
   m.position.set(0, 1.5, -30.98); scene.add(m);
 })();
 // Tinted window on the same face, tire marks on the asphalt pad, and two
 // small lights over the new office cluster and the EXFIL gate. The courtyard
 // is already sun-lit, so these are accent lights, not a relight.
 (function courtyardExtras(){
-  const win = new THREE.Mesh(new THREE.PlaneGeometry(3, 2), texturedMat(0x334455, 'assets/textures/facility_window_tinted_smoky_grey_blue_mullions_1024.webp', 1, 1));
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(3, 2), texturedMat(0x334455, 'assets/textures/facility/facility_window_tinted_smoky_grey_blue_mullions_1024.webp', 1, 1));
   win.position.set(4, 2, -30.98); scene.add(win);
   const officeLight = new THREE.PointLight(0xffe6b0, 20, 14); officeLight.position.set(0, 3, -28); scene.add(officeLight);
   const exfilLight = new THREE.PointLight(0x88ffaa, 20, 14); exfilLight.position.set(38, 3, -38); scene.add(exfilLight);
 })();
-groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground_asphalt_tire_marks_oil_stains_1024.webp', 1, 1);
+groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground/ground_asphalt_tire_marks_oil_stains_1024.webp', 1, 1);
 // Chain-link fence: see-through panel mounted flush on the east face of the
 // red building (-32,8; face x=-28), so the building behind it already blocks
 // movement. The panel itself is in NO list: it blocks nothing — no movement
@@ -593,7 +593,7 @@ groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground_asphalt_tire_marks_o
   const m = new THREE.Mesh(new THREE.PlaneGeometry(8, 3),
     new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.9, transparent:true, alphaTest:0.5, side:THREE.DoubleSide }));
   m.position.set(-27.98, 1.5, 8); m.rotation.y = Math.PI/2; scene.add(m);
-  texLoader.load('assets/textures/chain-link-fence.png', function(tex){
+  texLoader.load('assets/textures/raw/chain-link-fence.png', function(tex){
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4, 2);
     tex.colorSpace = THREE.SRGBColorSpace;
     m.material.map = tex; m.material.needsUpdate = true;
@@ -683,7 +683,7 @@ function attachGuardWeapon(g){
   if (attachPivotToHand(g.enemyWeapon, hand, g.yaw)) console.info('[double-agent] guard weapon attached to hand bone:', hand.name);
 }
 function loadPlayerModel(file){
-  fbxLoader.load('assets/' + file, (obj)=>{
+  fbxLoader.load('assets/characters/' + file, (obj)=>{
     if (!normalizeCharacter(obj, 2.2, Math.PI)) return;
     // Capsule stays visible until the idle clip is ready (initPlayerAnimation
     // hides it then), so there is no T-pose flash while clips preload.
@@ -757,7 +757,7 @@ function updateWeaponVisibility(){
   if (accessoryGroups.watch) accessoryGroups.watch.visible = !!accessoryGroups.watch.userData.boneAttached;
 }
 function loadPlayerWeapon(set, slot, file, targetLength){
-  gltfLoader.load('assets/' + file, (gltf)=>{
+  gltfLoader.load('assets/weapons/' + file, (gltf)=>{
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
     if (!fitWeapon(gltf.scene, targetLength)) return;
     pivot.userData.muzzleZ = gltf.scene.userData.muzzleZ;
@@ -824,7 +824,7 @@ function attachAccessories(){
   updateWeaponVisibility();
 }
 function loadSuppressor(set, file){
-  gltfLoader.load('assets/' + file, (gltf)=>{
+  gltfLoader.load('assets/weapons/' + file, (gltf)=>{
     const g = new THREE.Group(); gltf.scene && g.add(gltf.scene);
     if (!fitAccessory(gltf.scene, 0.14)) return;
     g.visible = false; suppressorGroups[set] = g; updateWeaponVisibility();
@@ -832,7 +832,7 @@ function loadSuppressor(set, file){
   }, undefined, ()=>{ console.warn('[double-agent] suppressor failed, weapon still works:', file); });
 }
 function loadAccessoryGlasses(set, file){
-  gltfLoader.load('assets/' + file, (gltf)=>{
+  gltfLoader.load('assets/weapons/' + file, (gltf)=>{
     const g = new THREE.Group(); gltf.scene && g.add(gltf.scene);
     if (!fitAccessory(gltf.scene, 0.28)) return;
     g.visible = false; accessoryGroups[set].glasses = g; player.add(g); attachAccessories();
@@ -840,7 +840,7 @@ function loadAccessoryGlasses(set, file){
   }, undefined, ()=>{ console.warn('[double-agent] glasses failed, gear line still lists them:', file); });
 }
 function loadAccessoryWatch(file){
-  gltfLoader.load('assets/' + file, (gltf)=>{
+  gltfLoader.load('assets/weapons/' + file, (gltf)=>{
     const g = new THREE.Group(); gltf.scene && g.add(gltf.scene);
     if (!fitAccessory(gltf.scene, 0.09)) return;
     g.visible = false; accessoryGroups.watch = g; player.add(g); attachAccessories();
@@ -941,7 +941,7 @@ function updateGuardAnimation(g, dt){
 const ENEMY_MODELS = ['enemy-terror1.fbx', 'enemy-terror2.fbx', 'enemy-terror3.fbx', 'enemy-terror4.fbx'];
 guards.forEach((g, i)=>{
   const file = ENEMY_MODELS[i % ENEMY_MODELS.length];
-  fbxLoader.load('assets/' + file, (obj)=>{
+  fbxLoader.load('assets/characters/' + file, (obj)=>{
     if (!normalizeCharacter(obj, 2.2, 0)) return;
     g.capsuleBody.visible = false; g.capsuleHead.visible = false;
     g.realModel = obj; g.group.add(obj);
@@ -951,7 +951,7 @@ guards.forEach((g, i)=>{
   }, undefined, ()=>{
     console.warn('[double-agent] guard', i, 'model failed, keeping capsule:', file);
   });
-  gltfLoader.load('assets/mp5k.glb', (gltf)=>{
+  gltfLoader.load('assets/weapons/mp5k.glb', (gltf)=>{
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
     if (!fitWeapon(gltf.scene, 0.60)) return;
     pivot.position.set(0.45, 1.30, 0.25); g.group.add(pivot); g.enemyWeapon = pivot;

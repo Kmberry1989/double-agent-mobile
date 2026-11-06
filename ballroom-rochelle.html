@@ -114,36 +114,36 @@ function cyl(x, y, z, rTop, rBot, h, color) {
 // Floor + dance floor + walls, with the new ballroom textures.
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(HALL_X * 2, HALL_Z * 2), new THREE.MeshStandardMaterial({ color: 0x6b4a26 }));
 floor.rotation.x = -Math.PI / 2; scene.add(floor);
-applyTex(floor, 'assets/textures/ballroom_floor_polished_wood_honey_brown_1024.webp', 8, 6);
+applyTex(floor, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 8, 6);
 const dance = new THREE.Mesh(new THREE.PlaneGeometry(13, 9), new THREE.MeshStandardMaterial({ color: 0x8a5a2e }));
 dance.rotation.x = -Math.PI / 2; dance.position.set(0, 0.02, -1); scene.add(dance);
-applyTex(dance, 'assets/textures/ballroom_floor_herringbone_marble_border_1024.webp', 1, 1);
+applyTex(dance, 'assets/textures/ballroom/ballroom_floor_herringbone_marble_border_1024.webp', 1, 1);
 const walls = [
   box(0, 3, -HALL_Z - 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // north wall
   box(0, 3, HALL_Z + 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // south wall (entrance side)
   box(-HALL_X - 0.5, 3, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
   box(HALL_X + 0.5, 3, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
 ];
-walls.forEach((w)=>applyTex(w, 'assets/textures/ballroom_wall_damask_burgundy_gold_1024.webp', 8, 2));
+walls.forEach((w)=>applyTex(w, 'assets/textures/ballroom/ballroom_wall_damask_burgundy_gold_1024.webp', 8, 2));
 // Wood wainscoting strip along the lower walls (player clamp is ±19/±13,
 // the strips sit at ±19.82/±13.82, so they are never walked into).
 [[0, -13.82, 40, 0.2], [0, 13.82, 40, 0.2], [-19.82, 0, 0.2, 28], [19.82, 0, 0.2, 28]].forEach(([x, z, w, d])=>{
-  const m = box(x, 0.6, z, w, 1.2, d, 0x3a2410); applyTex(m, 'assets/textures/ballroom_wall_wood_wainscoting_dark_1024.webp', 8, 1);
+  const m = box(x, 0.6, z, w, 1.2, d, 0x3a2410); applyTex(m, 'assets/textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp', 8, 1);
 });
 // Ceiling (was open) with plaster/moulding, plus curtains on the north wall.
-flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroom_ceiling_plaster_moulding_1024.webp', 6, 4, Math.PI / 2);
+flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroom/ballroom_ceiling_plaster_moulding_1024.webp', 6, 4, Math.PI / 2);
 [-12, -4, 4, 12].forEach((x)=>{
   const c = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 3.5), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
-  c.position.set(x, 2.75, -13.65); scene.add(c); applyTex(c, 'assets/textures/ballroom_curtain_velvet_1024.webp', 1, 1);
+  c.position.set(x, 2.75, -13.65); scene.add(c); applyTex(c, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
 });
 // Carpet runner (entrance to dance floor) and a rug in front of the bar.
-flatPlane(0, 0.03, 7.5, 2.5, 11, 0x7a1a1a, 'assets/textures/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4);
-flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom_rug_medallion_large_1024.webp', 1, 1);
+flatPlane(0, 0.03, 7.5, 2.5, 11, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4);
+flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom/ballroom_rug_medallion_large_1024.webp', 1, 1);
 // Exit door (north) + entrance (south): one single double-door texture.
 const exitDoor = box(0, 1.5, -HALL_Z + 0.1, 3, 3, 0.3, 0x2e7d32);
-applyTex(exitDoor, 'assets/textures/ballroom_door_double_mahogany_1024.webp', 1, 1);
+applyTex(exitDoor, 'assets/textures/ballroom/ballroom_door_double_mahogany_1024.webp', 1, 1);
 const entranceDoor = box(0, 1.5, HALL_Z - 0.1, 3, 3, 0.3, 0x3a2a18);
-applyTex(entranceDoor, 'assets/textures/ballroom_door_double_mahogany_1024.webp', 1, 1);
+applyTex(entranceDoor, 'assets/textures/ballroom/ballroom_door_double_mahogany_1024.webp', 1, 1);
 // Chandeliers: 6 now (3 north + 3 south, so the entrance side is no longer
 // dark), brighter — point lights 30 -> 80, distance 22 -> 30. Real
 // chandelier GLBs replace the spheres when loaded; lights stay.
@@ -154,20 +154,20 @@ CHANDELIERS.forEach(([x, z]) => {
   s.position.set(x, 5.2, z); scene.add(s); chandelierProc.push(s);
   const l = new THREE.PointLight(0xffc94d, 80, 30); l.position.set(x, 4.8, z); scene.add(l);
 });
-gltfLoader.load('assets/models/ballroom_chandelier.glb', (gltf)=>{
+gltfLoader.load('assets/props/ballroom_chandelier.glb', (gltf)=>{
   CHANDELIERS.forEach(([x, z])=>{
     const g = fitPropGroup(gltf.scene.clone(), 1.1, 1.4, 1.1); if (!g) return;
-    g.position.set(x, 5.2, z); scene.add(g); applyTexToGroup(g, 'assets/textures/ballroom_chandelier_crystal_glass_1024.webp');
+    g.position.set(x, 5.2, z); scene.add(g); applyTexToGroup(g, 'assets/textures/ballroom/ballroom_chandelier_crystal_glass_1024.webp');
   });
   chandelierProc.forEach((m)=>{ m.visible = false; });
 }, undefined, ()=>{});
 // Bar (east wall) — real bar + bar top GLBs replace the boxes when loaded.
 const barProc = [box(17.5, 0.6, 6, 4, 1.2, 1.5, 0x4a2c14), box(17.5, 1.4, 6, 4, 0.15, 1.8, 0x7a4a22)];
-loadProp('assets/models/ballroom_bar.glb', 17.5, 0.55, 6, 4, 1.1, 0.7, 0, [barProc[0]]);
-loadProp('assets/models/ballroom_bar_top.glb', 17.5, 1.15, 6, 4, 0.1, 0.9, 0, [barProc[1]]);
+loadProp('assets/props/ballroom_bar.glb', 17.5, 0.55, 6, 4, 1.1, 0.7, 0, [barProc[0]]);
+loadProp('assets/props/ballroom_bar_top.glb', 17.5, 1.15, 6, 4, 0.1, 0.9, 0, [barProc[1]]);
 // Bar counter texture as a thin top surface over the GLB bar top. If the
 // GLB fails, this plane sits inside the procedural bar top box and is hidden.
-flatPlane(17.5, 1.21, 6, 4, 0.9, 0x6a4a2a, 'assets/textures/ballroom_bar_counter_wood_marble_1024.webp', 1, 1);
+flatPlane(17.5, 1.21, 6, 4, 0.9, 0x6a4a2a, 'assets/textures/ballroom/ballroom_bar_counter_wood_marble_1024.webp', 1, 1);
 // Round tables + chairs (colliders)
 // Real table/chair GLBs replace the procedural ones when loaded; colliders
 // are unchanged, so movement and talk radii do not change. Chairs move in
@@ -184,24 +184,24 @@ tables.forEach(([x, z]) => {
     chairProc.push(box(x + Math.cos(a) * 2.1, 0.45, z + Math.sin(a) * 2.1, 0.5, 0.9, 0.5, 0x5a2f22));
   }
 });
-gltfLoader.load('assets/models/ballroom_table.glb', (gltf)=>{
+gltfLoader.load('assets/props/ballroom_table.glb', (gltf)=>{
   tables.forEach(([x, z])=>{
     const g = fitPropGroup(gltf.scene.clone(), 1.8, 0.75, 1.8); if (!g) return;
     g.position.set(x, 0.375, z); scene.add(g);
     // Linen tablecloth disc on top of the GLB table (top is at 0.75 m).
     const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.02, 24), new THREE.MeshStandardMaterial({ color: 0xf5ead0 }));
-    cloth.position.set(x, 0.78, z); scene.add(cloth); applyTex(cloth, 'assets/textures/ballroom_tablecloth_linen_cream_1024.webp', 1, 1);
+    cloth.position.set(x, 0.78, z); scene.add(cloth); applyTex(cloth, 'assets/textures/ballroom/ballroom_tablecloth_linen_cream_1024.webp', 1, 1);
   });
   tableProc.forEach((m)=>{ m.visible = false; });
 }, undefined, ()=>{});
-gltfLoader.load('assets/models/ballroom_chair.glb', (gltf)=>{
+gltfLoader.load('assets/props/ballroom_chair.glb', (gltf)=>{
   tables.forEach(([x, z])=>{
     for (let i = 0; i < 4; i++) {
       const a = i * Math.PI / 2 + 0.4;
       const cx = x + Math.cos(a) * 1.2, cz = z + Math.sin(a) * 1.2;
       const g = fitPropGroup(gltf.scene.clone(), 0.57, 1.0, 0.6); if (!g) continue;
       g.position.set(cx, 0.5, cz); g.rotation.y = Math.atan2(x - cx, z - cz); scene.add(g);
-      applyTexToGroup(g, 'assets/textures/ballroom_chair_upholstery_velvet_brocade_1024.webp');
+      applyTexToGroup(g, 'assets/textures/ballroom/ballroom_chair_upholstery_velvet_brocade_1024.webp');
     }
   });
   chairProc.forEach((m)=>{ m.visible = false; });
@@ -306,12 +306,12 @@ function playMxCharClipOnce(char, key) {
   act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); char._cur = act;
 }
 
-fbxLoader.load('assets/models/Rochelle_undercover.fbx', (obj) => {
+fbxLoader.load('assets/characters/Rochelle_undercover.fbx', (obj) => {
   fitCharacter(obj, 1.8);
   // Rochelle's FBX faces +Z in Three.js (0.88 wide in X, 0.23 deep in Z),
   // like the other guests: PI turns it to face forward for a player.
   obj.rotation.y = Math.PI;
-  applyBasecolor(obj, 'assets/models/textures/Rochelle_basecolor.jpg');
+  applyBasecolor(obj, 'assets/characters/textures/Rochelle_basecolor.jpg');
   player.add(obj); playerModel = obj;
   mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
 }, undefined, () => {
@@ -355,14 +355,14 @@ function loadGuestModel(npc, path) {
   }, undefined, () => {});
 }
 const NPCS = [
-  makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/models/Vickie.fbx', texture: 'assets/models/textures/Vickie_basecolor.png', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Enjoy the music — and keep an eye on the cats.'] }),
-  makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/models/Eric.fbx', texture: 'assets/models/textures/Eric_basecolor.png', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
-  makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/models/Kristen.fbx', texture: 'assets/models/textures/Kristen_basecolor.png', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'Have you seen the cats? They run the place, really.'] }),
+  makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/characters/Vickie.fbx', texture: 'assets/characters/textures/Vickie_basecolor.png', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Enjoy the music — and keep an eye on the cats.'] }),
+  makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/characters/Eric.fbx', texture: 'assets/characters/textures/Eric_basecolor.png', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
+  makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/characters/Kristen.fbx', texture: 'assets/characters/textures/Kristen_basecolor.png', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'Have you seen the cats? They run the place, really.'] }),
 ];
 // ---- Donald: always has a drink in hand, stumbles, falls over at times ----
 // He is friendly flavour only — talking to him never gives or blocks a clue.
 // His spill (see the puddle below) is what the wet paw trail leads from.
-const donald = makeGuest({ name: 'Donald', role: 'donald', model: 'assets/models/Donald.fbx', texture: 'assets/models/textures/Donald_basecolor.png', color: 0x4a3a1a, skin: 0xe8b48a, x: 10, z: 4, wps: [[10, 4], [6, 6], [12, 8], [8, 2], [14, 5]], lines: [
+const donald = makeGuest({ name: 'Donald', role: 'donald', model: 'assets/characters/Donald.fbx', texture: 'assets/characters/textures/Donald_basecolor.png', color: 0x4a3a1a, skin: 0xe8b48a, x: 10, z: 4, wps: [[10, 4], [6, 6], [12, 8], [8, 2], [14, 5]], lines: [
   'The chandeliers are listening, I swear it. They blinked at me.',
   'I once danced with a lamp. Lovely lamp. Terrible dancer.',
   'A cat — a cat tried to steal my drink! Whiskers and all, reaching for my glass!',
@@ -550,7 +550,7 @@ function buildCatClipLibraries() {
   }
 }
 function loadCatGLB(cat) {
-  gltfLoader.load('assets/models/cats/' + cat.name + '.glb', (gltf) => {
+  gltfLoader.load('assets/cats/' + cat.name + '.glb', (gltf) => {
     const obj = gltf.scene;
     fitCharacter(obj, 0.22);
     cat.group.add(obj); cat.model = obj;
@@ -573,7 +573,7 @@ function loadCatGLB(cat) {
   }, undefined, () => {});
 }
 CATS.forEach((cat) => loadCatGLB(cat));
-gltfLoader.load('assets/models/cats/morecatanimations.glb', (gltf) => {
+gltfLoader.load('assets/cats/morecatanimations.glb', (gltf) => {
   const src = {};
   (gltf.animations || []).forEach((clip) => {
     const label = CAT_LABELS.More[clip.name];
@@ -690,14 +690,14 @@ function updatePlayFight(dt) {
 // Real cat collars replace the torus collars when loaded (the glowing tag
 // stays — it is the scannable part). Real scanner: the player carries it
 // at their right side, since it is the tool used to scan the tags.
-gltfLoader.load('assets/models/cat_collar.glb', (gltf)=>{
+gltfLoader.load('assets/props/cat_collar.glb', (gltf)=>{
   CATS.forEach((cat)=>{
     const g = fitPropGroup(gltf.scene.clone(), 0.24, 0.06, 0.24); if (!g) return;
     g.position.set(0, 0.34, 0.32); g.rotation.x = 0.5; cat.group.add(g);
     if (cat.collarMesh) cat.collarMesh.visible = false;
   });
 }, undefined, ()=>{});
-gltfLoader.load('assets/models/cat_scanner.glb', (gltf)=>{
+gltfLoader.load('assets/props/cat_scanner.glb', (gltf)=>{
   const g = fitPropGroup(gltf.scene, 0.14, 0.3, 0.05); if (!g) return;
   g.position.set(0.45, 1.3, 0.2); player.add(g);
 }, undefined, ()=>{});
