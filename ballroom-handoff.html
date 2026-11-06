@@ -270,10 +270,10 @@ gltfLoader.load('assets/white_lambo.glb', (gltf) => {
 function makePlaceholderCar(x, z, rotY, color) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.6, 4.2), new THREE.MeshStandardMaterial({ color })); body.position.y = -1.18; g.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 2.2), new THREE.MeshStandardMaterial({ color: 0x222222 })); cabin.position.set(0, -0.61, -0.2); // 0.02 above the body top, not coplanar with it g.add(cabin);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 2.2), new THREE.MeshStandardMaterial({ color: 0x222222 })); cabin.position.set(0, -0.61, -0.2); g.add(cabin); // 0.02 above the body top, not coplanar with it
   const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12); wheelGeo.rotateZ(Math.PI / 2);
   const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-  [[-0.85, 1.4], [0.85, 1.4], [-0.85, -1.4], [0.85, -1.4]].forEach(([wx, wz]) => { const w = new THREE.Mesh(wheelGeo, wheelMat); w.position.set(wx, -1.15, wz); g.add(w); });
+  [[-0.85, 1.4], [0.85, 1.4], [-0.85, -1.4], [0.85, -1.4]].forEach(([wx, wz]) => { const w = new THREE.Mesh(wheelGeo, wheelMat); w.position.set(wx, -1.25, wz); g.add(w); });
   const lightMat = new THREE.MeshStandardMaterial({ color: 0xffeebb, emissive: 0x332200 });
   [-0.6, 0.6].forEach((lx) => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.06), lightMat); l.position.set(lx, -1.1, 2.12); g.add(l); });
   g.position.set(x, 0, z); g.rotation.y = rotY; scene.add(g);
