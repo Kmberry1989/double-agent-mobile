@@ -167,6 +167,14 @@ const STAIR_C = { x: 17, z: -11 }; // helix centre, NE corner
 const STAIR_TOP = 6; // balcony level
 const STAIR_R_OUT = 1.75; // outer edge of the treads
 const BALC = { x0: 5, x1: 17, z0: -14, z1: -10.5 }; // balcony floor rectangle
+// South balcony + walkways (2026-11-06): a second-floor balcony above the
+// entrance, reached from the north balcony by a walkway along the east wall.
+// The south strip joins the east walkway to the south balcony.
+const BALC2 = [
+  { x0: -6, x1: 6, z0: 10.5, z1: 13.9 },     // south balcony above the entrance
+  { x0: 6, x1: 17, z0: 12.5, z1: 13.9 },     // south strip along the south wall
+  { x0: 17, x1: 19.9, z0: -13.9, z1: 13.9 }, // east walkway
+];
 cyl(STAIR_C.x, 3.2, STAIR_C.z, 0.55, 0.55, 6.4, 0x3a2a18); // centre column
 for (let i = 0; i < 15; i++) {
   const th = (180 + i * 24) * Math.PI / 180;
@@ -189,11 +197,37 @@ applyTex(balcN, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_bro
 box(10.25, 7.0, -10.5, 10.5, 0.08, 0.08, 0x3a2a18); // south rail, x 5-15.5
 box(16.75, 7.0, -10.5, 0.5, 0.08, 0.08, 0x3a2a18); // south rail stub, x 16.5-17
 box(5, 7.0, -12.25, 0.08, 0.08, 3.5, 0x3a2a18); // west rail, z -14..-10.5
-box(17, 7.0, -13.2, 0.08, 0.08, 1.4, 0x3a2a18); // north strip east rail, z -13.9..-12.5
+// North strip east rail removed (2026-11-06): this edge is now the open step from the north balcony onto the east walkway.
 for (let x = 5.75; x <= 14.75; x += 1.5) box(x, 6.5, -10.5, 0.08, 1, 0.08, 0x3a2a18);
 box(17, 6.5, -10.5, 0.08, 1, 0.08, 0x3a2a18);
 for (let z = -13.25; z <= -11.75; z += 1.5) box(5, 6.5, z, 0.08, 1, 0.08, 0x3a2a18);
-box(17, 6.5, -13.5, 0.08, 1, 0.08, 0x3a2a18); box(17, 6.5, -12.75, 0.08, 1, 0.08, 0x3a2a18);
+// Second-floor balcony above the entrance + walkways (2026-11-06).
+// South balcony: x -6..6, z 10.5..13.9, centred over the double doors, so the
+// player can stand above the entrance and look down into the ballroom.
+// South strip (x 6..17, z 12.5..13.9) joins it to the east walkway
+// (x 17..19.9, z -13.9..13.9), which runs along the east wall from the north
+// balcony. Route: spiral stairs -> north balcony -> east walkway -> south
+// strip -> south balcony. The dance floor stays open below.
+const balcS = box(0, 5.9, 12.2, 12, 0.2, 3.4, 0x6b4a26); // x -6..6, z 10.5..13.9
+applyTex(balcS, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 4, 1);
+const walkS = box(11.5, 5.9, 13.2, 11, 0.2, 1.4, 0x6b4a26); // south strip, x 6..17, z 12.5..13.9
+applyTex(walkS, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 3, 1);
+const walkE = box(18.45, 5.9, 0, 2.9, 0.2, 27.8, 0x6b4a26); // east walkway, x 17..19.9, z -13.9..13.9
+applyTex(walkE, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 1, 8);
+// Railings (dark wood, same as the north balcony). The OPENING is the gap in
+// the south balcony's east rail (z 12.5..13.9), where the south strip walks
+// onto it. The east walkway's west rail has gaps at both ends: the north
+// strip (where he steps on from the north balcony) and the south strip.
+box(0, 7.0, 10.5, 12, 0.08, 0.08, 0x3a2a18); // south balcony north rail, x -6..6
+box(-6, 7.0, 12.2, 0.08, 0.08, 3.4, 0x3a2a18); // south balcony west rail, z 10.5..13.9
+box(6, 7.0, 11.5, 0.08, 0.08, 2.0, 0x3a2a18); // south balcony east rail, z 10.5..12.5 (gap z 12.5..13.9 is the opening)
+box(11.5, 7.0, 12.5, 11, 0.08, 0.08, 0x3a2a18); // south strip north rail, x 6..17
+box(17, 7.0, 0, 0.08, 0.08, 25, 0x3a2a18); // east walkway west rail, z -12.5..12.5
+for (let x = -5.25; x <= 5.25; x += 1.5) box(x, 6.5, 10.5, 0.08, 1, 0.08, 0x3a2a18);
+for (let z = 11.25; z <= 12.75; z += 1.5) box(-6, 6.5, z, 0.08, 1, 0.08, 0x3a2a18);
+box(6, 6.5, 11.25, 0.08, 1, 0.08, 0x3a2a18);
+for (let x = 6.75; x <= 16.25; x += 1.5) box(x, 6.5, 12.5, 0.08, 1, 0.08, 0x3a2a18);
+for (let z = -11.75; z <= 11.75; z += 1.5) box(17, 6.5, z, 0.08, 1, 0.08, 0x3a2a18);
 // Exit door (north) + entrance (south): one single double-door texture.
 const exitDoor = box(0, 1.5, -HALL_Z + 0.1, 3, 3, 0.3, 0x2e7d32);
 applyTex(exitDoor, 'assets/textures/ballroom/ballroom_door_double_mahogany_1024.webp', 1, 1);
@@ -266,7 +300,13 @@ colliders.push({ x: 17.5, z: 6, r: 2.6, y: 0 }); // bar, ground floor only
 colliders.push({ x: STAIR_C.x, z: STAIR_C.z, r: 0.7 });
 [5.75, 7.25, 8.75, 10.25, 11.75, 13.25, 14.75, 17].forEach((x)=>colliders.push({ x, z: -10.5, r: 0.8, yMin: 5.5 })); // south railing (gap x 15.5-16.5 is the stair arrival)
 [[-13.25], [-11.75]].forEach(([z])=>colliders.push({ x: 5, z, r: 0.8, yMin: 5.5 })); // west railing
-[[-13.5], [-12.75]].forEach(([z])=>colliders.push({ x: 17, z, r: 0.8, yMin: 5.5 })); // north strip east railing
+// (north strip east railing removed 2026-11-06: that edge is the open step onto the east walkway)
+// South balcony + walkway railings (2026-11-06): y-gated like the north balcony.
+[-5.25, -3.75, -2.25, -0.75, 0.75, 2.25, 3.75, 5.25].forEach((x)=>colliders.push({ x, z: 10.5, r: 0.8, yMin: 5.5 })); // south balcony north railing
+[11.25, 12.75].forEach((z)=>colliders.push({ x: -6, z, r: 0.8, yMin: 5.5 })); // south balcony west railing
+colliders.push({ x: 6, z: 11.25, r: 0.8, yMin: 5.5 }); // south balcony east railing (opening z 12.5..13.9 has none)
+[6.75, 8.25, 9.75, 11.25, 12.75, 14.25, 15.75].forEach((x)=>colliders.push({ x, z: 12.5, r: 0.8, yMin: 5.5 })); // south strip north railing
+for (let z = -11.75; z <= 11.75; z += 1.5) colliders.push({ x: 17, z, r: 0.8, yMin: 5.5 }); // east walkway west railing
 // ---- Exterior: mansion drive, round drive, bushes, steps, double doors (2026-11-04) ----
 // Kyle's mission starts outside. Ground is 1.5 m below the ballroom floor,
 // so a 6-step flight climbs from the drive to the double doors.
@@ -340,6 +380,15 @@ const facUR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshSta
 const facULintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facULintel.position.set(0, 9, 15.4); scene.add(facULintel); // upper lintel, ivory stone, south-facing only
 cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
+// Pillar bases + capitals (2026-11-06): a slightly larger cube at the foot
+// and at the top of each portico pillar, in darker stone (0xd8c8a8) than the
+// pale shaft (0xe8ddc8). Shaft is 0.8 m across; cubes are 1.0 m across.
+// Bases sit on the lawn (sunk 0.05 so no face is coplanar with the ground);
+// capitals reach into the portico roof slab, so no gap shows at the top.
+[-4, 4].forEach((x) => {
+  box(x, -1.3, 17, 1.0, 0.5, 1.0, 0xd8c8a8); // base, y -1.55..-1.05
+  box(x, 3.35, 17, 1.0, 0.7, 1.0, 0xd8c8a8); // capital, y 3.0..3.7 (roof slab is 3.6..4.0)
+});
 box(0, 3.8, 17.4, 12, 0.4, 6, 0xd8c8a8); // shifted south 0.4 so its north face is not coplanar with the south wall face at z 14
 // Simple low gable roof over the whole front (central walls + wings): two sloped slabs,
 // ridge at y 16 along z 3, eaves at y 12.75 with a small overhang (z 20.5 / -14.5, x +/-37).
@@ -1367,8 +1416,10 @@ function stairBalconyY(pos) {
     // Under the stair where the low steps are: the footprint is solid here.
     pos.x = STAIR_C.x + dx / r * 2.0; pos.z = STAIR_C.z + dz / r * 2.0;
   }
-  // On the balcony (already up there) stay at 6; anywhere else, ground floor.
-  if (pos.y >= 5 && pos.x >= BALC.x0 && pos.x <= BALC.x1 && pos.z >= BALC.z0 && pos.z <= BALC.z1) return STAIR_TOP;
+  // On a balcony or walkway (already up there) stay at 6; anywhere else, ground floor.
+  if (pos.y >= 5) {
+    for (const r of [BALC, ...BALC2]) if (pos.x >= r.x0 && pos.x <= r.x1 && pos.z >= r.z0 && pos.z <= r.z1) return STAIR_TOP;
+  }
   return 0;
 }
 
