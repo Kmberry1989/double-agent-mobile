@@ -59,6 +59,7 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 const MODELS = [
   { group: 'Characters (FBX)', items: [
     ['Kyle', 'assets/models/Kyle_undercover.fbx', 'fbx', ''],
+    ['Kyle (Combat)', 'assets/models/Kyle_combat.fbx', 'fbx', ''],
     ['Rochelle', 'assets/models/Rochelle_undercover.fbx', 'fbx', 'assets/models/textures/Rochelle_basecolor.jpg'],
     ['Vickie', 'assets/models/Vickie.fbx', 'fbx', 'assets/models/textures/Vickie_basecolor.png'],
     ['Eric', 'assets/models/Eric.fbx', 'fbx', 'assets/models/textures/Eric_basecolor.png'],
@@ -190,6 +191,26 @@ function collectBones(obj) {
   bones = {};
   obj.traverse(o => { const n = (o.name || '').toLowerCase(); if (n.includes('hips')) bones.hips = o; else if (n.includes('chest')) bones.chest = o; else if (n.includes('spine')) bones.spine = o; });
 }
+// Full PBR set for Kyle (Combat): basecolor + metallic + roughness + normal,
+// all 2048x2048, stored beside the FBX (the FBX also references them by name).
+const PBR = {
+  'Kyle (Combat)': {
+    base: 'assets/models/tactical_combat_suit_3d_model_basecolor.JPEG',
+    metal: 'assets/models/tactical_combat_suit_3d_model_metallic.JPEG',
+    rough: 'assets/models/tactical_combat_suit_3d_model_roughness.JPEG',
+    normal: 'assets/models/tactical_combat_suit_3d_model_normal.PNG',
+  },
+};
+function applyPBR(obj, set) {
+  const base = texLoader.load(set.base); base.colorSpace = THREE.SRGBColorSpace;
+  const normal = texLoader.load(set.normal);
+  const rough = texLoader.load(set.rough);
+  const metal = texLoader.load(set.metal);
+  obj.traverse(o => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach(m => {
+    m.map = base; m.normalMap = normal; m.roughnessMap = rough; m.metalnessMap = metal;
+    m.metalness = 1; m.roughness = 1; m.needsUpdate = true;
+  }); } });
+}
 function applyBasecolor(obj, texPath) {
   if (!texPath) return;
   const tex = texLoader.load(texPath); tex.colorSpace = THREE.SRGBColorSpace;
@@ -205,19 +226,22 @@ function afterModel(obj, info) {
   const isCat = info[0] === 'Mabel' || info[0] === 'Margo' || info[0] === 'Moxie';
   const fit = fitModel(obj, isCat ? 0.35 : 1.8);
   collectBones(obj);
+  let hasBones = false;
+  obj.traverse(o => { if (o.isBone) hasBones = true; });
   mixer = new THREE.AnimationMixer(obj);
-  setAnimOptions(embeddedAnims.length ? embeddedAnims.map(a => a.name) : (info[2] === 'fbx' ? ANIMS : []));
+  if (!hasBones && !embeddedAnims.length) setAnimOptions([]);
+  else setAnimOptions(embeddedAnims.length ? embeddedAnims.map(a => a.name) : (info[2] === 'fbx' ? ANIMS : []));
   if (pendingAnim) { const pa = pendingAnim; pendingAnim = null; animSel.value = pa; playAnim(pa); setView('side'); }
   else if (embeddedAnims.length) playAnim(embeddedAnims[0].name);
-  else if (info[2] === 'fbx') playAnim('Standing_Idle');
+  else if (info[2] === 'fbx' && hasBones) playAnim('Standing_Idle');
   resetView();
-  setStatus(`${info[0]} — ${info[1]}\nsize ${(fit.size.x).toFixed(2)} x ${(fit.size.y).toFixed(2)} x ${(fit.size.z).toFixed(2)} m${bones.hips ? '' : '\n(no Hips bone found)'}`);
+  setStatus(`${info[0]} — ${info[1]}\nsize ${(fit.size.x).toFixed(2)} x ${(fit.size.y).toFixed(2)} x ${(fit.size.z).toFixed(2)} m${hasBones ? '' : '\nSTATIC MODEL — no skeleton, so no animation can play on it'}${bones.hips ? '' : '\n(no Hips bone found)'}`);
 }
 function loadModel(name) {
   const info = findModel(name); if (!info) return;
   clearModel(); setStatus('Loading ' + info[1] + '…');
   if (info[2] === 'fbx') {
-    fbxLoader.load(info[1], obj => { applyBasecolor(obj, info[3]); afterModel(obj, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
+    fbxLoader.load(info[1], obj => { if (PBR[info[0]]) applyPBR(obj, PBR[info[0]]); else applyBasecolor(obj, info[3]); afterModel(obj, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
   } else {
     gltfLoader.load(info[1], gltf => { embeddedAnims = gltf.animations || []; afterModel(gltf.scene, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
   }
