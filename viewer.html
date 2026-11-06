@@ -369,6 +369,8 @@ function loadWeapon(name) {
   gltfLoader.load(w.file + '?v=' + ASSET_V, (gltf) => {
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
     if (!fitWeapon(gltf.scene, w.len)) return;
+    // Slide the gun forward so its grip (rear of the fitted mesh), not its centre, sits at the hand.
+    gltf.scene.position.z += 0.25 * w.len;
     scene.add(pivot);
     if (!model) { pivot.removeFromParent(); return; }
     const hand = findHandBone(model);
@@ -381,6 +383,12 @@ function loadWeapon(name) {
       pivot.quaternion.setFromEuler(new THREE.Euler(0, 0, 0));
       pivot.scale.setScalar(1);
       hand.attach(pivot);
+      // Grip orientation: the courtyard's yaw-based pivot leaves the barrel pointing
+      // wherever the player faces, so in a chest-held pose it hangs down off the fist.
+      // In the viewer's hand-local space, point the barrel along the hand's finger
+      // direction (hand -Y) and the slide top toward the back of the hand (hand -Z),
+      // so the gun follows the fist through the clip (barrel tracks the torso turn).
+      pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().set(-1,0,0,0, 0,0,-1,0, 0,-1,0,0, 0,0,0,1));
       weaponPivot = pivot;
     } catch (e) { pivot.removeFromParent(); }
   }, undefined, () => { statusEl.textContent += ' / weapon failed to load: ' + w.file; });
