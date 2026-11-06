@@ -93,6 +93,7 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 // ---------- Animation manifest (embedded copy; file version is assets/animation-manifest.json) ----------
 const ANIM_MAP = {
@@ -378,6 +379,11 @@ window.__doubleAgentFBX = { ANIM_MAP, tryLoadFBXAnimations, fbxClips, playPlayer
 //   the game. The ONLY file that may legitimately be missing is
 //   assets/Agent_Kyle.fbx (present in assets/, 1.6 MB).
 const gltfLoader = new GLTFLoader();
+// Draco decoder: most GLBs in this repo are Draco-compressed (white_lambo, weapons, ballroom props, cats).
+// Without this, GLTFLoader throws 'No DRACOLoader instance provided' and the model silently fails to load.
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+gltfLoader.setDRACOLoader(dracoLoader);
 function normalizeCharacter(obj, targetHeight, yawOffset){
   obj.traverse((o)=>{ if (o.isMesh) o.castShadow = true; });
   obj.rotation.y = yawOffset || 0;

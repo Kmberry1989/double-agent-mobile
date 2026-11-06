@@ -41,7 +41,13 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 const gltfLoader = new GLTFLoader();
+// Draco decoder: most GLBs in this repo are Draco-compressed (white_lambo, weapons, ballroom props, cats).
+// Without this, GLTFLoader throws 'No DRACOLoader instance provided' and the model silently fails to load.
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+gltfLoader.setDRACOLoader(dracoLoader);
 // GLB prop helper: fit a loaded model to target W/H/D (non-uniform, so it
 // matches the footprint it replaces), centre it in a group, and return the
 // group. The caller places the group: base-anchored props sit at y = targetH/2
