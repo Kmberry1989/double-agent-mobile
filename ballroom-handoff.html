@@ -133,13 +133,24 @@ const walls = [
   box(HALL_X + 0.5, 3, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
 ];
 walls.forEach((w)=>applyTex(w, 'assets/textures/ballroom/ballroom_wall_damask_burgundy_gold_1024.webp', 8, 2));
+// Second story (2026-11-06): taller wall band above the existing walls, so the
+// balcony at y=6 has headroom. Same damask, same footprint as below.
+const upperWalls = [
+  box(0, 9, -HALL_Z - 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // north wall, upper
+  box(-11.25, 9, HALL_Z + 0.5, 19.5, 6, 1, 0x5a2f22), // south wall, upper left
+  box(11.25, 9, HALL_Z + 0.5, 19.5, 6, 1, 0x5a2f22), // south wall, upper right
+  box(0, 9, HALL_Z + 0.5, 3, 6, 1, 0x5a2f22), // upper lintel above the double doors
+  box(-HALL_X - 0.5, 9, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
+  box(HALL_X + 0.5, 9, 0, 1, 6, HALL_Z * 2 + 2, 0x5a2f22),
+];
+upperWalls.forEach((w)=>applyTex(w, 'assets/textures/ballroom/ballroom_wall_damask_burgundy_gold_1024.webp', 8, 2));
 // Wood wainscoting strip along the lower walls (player clamp is ±19/±13,
 // the strips sit at ±19.82/±13.82, so they are never walked into).
 [[-11.25, -13.82, 19.5, 0.2], [11.25, -13.82, 19.5, 0.2], [-11.25, 13.82, 19.5, 0.2], [11.25, 13.82, 19.5, 0.2], [-19.82, 0, 0.2, 28], [19.82, 0, 0.2, 28]].forEach(([x, z, w, d])=>{
   const m = box(x, 0.6, z, w, 1.2, d, 0x3a2410); applyTex(m, 'assets/textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp', 8, 1);
 });
 // Ceiling (was open) with plaster/moulding, plus curtains on the north wall.
-flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroom/ballroom_ceiling_plaster_moulding_1024.webp', 6, 4, Math.PI / 2);
+flatPlane(0, 11.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroom/ballroom_ceiling_plaster_moulding_1024.webp', 6, 4, Math.PI / 2); // raised to ~12 m for the second story (2026-11-06)
 [-12, -4, 4, 12].forEach((x)=>{
   const c = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 3.5), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
   c.position.set(x, 2.75, -13.65); scene.add(c); applyTex(c, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
@@ -147,6 +158,42 @@ flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroo
 // Carpet runner (entrance to dance floor) and a rug in front of the bar.
 flatPlane(0, 0.03, 7.5, 2.5, 11, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4);
 flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom/ballroom_rug_medallion_large_1024.webp', 1, 1);
+// Spiral staircase + second-story balcony, NE corner (2026-11-06, walkable).
+// Helix: 15 steps, one full turn, 0.4 m rise per step, floor (y=0) to balcony
+// (y=6). Entry/exit is on the west side (180 deg), facing the room, so the
+// top step lands straight onto the balcony. Treads span r 0.55-1.75 (about
+// 1.2 m deep), centre column r 0.55. No hint text.
+const STAIR_C = { x: 17, z: -11 }; // helix centre, NE corner
+const STAIR_TOP = 6; // balcony level
+const STAIR_R_OUT = 1.75; // outer edge of the treads
+const BALC = { x0: 5, x1: 17, z0: -14, z1: -10.5 }; // balcony floor rectangle
+cyl(STAIR_C.x, 3.2, STAIR_C.z, 0.55, 0.55, 6.4, 0x3a2a18); // centre column
+for (let i = 0; i < 15; i++) {
+  const th = (180 + i * 24) * Math.PI / 180;
+  const st = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 1.0), new THREE.MeshStandardMaterial({ color: 0x6b4a26 }));
+  st.position.set(STAIR_C.x + 1.15 * Math.cos(th), i * 0.4 - 0.09, STAIR_C.z + 1.15 * Math.sin(th));
+  st.rotation.y = -th; scene.add(st);
+  applyTex(st, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 1, 1);
+}
+// Balcony floor at y=6: two boxes (west floor + north strip) leaving the
+// stairwell open where the top steps arrive, so the climber's head never
+// passes through the floor. North edge inset 0.1 from the wall (no coplanar face).
+const balcW = box(10, 5.9, -12.2, 10, 0.2, 3.4, 0x6b4a26); // x 5-15, z -13.9..-10.5
+applyTex(balcW, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 3, 1);
+const balcN = box(16, 5.9, -13.2, 2, 0.2, 1.4, 0x6b4a26); // x 15-17, z -13.9..-12.5
+applyTex(balcN, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 1, 1);
+// Balcony railings (dark wood): top rails + posts on the south edge, the west
+// edge, and the north strip's east edge. The stair arrival (x 15.5-16.5 on the
+// south edge) stays open — that is how he steps on and off the stairs. The
+// centre column guards the east side of the stairwell.
+box(10.25, 7.0, -10.5, 10.5, 0.08, 0.08, 0x3a2a18); // south rail, x 5-15.5
+box(16.75, 7.0, -10.5, 0.5, 0.08, 0.08, 0x3a2a18); // south rail stub, x 16.5-17
+box(5, 7.0, -12.25, 0.08, 0.08, 3.5, 0x3a2a18); // west rail, z -14..-10.5
+box(17, 7.0, -13.2, 0.08, 0.08, 1.4, 0x3a2a18); // north strip east rail, z -13.9..-12.5
+for (let x = 5.75; x <= 14.75; x += 1.5) box(x, 6.5, -10.5, 0.08, 1, 0.08, 0x3a2a18);
+box(17, 6.5, -10.5, 0.08, 1, 0.08, 0x3a2a18);
+for (let z = -13.25; z <= -11.75; z += 1.5) box(5, 6.5, z, 0.08, 1, 0.08, 0x3a2a18);
+box(17, 6.5, -13.5, 0.08, 1, 0.08, 0x3a2a18); box(17, 6.5, -12.75, 0.08, 1, 0.08, 0x3a2a18);
 // Exit door (north) + entrance (south): one single double-door texture.
 const exitDoor = box(0, 1.5, -HALL_Z + 0.1, 3, 3, 0.3, 0x2e7d32);
 applyTex(exitDoor, 'assets/textures/ballroom/ballroom_door_double_mahogany_1024.webp', 1, 1);
@@ -185,7 +232,7 @@ const tableProc = [], chairProc = [];
 tables.forEach(([x, z]) => {
   tableProc.push(cyl(x, 0.45, z, 1.5, 1.5, 0.12, 0xf5ead0));
   tableProc.push(cyl(x, 0.2, z, 0.15, 0.25, 0.4, 0x3a2a18));
-  colliders.push({ x, z, r: 1.9 });
+  colliders.push({ x, z, r: 1.9, y: 0 }); // ground floor only — the balcony player at y=6 walks over the tables
   for (let i = 0; i < 4; i++) {
     const a = i * Math.PI / 2 + 0.4;
     chairProc.push(box(x + Math.cos(a) * 2.1, 0.45, z + Math.sin(a) * 2.1, 0.5, 0.9, 0.5, 0x5a2f22));
@@ -213,7 +260,13 @@ gltfLoader.load('assets/props/ballroom_chair.glb', (gltf)=>{
   });
   chairProc.forEach((m)=>{ m.visible = false; });
 }, undefined, ()=>{});
-colliders.push({ x: 17.5, z: 6, r: 2.6 });
+colliders.push({ x: 17.5, z: 6, r: 2.6, y: 0 }); // bar, ground floor only
+// Staircase + balcony colliders (2026-11-06): centre column blocks at every height;
+// balcony railings (yMin) only block up on the balcony, never the climber below.
+colliders.push({ x: STAIR_C.x, z: STAIR_C.z, r: 0.7 });
+[5.75, 7.25, 8.75, 10.25, 11.75, 13.25, 14.75, 17].forEach((x)=>colliders.push({ x, z: -10.5, r: 0.8, yMin: 5.5 })); // south railing (gap x 15.5-16.5 is the stair arrival)
+[[-13.25], [-11.75]].forEach(([z])=>colliders.push({ x: 5, z, r: 0.8, yMin: 5.5 })); // west railing
+[[-13.5], [-12.75]].forEach(([z])=>colliders.push({ x: 17, z, r: 0.8, yMin: 5.5 })); // north strip east railing
 // ---- Exterior: mansion drive, round drive, bushes, steps, double doors (2026-11-04) ----
 // Kyle's mission starts outside. Ground is 1.5 m below the ballroom floor,
 // so a 6-step flight climbs from the drive to the double doors.
@@ -262,7 +315,8 @@ function bush(x, z, r) {
   });
   g.position.set(x, 0, z); scene.add(g); return g;
 }
-for (let a = 0; a < 360; a += 20) { const rad = a * Math.PI / 180; bush(13.5 * Math.cos(rad), 32 + 13.5 * Math.sin(rad), 0.9); }
+for (let a = 0; a < 360; a += 20) { if (a === 260 || a === 280) continue; // these two land on the front steps — removed at Kyle's direction
+  const rad = a * Math.PI / 180; bush(13.5 * Math.cos(rad), 32 + 13.5 * Math.sin(rad), 0.9); }
 for (let x = -18; x <= 18; x += 3) { if (Math.abs(x) < 3) continue; bush(x, 16.5, 0.8); }
 for (let a = 0; a < 360; a += 60) { const rad = a * Math.PI / 180; bush(3.5 * Math.cos(rad), 32 + 3.5 * Math.sin(rad), 0.7); }
 // Mansion wings + portico columns + roof
@@ -275,15 +329,25 @@ const wingR = box(28.4, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingR, 'assets/t
 const facL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 7.5), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facL.position.set(-11.25, 2.25, 15.4); scene.add(facL); applyTex(facL, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080.webp', 1, 1); // 7.5 tall so the wall meets the ground at y -1.5; centered texture: two whole windows at 1/3 and 2/3, quoins only at the edges (flanking the door + outer edge), no center quoin column // central entrance walls v2: pale ivory limestone with arched windows, distinct from the beige wings
 const facR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 7.5), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facR.position.set(11.25, 2.25, 15.4); scene.add(facR); applyTex(facR, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080.webp', 1, 1);
 const facLintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facLintel.position.set(0, 4.5, 15.4); scene.add(facLintel); // lintel above the double doors, ivory stone to match the entrance walls, south-facing only
+// Second story, exterior (2026-11-06): upper wings (beige facade, cropped to the
+// 4:3 tile so the windows are undistorted), upper entrance planes (ivory, cropped
+// to the 3.25:1 plane so the windows are undistorted), upper lintel. All start at
+// y 6, where the ground-floor skin ends; the roof (ridge y 16) now sits above them.
+const wingUL = box(-28.4, 9.25, 14, 16, 6, 12, 0xd8c8a8); applyTex(wingUL, 'assets/textures/exterior/exterior_mansion_facade_windows_1024x768.webp', 2, 1);
+const wingUR = box(28.4, 9.25, 14, 16, 6, 12, 0xd8c8a8); applyTex(wingUR, 'assets/textures/exterior/exterior_mansion_facade_windows_1024x768.webp', 2, 1);
+const facUL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facUL.position.set(-11.25, 9, 15.4); scene.add(facUL); applyTex(facUL, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080x640.webp', 1, 1);
+const facUR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facUR.position.set(11.25, 9, 15.4); scene.add(facUR); applyTex(facUR, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080x640.webp', 1, 1);
+const facULintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facULintel.position.set(0, 9, 15.4); scene.add(facULintel); // upper lintel, ivory stone, south-facing only
 cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 box(0, 3.8, 17.4, 12, 0.4, 6, 0xd8c8a8); // shifted south 0.4 so its north face is not coplanar with the south wall face at z 14
 // Simple low gable roof over the whole front (central walls + wings): two sloped slabs,
-// ridge at y 10 along z 3, eaves at y 6.75 with a small overhang (z 20.5 / -14.5, x +/-37).
-// Dark slate grey, no texture. Eaves clear the wing tops (6.5) and sit well above the
-// portico roof (top 4.0), so nothing z-fights; the doors stay in clear view from the drive.
-const roofFront = box(0, 8.375, 11.75, 74, 0.3, 17.8, 0x3a3f44); roofFront.rotation.x = 0.1837;
-const roofBack = box(0, 8.375, -5.75, 74, 0.3, 17.8, 0x3a3f44); roofBack.rotation.x = -0.1837;
+// ridge at y 16 along z 3, eaves at y 12.75 with a small overhang (z 20.5 / -14.5, x +/-37).
+// Raised 6 m for the second story (2026-11-06). Dark slate grey, no texture. Eaves
+// clear the upper wing tops (12.25) and sit well above the portico roof (top 4.0),
+// so nothing z-fights; the doors stay in clear view from the drive.
+const roofFront = box(0, 14.375, 11.75, 74, 0.3, 17.8, 0x3a3f44); roofFront.rotation.x = 0.1837;
+const roofBack = box(0, 14.375, -5.75, 74, 0.3, 17.8, 0x3a3f44); roofBack.rotation.x = -0.1837;
 // 6 steps, 1 m deep each, 0.25 m high each, from drive (y -1.5) to floor (y 0)
 for (let i = 0; i < 6; i++) { const st = box(0, -1.5 + (i + 1) * 0.25 - 0.125, 19.5 - i, 5, 0.25, 1, 0xb8b8b8); applyTex(st, 'assets/textures/exterior/exterior_drive_cobblestone_1024.webp', 1, 1); }
 // Double doors, hinged at the outer edges, closed at start
@@ -1259,6 +1323,55 @@ function nearestTalk() {
   }
 }
 
+// Spiral staircase height (2026-11-06): the helix winds once (360 deg) from the
+// floor to the balcony (y=6). The angle is tracked continuously while on the
+// stairs, so the entry/exit seam (west side, 180 deg) never jumps.
+let stairOn = false, stairPhi = 180, stairPrevTheta = 0;
+function stairAngleDeg(x, z) { return (Math.atan2(z - STAIR_C.z, x - STAIR_C.x) * 180 / Math.PI + 360) % 360; }
+function wrap180(a) { return ((a + 180) % 360 + 360) % 360 - 180; }
+function stairBalconyY(pos) {
+  const dx = pos.x - STAIR_C.x, dz = pos.z - STAIR_C.z;
+  const r = Math.hypot(dx, dz);
+  const theta = stairAngleDeg(pos.x, pos.z);
+  const inAnnulus = r > 0.55 && r < 2.0;
+  const nearEntry = Math.abs(wrap180(theta - 180)) < 60;
+  // Top engagement only right at the top step, so walking the balcony past the
+  // stairwell does not snag the player onto the helix.
+  const nearTopStep = Math.hypot(pos.x - (STAIR_C.x - 1.15), pos.z - STAIR_C.z) < 0.9;
+  if (!stairOn && inAnnulus && nearEntry && (pos.y < 0.5 || (pos.y > 5.5 && nearTopStep))) {
+    stairOn = true;
+    // Start the turn from where he actually is, so his height matches the step
+    // under his feet instead of snapping to a landing.
+    stairPhi = (pos.y > 3 ? 540 : 180) + wrap180(theta - 180);
+    stairPrevTheta = theta;
+  }
+  if (stairOn) {
+    // Integrate the angle so the 180 deg seam never jumps.
+    stairPhi += wrap180(theta - stairPrevTheta); stairPrevTheta = theta;
+    const prog = Math.max(0, Math.min(360, stairPhi - 180));
+    // Step off at a landing: leave the stair when he walks away from it.
+    if (!inAnnulus) { stairOn = false; }
+    else if (prog <= 0 && !nearEntry) { stairOn = false; } // walked around the base
+    else if (prog >= 360 && !nearEntry) { stairOn = false; } // walked around the top onto the balcony
+    else {
+      // Mid-flight: stay on the treads.
+      if (prog > 0 && prog < 360 && r > 0.01) {
+        const rr = Math.max(0.7, Math.min(1.65, r));
+        pos.x = STAIR_C.x + dx / r * rr; pos.z = STAIR_C.z + dz / r * rr;
+      }
+      return prog >= 360 ? STAIR_TOP : (prog <= 0 ? 0 : STAIR_TOP * prog / 360);
+    }
+    // Disengaged above: fall through to the balcony / ground check.
+  }
+  if (!stairOn && inAnnulus && pos.y < 0.5 && !nearEntry) {
+    // Under the stair where the low steps are: the footprint is solid here.
+    pos.x = STAIR_C.x + dx / r * 2.0; pos.z = STAIR_C.z + dz / r * 2.0;
+  }
+  // On the balcony (already up there) stay at 6; anywhere else, ground floor.
+  if (pos.y >= 5 && pos.x >= BALC.x0 && pos.x <= BALC.x1 && pos.z >= BALC.z0 && pos.z <= BALC.z1) return STAIR_TOP;
+  return 0;
+}
+
 // ---- Loop ----
 const clock = new THREE.Clock();
 function animate() {
@@ -1313,10 +1426,16 @@ function animate() {
     } else {
       player.position.x = Math.max(-HALL_X + 1, Math.min(HALL_X - 1, player.position.x));
       player.position.z = Math.max(-HALL_Z + 1, Math.min(HALL_Z - 1, player.position.z));
-      player.position.y = 0;
+      // Spiral staircase + balcony (NE corner): height follows the helix while
+      // on the stairs, stays 6 on the balcony, 0 on the ground floor.
+      player.position.y = stairBalconyY(player.position);
     }
     if (missionStage === 'outside' && player.position.z <= 13) { missionStage = 'handoff'; updateMissionHUD(); }
     for (const c of colliders) {
+      // y-gated colliders: ground furniture (y:0) only blocks near the floor,
+      // balcony railings (yMin:5.5) only block up on the balcony.
+      if (c.y !== undefined && Math.abs(player.position.y - c.y) > 2) continue;
+      if (c.yMin !== undefined && player.position.y < c.yMin) continue;
       const ddx = player.position.x - c.x, ddz = player.position.z - c.z, d = Math.hypot(ddx, ddz);
       if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
     }
