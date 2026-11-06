@@ -478,7 +478,7 @@ document.getElementById('backBtn').addEventListener('click', () => setView('back
 document.getElementById('topBtn').addEventListener('click', () => setView('top'));
 document.getElementById('resetBtn').addEventListener('click', resetView);
 document.getElementById('shootBtn').addEventListener('click', () => {
-  pendingAnim = 'Shooting_Pistol'; modelSel.value = 'Kyle'; weaponSel.value = 'White glock'; loadModel('Kyle');
+  pendingAnim = 'Shooting_Pistol'; modelSel.value = 'Kyle'; weaponSel.value = 'white glock'; // option values come from filenames, lowercase loadModel('Kyle');
 });
 document.getElementById('camBtn').addEventListener('click', e => {
   camMode = camMode === 'orbit' ? 'free' : 'orbit';
