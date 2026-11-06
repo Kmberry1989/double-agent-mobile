@@ -402,7 +402,7 @@ function stripRootTravel(clip) {
   });
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx'], ['openDoor', 'Opening_Door_Inwards.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx'], ['openDoor', 'Opening_Door_Inwards.fbx'], ['idleLook', 'Looking_Around.fbx'], ['idleShrug', 'Shrugging.fbx'], ['idleNod', 'Head_Nod_Yes.fbx'], ['idleShake', 'Shaking_Head_No.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -483,6 +483,16 @@ function playClip(key) {
   playMxCharClip(player, key);
   mixer = player.mixer;
 }
+// Kyle idle variations (same set as ballroom.html): after ~5 s standing
+// still, he looks around, shrugs, nods, or shakes his head, then back to
+// idle. Applies to Kyle only — as the player before the handoff
+// (idleTimer) and as the standing NPC after it (kyleIdleTimer). Moving,
+// talking, the door animation, cinematics, and the photo window all
+// interrupt or suppress the cycle; the main loop never runs during a
+// cinematic, so those are already excluded.
+const IDLE_VARS = ['idleLook', 'idleShrug', 'idleNod', 'idleShake'];
+let idleTimer = 4 + Math.random() * 2, idleVarKey = null, idleVarEnd = 0;
+let kyleIdleTimer = 4 + Math.random() * 2, kyleIdleVarKey = null, kyleIdleVarEnd = 0;
 
 // ---- NPCs: original names/lines, friendly only ----
 function makeGuest(npc) {
@@ -874,7 +884,7 @@ const PHOTOS = [
 ];
 const photos = [];
 let photoIdx = 0, windowOpen = false, windowTimer = 0, cinematic = null, missionStage = 'outside', introIdx = 0, nextCineAt = 0, lastWinSec = -1;
-let handoffCine = null, handedOff = false, kyleNPCMixer = null, kyleNPCGroup = null;
+let handoffCine = null, handedOff = false, kyleNPCMixer = null, kyleNPCGroup = null, kyleNPCChar = null;
 const INTRO = [
   ['Kyle (earpiece)', "Rochelle, you're in. Camera out, photographer first, agent second."],
   ['Rochelle', "Got it. Ball, chandeliers, everybody dancing. Nobody's looking at the photographer. Yet."],
@@ -986,6 +996,7 @@ function switchControl() {
   if (playerModel && playerModel.parent === player) {
     player.remove(playerModel); kyleNPCGroup.add(playerModel);
     kyleNPCMixer = new THREE.AnimationMixer(playerModel);
+    kyleNPCChar = { mixer: kyleNPCMixer, _cur: null };
   }
   // Rochelle becomes the player.
   playerModel = null; mixer = null; player.mixer = null; player._cur = null;
@@ -1289,7 +1300,23 @@ function animate() {
       if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
     }
     player.rotation.y = yaw;
-    if (mixer) { mixer.update(dt); if (doorAnimT >= 0) playMxCharClipOnce(player, 'openDoor'); else if (!talking) playClip(ml > 0.1 ? 'walk' : 'idle'); }
+    if (mixer) {
+      mixer.update(dt);
+      if (doorAnimT >= 0) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playMxCharClipOnce(player, 'openDoor'); }
+      else if (!talking && !handedOff && ml <= 0.1) {
+        // Kyle-as-player idle variations: ~5 s still, then a short gesture.
+        if (idleVarKey) { if (t >= idleVarEnd) { idleVarKey = null; playClip('idle'); } }
+        else {
+          idleTimer -= dt;
+          if (idleTimer <= 0) {
+            const k = IDLE_VARS[Math.floor(Math.random() * IDLE_VARS.length)];
+            if (mxClips[k]) { playMxCharClipOnce(player, k); idleVarKey = k; idleVarEnd = t + mxClips[k].duration; }
+            idleTimer = 4 + Math.random() * 2;
+          } else playClip('idle');
+        }
+      } else if (!talking) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playClip(ml > 0.1 ? 'walk' : 'idle'); }
+      else { idleTimer = 4 + Math.random() * 2; idleVarKey = null; }
+    }
     // Guest/contact bone animation: talk while talking, walk while moving, else idle.
     // All ballroom characters are now Mixamo-rigged, so all use mxClips.
     for (const n of NPCS) {
@@ -1302,7 +1329,19 @@ function animate() {
       else if (n.moving) playMxCharClip(n, 'walk');
       else playMxCharClip(n, 'idle');
     }
-    if (kyleNPCMixer && mxClips['idle']) { kyleNPCMixer.update(dt); const a = kyleNPCMixer.clipAction(mxClips['idle']); if (a && !a.isRunning()) a.play(); }
+    if (kyleNPCMixer && kyleNPCChar) {
+      kyleNPCMixer.update(dt);
+      if (kyleIdleVarKey) { if (t >= kyleIdleVarEnd) { kyleIdleVarKey = null; playMxCharClip(kyleNPCChar, 'idle'); } }
+      else if (windowOpen) { kyleIdleTimer = 4 + Math.random() * 2; playMxCharClip(kyleNPCChar, 'idle'); }
+      else {
+        kyleIdleTimer -= dt;
+        if (kyleIdleTimer <= 0) {
+          const k = IDLE_VARS[Math.floor(Math.random() * IDLE_VARS.length)];
+          if (mxClips[k]) { playMxCharClipOnce(kyleNPCChar, k); kyleIdleVarKey = k; kyleIdleVarEnd = t + mxClips[k].duration; }
+          kyleIdleTimer = 4 + Math.random() * 2;
+        } else playMxCharClip(kyleNPCChar, 'idle');
+      }
+    }
     // Auto rendezvous 2026-11-04: walking up to Rochelle starts it, no tap needed.
     if (missionStage === 'handoff' && started && !handoffCine && rochelleNPC && rochelleNPC.group.position.distanceTo(player.position) < 3.2) startHandoff();
     // Prompt / exit proximity
