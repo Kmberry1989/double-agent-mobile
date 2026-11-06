@@ -258,9 +258,9 @@ const wingR = box(28.4, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingR, 'assets/t
 // ballroom south wall (z 15.4, wall back is 15.0), so from outside you see windows,
 // not the interior damask wallpaper. Planes face south only, so from inside they are
 // backface-culled and can never bleed through the south wall. Door gap stays open.
-const facL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xd8c8a8 })); facL.position.set(-11.25, 3, 15.4); scene.add(facL); applyTex(facL, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 3, 1);
-const facR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xd8c8a8 })); facR.position.set(11.25, 3, 15.4); scene.add(facR); applyTex(facR, 'assets/textures/exterior_mansion_facade_windows_1024.webp', 3, 1);
-const facLintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ color: 0xd8c8a8 })); facLintel.position.set(0, 4.5, 15.4); scene.add(facLintel); // lintel above the double doors, plain stone, south-facing only
+const facL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0x4a2e1a })); facL.position.set(-11.25, 3, 15.4); scene.add(facL); applyTex(facL, 'assets/textures/exterior_mansion_entrance_dark_stone_1024.webp', 3, 1); // central entrance walls: darker stone, distinct from the light wings
+const facR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0x4a2e1a })); facR.position.set(11.25, 3, 15.4); scene.add(facR); applyTex(facR, 'assets/textures/exterior_mansion_entrance_dark_stone_1024.webp', 3, 1);
+const facLintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ color: 0x4a2e1a })); facLintel.position.set(0, 4.5, 15.4); scene.add(facLintel); // lintel above the double doors, dark stone to match the entrance walls, south-facing only
 cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 box(0, 3.8, 17.4, 12, 0.4, 6, 0xd8c8a8); // shifted south 0.4 so its north face is not coplanar with the south wall face at z 14
@@ -275,9 +275,22 @@ function makeDoorPanel(sign) {
 }
 const doorL = makeDoorPanel(-1), doorR = makeDoorPanel(1);
 let doorOpen = 0;
+let doorAnimT = -1; // >=0 while Kyle's door-opening clip is playing (movement locked)
+let doorAnimDone = false;
 function updateDoors(dt) {
   if (missionStage !== 'outside') return;
-  if (player.position.z < 18 && Math.abs(player.position.x) < 3) doorOpen = Math.min(1, doorOpen + dt);
+  const atDoors = player.position.z < 18 && Math.abs(player.position.x) < 3;
+  if (!doorAnimDone && atDoors && mxClips['openDoor']) {
+    if (doorAnimT < 0) { doorAnimT = 0; playMxCharClipOnce(player, 'openDoor'); }
+    doorAnimT += dt;
+    const dur = mxClips['openDoor'].duration || 6.37;
+    doorOpen = Math.min(1, Math.max(0, doorAnimT - 2.5)); // doors swing as he pushes, 2.5-3.5 s into the clip
+    if (doorAnimT >= dur) { doorAnimDone = true; doorAnimT = -1; }
+  } else if (!doorAnimDone && atDoors) {
+    // Clip not loaded yet: fall back to the old 1 s swing, no movement lock.
+    doorOpen = Math.min(1, doorOpen + dt);
+    if (doorOpen >= 1) doorAnimDone = true;
+  }
   doorL.rotation.y = -doorOpen * Math.PI / 2;
   doorR.rotation.y = doorOpen * Math.PI / 2;
 }
@@ -383,7 +396,7 @@ function stripRootTravel(clip) {
   });
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx'], ['openDoor', 'Opening_Door_Inwards.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -1241,6 +1254,7 @@ function animate() {
     let fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
     let fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
     if (joyId !== null) { fx += joyX; fz += -joyY; }
+    if (doorAnimT >= 0) { fx = 0; fz = 0; } // locked while Kyle opens the doors
     const ml = Math.hypot(fx, fz);
     if (ml > 1) { fx /= ml; fz /= ml; }
     // Camera-forward movement (same fix as the courtyard game: forward = -sin/-cos)
@@ -1269,7 +1283,7 @@ function animate() {
       if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
     }
     player.rotation.y = yaw;
-    if (mixer) { mixer.update(dt); if (!talking) playClip(ml > 0.1 ? 'walk' : 'idle'); }
+    if (mixer) { mixer.update(dt); if (doorAnimT >= 0) playMxCharClipOnce(player, 'openDoor'); else if (!talking) playClip(ml > 0.1 ? 'walk' : 'idle'); }
     // Guest/contact bone animation: talk while talking, walk while moving, else idle.
     // All ballroom characters are now Mixamo-rigged, so all use mxClips.
     for (const n of NPCS) {
