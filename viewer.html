@@ -40,7 +40,10 @@
     <label>X <input id="offX" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset X"><input id="offXn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset X value"></label>
     <label>Y <input id="offY" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Y"><input id="offYn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Y value"></label>
     <label>Z <input id="offZ" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Z"><input id="offZn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Z value"></label>
-    <span id="offRead">Offset: x 0.000, y 0.000, z 0.000 m</span>
+    <label>Rot X <input id="offRX" type="range" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation X"><input id="offRXn" type="number" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation X value"></label>
+    <label>Rot Y <input id="offRY" type="range" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Y"><input id="offRYn" type="number" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Y value"></label>
+    <label>Rot Z <input id="offRZ" type="range" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Z"><input id="offRZn" type="number" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Z value"></label>
+    <span id="offRead">offset: x=0.000, y=0.000, z=0.000 m | rot x=0, y=0, z=0 deg</span>
     <button id="offCopy" type="button">Copy</button>
     <button id="offReset" type="button">Reset</button>
   </div>
@@ -387,28 +390,41 @@ let weaponPivot = null;
 // switching weapons and back restores each weapon's offset. The offset is
 // applied to the pivot's hand-local position, so it rides with the hand
 // through the animation instead of sitting in world space.
-const weaponOffsets = new Map(); // weapon name -> {x, y, z}
+const weaponOffsets = new Map(); // weapon name -> {x, y, z, rx, ry, rz}
+// Baked weapon offsets, approved by Kyle in the viewer (hand-local metres /
+// degrees). A weapon loads at its baked placement; Reset returns to the raw
+// computed placement (0,0,0) for comparison, and reloading re-seeds the bake.
+const BAKED_OFFSETS = {
+  white_aks74u: { x: -0.002, y: -0.024, z: 0.074 },
+};
 let curWeaponName = '';
 const wOffEl = document.getElementById('wOff');
 const offReadEl = document.getElementById('offRead');
 const OFF_AXES = ['x', 'y', 'z'];
-const offSliders = {}, offNums = {};
+const ROT_AXES = ['x', 'y', 'z'];
+const offSliders = {}, offNums = {}, rotSliders = {}, rotNums = {};
 OFF_AXES.forEach(a => {
   offSliders[a] = document.getElementById('off' + a.toUpperCase());
   offNums[a] = document.getElementById('off' + a.toUpperCase() + 'n');
+  rotSliders[a] = document.getElementById('offR' + a.toUpperCase());
+  rotNums[a] = document.getElementById('offR' + a.toUpperCase() + 'n');
 });
 const fmt3 = v => (v === 0 ? 0 : v).toFixed(3);
 function getOffset(name) {
-  if (!weaponOffsets.has(name)) weaponOffsets.set(name, { x: 0, y: 0, z: 0 });
+  if (!weaponOffsets.has(name)) {
+    const b = BAKED_OFFSETS[name] || {};
+    weaponOffsets.set(name, { x: b.x || 0, y: b.y || 0, z: b.z || 0, rx: 0, ry: 0, rz: 0 });
+  }
   return weaponOffsets.get(name);
 }
 function updateOffsetReadout() {
   const o = getOffset(curWeaponName);
-  offReadEl.textContent = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)} m`;
+  offReadEl.textContent = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)} m | rot x=${o.rx}, y=${o.ry}, z=${o.rz} deg`;
 }
 function syncOffsetUI() {
   const o = getOffset(curWeaponName);
   OFF_AXES.forEach(a => { offSliders[a].value = o[a]; offNums[a].value = fmt3(o[a]); });
+  ROT_AXES.forEach(a => { rotSliders[a].value = o['r' + a]; rotNums[a].value = o['r' + a]; });
   updateOffsetReadout();
 }
 function applyWeaponOffset() {
@@ -416,6 +432,17 @@ function applyWeaponOffset() {
   const o = getOffset(curWeaponName);
   const b = weaponPivot.userData.basePos;
   weaponPivot.position.set(b.x + o.x, b.y + o.y, b.z + o.z);
+}
+// Rotation offset (degrees), applied in the pivot's own local frame on top
+// of the computed grip rotation: pivot.quaternion = baseQuat * offsetQuat.
+// Like the position offset it rides with the hand through the animation.
+function applyWeaponRotation() {
+  if (!weaponPivot || !weaponPivot.userData.baseQuat) return;
+  const o = getOffset(curWeaponName);
+  const off = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+    THREE.MathUtils.degToRad(o.rx), THREE.MathUtils.degToRad(o.ry), THREE.MathUtils.degToRad(o.rz)
+  ));
+  weaponPivot.quaternion.copy(weaponPivot.userData.baseQuat).multiply(off);
 }
 function setOffsetAxis(a, v) {
   const o = getOffset(curWeaponName);
@@ -425,6 +452,14 @@ function setOffsetAxis(a, v) {
   updateOffsetReadout();
   applyWeaponOffset();
 }
+function setRotationAxis(a, v) {
+  const o = getOffset(curWeaponName);
+  o['r' + a] = Math.max(-180, Math.min(180, Math.round(v)));
+  rotSliders[a].value = o['r' + a];
+  rotNums[a].value = o['r' + a];
+  updateOffsetReadout();
+  applyWeaponRotation();
+}
 OFF_AXES.forEach(a => {
   offSliders[a].addEventListener('input', e => setOffsetAxis(a, parseFloat(e.target.value) || 0));
   offNums[a].addEventListener('change', e => {
@@ -433,9 +468,17 @@ OFF_AXES.forEach(a => {
     setOffsetAxis(a, v);
   });
 });
+ROT_AXES.forEach(a => {
+  rotSliders[a].addEventListener('input', e => setRotationAxis(a, parseFloat(e.target.value) || 0));
+  rotNums[a].addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (isNaN(v)) v = 0;
+    setRotationAxis(a, v);
+  });
+});
 document.getElementById('offCopy').addEventListener('click', async e => {
-  const o = getOffset(curWeaponName);
-  const text = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)} m`;
+  updateOffsetReadout();
+  const text = offReadEl.textContent;
   let ok = false;
   try { await navigator.clipboard.writeText(text); ok = true; } catch (_) {
     const ta = document.createElement('textarea');
@@ -450,9 +493,10 @@ document.getElementById('offCopy').addEventListener('click', async e => {
 });
 document.getElementById('offReset').addEventListener('click', () => {
   const o = getOffset(curWeaponName);
-  o.x = 0; o.y = 0; o.z = 0;
+  o.x = 0; o.y = 0; o.z = 0; o.rx = 0; o.ry = 0; o.rz = 0;
   syncOffsetUI();
   applyWeaponOffset();
+  applyWeaponRotation();
 });
 // Hand axes, MEASURED 2026-11-06 (Node/Three.js on assets/characters/Agent_Kyle.fbx):
 // the four finger-base bones sit along hand-local +Y (avg dir (-0.012, 1.000,
@@ -519,7 +563,11 @@ function loadWeapon(name) {
       // Hand-local base position, captured AFTER hand.attach: the offset
       // applies on top of this and rides with the hand through the clip.
       pivot.userData.basePos = pivot.position.clone();
+      // Hand-local base rotation, captured the same way (the grip quaternion
+      // was just copied onto the pivot above).
+      pivot.userData.baseQuat = pivot.quaternion.clone();
       applyWeaponOffset();
+      applyWeaponRotation();
       weaponPivot = pivot;
     } catch (e) { pivot.removeFromParent(); }
   }, undefined, () => { statusEl.textContent += ' / weapon failed to load: ' + w.file; });
