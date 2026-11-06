@@ -366,6 +366,16 @@ function fitWeapon(obj) {
   return true;
 }
 let weaponPivot = null;
+// Hand axes, MEASURED 2026-11-06 (Node/Three.js on assets/characters/Agent_Kyle.fbx):
+// the four finger-base bones sit along hand-local +Y (avg dir (-0.012, 1.000,
+// 0.027)), so the fingers point along +Y — NOT -Y, which is why the old code
+// put the gun along the forearm (hand -Y points toward the forearm). The back
+// of the hand (dorsal) is cross(finger, thumb) = (0.569, 0.029, -0.822) in
+// hand-local space. These are constants of the Mixamo rig, so they are fixed
+// here rather than re-measured per pose (a clenched fist would move the
+// finger bones and corrupt a live measurement).
+const FINGER_DIR = new THREE.Vector3(-0.012, 1.000, 0.027).normalize();
+const DORSAL_DIR = new THREE.Vector3(0.569, 0.029, -0.822).normalize();
 function loadWeapon(name) {
   if (weaponPivot) { weaponPivot.removeFromParent(); weaponPivot = null; }
   if (!name) return;
@@ -379,21 +389,42 @@ function loadWeapon(name) {
     if (!hand) { pivot.removeFromParent(); statusEl.textContent += ' / no right-hand bone — weapon not attached'; return; }
     try {
       model.updateMatrixWorld(true);
-      const hp = new THREE.Vector3(); hand.getWorldPosition(hp);
-      scene.attach(pivot);
-      // Palm in world units: 9 cm from the wrist along the finger direction (-Y of the hand).
-      const handQ = new THREE.Quaternion(); hand.getWorldQuaternion(handQ);
-      const fingerDir = new THREE.Vector3(0, -1, 0).applyQuaternion(handQ);
-      pivot.position.copy(hp).addScaledVector(fingerDir, 0.09);
-      pivot.quaternion.setFromEuler(new THREE.Euler(0, 0, 0));
-      pivot.scale.setScalar(1);
+      pivot.updateMatrixWorld(true);
+      // Grip point in pivot space: the Blender object origin (= grip) is the
+      // mesh node's origin, which the GLB node translation offsets from the
+      // pivot origin (white glock: (0, -0.0213, +0.0546)). The muzzle is the
+      // end of the long axis farther from the grip (white glock: -Z, measured
+      // from the mesh — thin barrel tip at -Z, grip hanging down at +Z).
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const size = new THREE.Vector3(); box.getSize(size);
+      let meshNode = null;
+      gltf.scene.traverse((o) => { if (!meshNode && o.isMesh) meshNode = o; });
+      const gripLocal = pivot.worldToLocal(meshNode.getWorldPosition(new THREE.Vector3()));
+      const axes = ['x', 'y', 'z'];
+      const longAxis = axes.reduce((a, b) => (size[a] >= size[b] ? a : b));
+      const muzzleSign = (box.max[longAxis] - gripLocal[longAxis]) >= (gripLocal[longAxis] - box.min[longAxis]) ? 1 : -1;
+      const muzzleDir = new THREE.Vector3(0, 0, 0); muzzleDir[longAxis] = muzzleSign;
+      const slideTop = new THREE.Vector3(0, 1, 0);
+      // Rotation (hand-local): muzzle -> finger direction, slide top -> back
+      // of the hand. Built from the two measured axes, so the gun follows the
+      // fist through the clip with the barrel tracking the fingers.
+      const e1 = muzzleDir.clone(), e2 = slideTop.clone();
+      const e3 = new THREE.Vector3().crossVectors(e1, e2).normalize();
+      const f1 = FINGER_DIR.clone(), f2 = DORSAL_DIR.clone();
+      const f3 = new THREE.Vector3().crossVectors(f1, f2).normalize();
+      const R = new THREE.Matrix4().multiplyMatrices(
+        new THREE.Matrix4().makeBasis(f1, f2, f3),
+        new THREE.Matrix4().makeBasis(e1, e2, e3).transpose()
+      );
+      const q = new THREE.Quaternion().setFromRotationMatrix(R);
       hand.attach(pivot);
-      // Grip orientation: the courtyard's yaw-based pivot leaves the barrel pointing
-      // wherever the player faces, so in a chest-held pose it hangs down off the fist.
-      // In the viewer's hand-local space, point the barrel along the hand's finger
-      // direction (hand -Y) and the slide top toward the back of the hand (hand -Z),
-      // so the gun follows the fist through the clip (barrel tracks the torso turn).
-      pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().set(-1,0,0,0, 0,0,-1,0, 0,-1,0,0, 0,0,0,1));
+      pivot.quaternion.copy(q);
+      // Put the GRIP (not the pivot origin) exactly on the hand bone: the
+      // pivot origin is offset from the grip by the node translation, so the
+      // pivot sits at -(R * gripLocal) in hand space. No 0.09 m offset — the
+      // old offset along hand -Y (the forearm direction) is what put the gun
+      // along the forearm with an empty fist.
+      pivot.position.copy(gripLocal.clone().applyQuaternion(q).negate());
       weaponPivot = pivot;
     } catch (e) { pivot.removeFromParent(); }
   }, undefined, () => { statusEl.textContent += ' / weapon failed to load: ' + w.file; });
