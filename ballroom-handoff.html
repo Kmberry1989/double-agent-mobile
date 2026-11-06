@@ -258,12 +258,18 @@ const wingR = box(28.4, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingR, 'assets/t
 // ballroom south wall (z 15.4, wall back is 15.0), so from outside you see windows,
 // not the interior damask wallpaper. Planes face south only, so from inside they are
 // backface-culled and can never bleed through the south wall. Door gap stays open.
-const facL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facL.position.set(-11.25, 3, 15.4); scene.add(facL); applyTex(facL, 'assets/textures/exterior/exterior_mansion_entrance_ivory_1024.webp', 1, 1); // one tile per side, not 3 — was splitting the facade into 6 panels // central entrance walls v2: pale ivory limestone with arched windows, distinct from the beige wings
-const facR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facR.position.set(11.25, 3, 15.4); scene.add(facR); applyTex(facR, 'assets/textures/exterior/exterior_mansion_entrance_ivory_1024.webp', 1, 1);
+const facL = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 7.5), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facL.position.set(-11.25, 2.25, 15.4); scene.add(facL); applyTex(facL, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_2080.webp', 1, 1); // 7.5 tall so the wall meets the ground at y -1.5; wide texture re-laid out at the wall's 2.6:1 aspect, windows/quoins unstretched // central entrance walls v2: pale ivory limestone with arched windows, distinct from the beige wings
+const facR = new THREE.Mesh(new THREE.PlaneGeometry(19.5, 7.5), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facR.position.set(11.25, 2.25, 15.4); scene.add(facR); applyTex(facR, 'assets/textures/exterior/exterior_mansion_entrance_ivory_wide_2080.webp', 1, 1);
 const facLintel = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshStandardMaterial({ color: 0xe8e0d0 })); facLintel.position.set(0, 4.5, 15.4); scene.add(facLintel); // lintel above the double doors, ivory stone to match the entrance walls, south-facing only
 cyl(-4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 cyl(4, 1.0, 17, 0.4, 0.4, 5, 0xe8ddc8);
 box(0, 3.8, 17.4, 12, 0.4, 6, 0xd8c8a8); // shifted south 0.4 so its north face is not coplanar with the south wall face at z 14
+// Simple low gable roof over the whole front (central walls + wings): two sloped slabs,
+// ridge at y 10 along z 3, eaves at y 6.75 with a small overhang (z 20.5 / -14.5, x +/-37).
+// Dark slate grey, no texture. Eaves clear the wing tops (6.5) and sit well above the
+// portico roof (top 4.0), so nothing z-fights; the doors stay in clear view from the drive.
+const roofFront = box(0, 8.375, 11.75, 74, 0.3, 17.8, 0x3a3f44); roofFront.rotation.x = 0.1837;
+const roofBack = box(0, 8.375, -5.75, 74, 0.3, 17.8, 0x3a3f44); roofBack.rotation.x = -0.1837;
 // 6 steps, 1 m deep each, 0.25 m high each, from drive (y -1.5) to floor (y 0)
 for (let i = 0; i < 6; i++) { const st = box(0, -1.5 + (i + 1) * 0.25 - 0.125, 19.5 - i, 5, 0.25, 1, 0xb8b8b8); applyTex(st, 'assets/textures/exterior/exterior_drive_cobblestone_1024.webp', 1, 1); }
 // Double doors, hinged at the outer edges, closed at start
