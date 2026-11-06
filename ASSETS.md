@@ -1,17 +1,17 @@
 # Double Agent — Asset Inventory
 
-Generated from `assets/` in Kmberry1989/double-agent-mobile. 252 files, 212.6 MB total. The folders are the categories: characters, cats, weapons, vehicles, props, animations, textures (with subfolders), audio. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
+Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB total. The folders are the categories: characters, cats, weapons, vehicles, props, animations, textures (with subfolders), audio. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
 
 ## Contents
 - Characters — 17 files, 62.7 MB
 - Characters — enemies — 4 files, 10.5 MB
 - Character textures — 13 files, 23.0 MB
 - Cats — 4 files, 19.2 MB
-- Weapons — player (white/black sets) — 15 files, 785.5 KB
-- Weapons — player gear, throwable/placeable (systems unwired) — 10 files, 523.3 KB
-- Weapons — player gear, suppressors — 2 files, 65.7 KB
-- Weapons — player gear, accessories — 9 files, 384.0 KB
-- Weapons — enemy (unprefixed) — 8 files, 329.5 KB
+- Weapons — player (white/black sets) — 15 files, 1.1 MB
+- Weapons — player gear, throwable/placeable (systems unwired) — 10 files, 675.9 KB
+- Weapons — player gear, suppressors — 2 files, 78.8 KB
+- Weapons — player gear, accessories — 9 files, 472.1 KB
+- Weapons — enemy (unprefixed) — 8 files, 388.7 KB
 - Vehicles — 3 files, 203.6 KB
 - Ballroom & office props — 20 files, 781.4 KB
 - Animations — locomotion & poses — 21 files, 9.0 MB
@@ -24,7 +24,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 252 files, 212.6 MB
 - Animations — driving — 4 files, 2.6 MB
 - Animations — ActionForge clips (unreferenced) — 4 files, 2.6 MB
 - Textures — ballroom — 14 files, 9.8 MB
-- Textures — exterior (mansion/drive) — 8 files, 1.7 MB
+- Textures — exterior (mansion/drive) — 10 files, 1.8 MB
 - Textures — ground — 6 files, 7.7 MB
 - Textures — props — 9 files, 7.8 MB
 - Textures — walls — 3 files, 1.8 MB
@@ -92,74 +92,74 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 252 files, 212.6 MB
 | `cats/Moxie.glb` | 3.8 MB | Rigged + skinned GLB, shared 33-bone rig |
 | `cats/morecatanimations.glb` | 4.1 MB | Animation-only GLB (clips for the cats, model not used) |
 
-## Weapons — player (white/black sets) (15 files, 785.5 KB)
+## Weapons — player (white/black sets) (15 files, 1.1 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `weapons/black_aks74u.glb` | 38.4 KB |  |
-| `weapons/black_glock_threaded.glb` | 39.9 KB |  |
-| `weapons/black_makarov.glb` | 40.7 KB |  |
-| `weapons/black_mp5-k.glb` | 25.0 KB |  |
-| `weapons/black_mp5k.glb` | 40.8 KB |  |
-| `weapons/black_rpg.glb` | 46.4 KB |  |
-| `weapons/black_walther.glb` | 39.3 KB |  |
-| `weapons/white_RPG7.glb` | 61.1 KB |  |
-| `weapons/white_aks74u.glb` | 59.4 KB |  |
-| `weapons/white_glock.glb` | 46.8 KB |  |
-| `weapons/white_glock_nodraco.glb` | 99.6 KB | De-Draco copy for Blender import (set grip origin there) |
-| `weapons/white_mac.glb` | 55.9 KB |  |
-| `weapons/white_makarov.glb` | 67.3 KB |  |
-| `weapons/white_mp5k.glb` | 58.4 KB |  |
-| `weapons/white_walther.glb` | 66.6 KB |  |
+| `weapons/black_aks74u.glb` | 42.3 KB |  |
+| `weapons/black_glock_threaded.glb` | 48.2 KB |  |
+| `weapons/black_makarov.glb` | 51.1 KB |  |
+| `weapons/black_mp5-k.glb` | 29.6 KB |  |
+| `weapons/black_mp5k.glb` | 46.9 KB |  |
+| `weapons/black_rpg.glb` | 52.6 KB |  |
+| `weapons/black_walther.glb` | 48.3 KB |  |
+| `weapons/white_RPG7.glb` | 65.9 KB |  |
+| `weapons/white_aks74u.glb` | 63.3 KB |  |
+| `weapons/white_glock.glb` | 55.6 KB |  |
+| `weapons/white_glock_nodraco.glb` | 299.5 KB | De-Draco copy for Blender import (set grip origin there) |
+| `weapons/white_mac.glb` | 60.2 KB |  |
+| `weapons/white_makarov.glb` | 76.5 KB |  |
+| `weapons/white_mp5k.glb` | 63.6 KB |  |
+| `weapons/white_walther.glb` | 76.1 KB |  |
 
-## Weapons — player gear, throwable/placeable (systems unwired) (10 files, 523.3 KB)
-
-| File | Size | Note |
-| --- | --- | --- |
-| `weapons/black_c4.glb` | 52.2 KB |  |
-| `weapons/black_claymore.glb` | 40.0 KB |  |
-| `weapons/black_grenade.glb` | 61.5 KB |  |
-| `weapons/black_knife.glb` | 32.3 KB |  |
-| `weapons/black_lockpicks.glb` | 66.7 KB |  |
-| `weapons/black_throwing_knife.glb` | 36.5 KB |  |
-| `weapons/white_c4.glb` | 57.4 KB |  |
-| `weapons/white_claymore.glb` | 65.9 KB |  |
-| `weapons/white_grenade.glb` | 74.0 KB |  |
-| `weapons/white_knife.glb` | 36.8 KB |  |
-
-## Weapons — player gear, suppressors (2 files, 65.7 KB)
+## Weapons — player gear, throwable/placeable (systems unwired) (10 files, 675.9 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `weapons/black_suppressor.glb` | 21.6 KB |  |
-| `weapons/white_suppressor.glb` | 44.0 KB |  |
+| `weapons/black_c4.glb` | 67.7 KB |  |
+| `weapons/black_claymore.glb` | 53.3 KB |  |
+| `weapons/black_grenade.glb` | 79.6 KB |  |
+| `weapons/black_knife.glb` | 35.6 KB |  |
+| `weapons/black_lockpicks.glb` | 107.6 KB |  |
+| `weapons/black_throwing_knife.glb` | 40.2 KB |  |
+| `weapons/white_c4.glb` | 75.8 KB |  |
+| `weapons/white_claymore.glb` | 84.7 KB |  |
+| `weapons/white_grenade.glb` | 91.3 KB |  |
+| `weapons/white_knife.glb` | 40.0 KB |  |
 
-## Weapons — player gear, accessories (9 files, 384.0 KB)
-
-| File | Size | Note |
-| --- | --- | --- |
-| `weapons/black_bag.glb` | 60.0 KB |  |
-| `weapons/black_glasses.glb` | 39.2 KB |  |
-| `weapons/black_glasses2.glb` | 37.4 KB |  |
-| `weapons/black_pen.glb` | 37.8 KB |  |
-| `weapons/black_pen2.glb` | 17.0 KB |  |
-| `weapons/black_watch.glb` | 46.4 KB |  |
-| `weapons/white_glasses2.glb` | 55.3 KB |  |
-| `weapons/white_open_glasses.glb` | 59.8 KB |  |
-| `weapons/white_pen.glb` | 31.0 KB |  |
-
-## Weapons — enemy (unprefixed) (8 files, 329.5 KB)
+## Weapons — player gear, suppressors (2 files, 78.8 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `weapons/aks74u.glb` | 42.4 KB | Enemy weapons; unprefixed = enemies |
-| `weapons/cufflinks.glb` | 66.4 KB | Enemy weapons; unprefixed = enemies |
-| `weapons/mp5k.glb` | 26.6 KB | Enemy weapons; unprefixed = enemies |
-| `weapons/ppk.glb` | 69.4 KB | Enemy weapons; unprefixed = enemies |
-| `weapons/ppk_magazine.glb` | 40.9 KB | Enemy weapons; unprefixed = enemies |
-| `weapons/ppk_suppressor.glb` | 26.4 KB | Enemy weapons; unprefixed = enemies |
-| `weapons/rpg.glb` | 36.2 KB | Enemy weapons; unprefixed = enemies |
-| `weapons/suppressor.glb` | 21.1 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/black_suppressor.glb` | 27.4 KB |  |
+| `weapons/white_suppressor.glb` | 51.4 KB |  |
+
+## Weapons — player gear, accessories (9 files, 472.1 KB)
+
+| File | Size | Note |
+| --- | --- | --- |
+| `weapons/black_bag.glb` | 90.2 KB |  |
+| `weapons/black_glasses.glb` | 50.0 KB |  |
+| `weapons/black_glasses2.glb` | 46.4 KB |  |
+| `weapons/black_pen.glb` | 41.1 KB |  |
+| `weapons/black_pen2.glb` | 20.5 KB |  |
+| `weapons/black_watch.glb` | 57.2 KB |  |
+| `weapons/white_glasses2.glb` | 63.9 KB |  |
+| `weapons/white_open_glasses.glb` | 67.8 KB |  |
+| `weapons/white_pen.glb` | 35.0 KB |  |
+
+## Weapons — enemy (unprefixed) (8 files, 388.7 KB)
+
+| File | Size | Note |
+| --- | --- | --- |
+| `weapons/aks74u.glb` | 46.1 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/cufflinks.glb` | 81.5 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/mp5k.glb` | 32.3 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/ppk.glb` | 78.2 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/ppk_magazine.glb` | 51.0 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/ppk_suppressor.glb` | 31.4 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/rpg.glb` | 40.8 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/suppressor.glb` | 27.4 KB | Enemy weapons; unprefixed = enemies |
 
 ## Vehicles (3 files, 203.6 KB)
 
@@ -338,7 +338,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 252 files, 212.6 MB
 | `textures/ballroom/ballroom_wall_damask_burgundy_gold_1024.webp` | 1.2 MB |  |
 | `textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp` | 356.7 KB |  |
 
-## Textures — exterior (mansion/drive) (8 files, 1.7 MB)
+## Textures — exterior (mansion/drive) (10 files, 1.8 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
@@ -349,7 +349,9 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 252 files, 212.6 MB
 | `textures/exterior/exterior_mansion_entrance_ivory_1024.webp` | 93.2 KB |  |
 | `textures/exterior/exterior_mansion_entrance_ivory_wide_2080.webp` | 95.0 KB |  |
 | `textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080.webp` | 136.2 KB |  |
+| `textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080x640.webp` | 106.2 KB |  |
 | `textures/exterior/exterior_mansion_facade_windows_1024.webp` | 112.5 KB |  |
+| `textures/exterior/exterior_mansion_facade_windows_1024x768.webp` | 77.4 KB |  |
 
 ## Textures — ground (6 files, 7.7 MB)
 
