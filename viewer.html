@@ -403,8 +403,8 @@ function afterModel(obj, info) {
   if (!hasBones && !embeddedAnims.length) setAnimOptions([]);
   else setAnimOptions(embeddedAnims.length ? embeddedAnims.map(a => a.name) : (info[2] === 'fbx' ? ANIMS : []));
   if (pendingAnim) { const pa = pendingAnim; pendingAnim = null; animSel.value = pa; playAnim(pa); setView('side'); }
-  else if (embeddedAnims.length) playAnim(embeddedAnims[0].name);
-  else if (info[2] === 'fbx' && hasBones) playAnim('Standing_Idle');
+  else if (embeddedAnims.length) { animSel.value = embeddedAnims[0].name; playAnim(embeddedAnims[0].name); }
+  else if (info[2] === 'fbx' && hasBones) { animSel.value = 'Standing_Idle'; playAnim('Standing_Idle'); }
   resetView();
   if (weaponSel.value) loadWeapon(weaponSel.value);
   setStatus(`${info[0]} — ${info[1]}\nsize ${(fit.size.x).toFixed(2)} x ${(fit.size.y).toFixed(2)} x ${(fit.size.z).toFixed(2)} m, ${boneCount} bones${hasBones ? '' : '\nSTATIC MODEL — no skeleton, so no animation can play on it'}${bones.hips ? '' : '\n(no Hips bone found)'}`);
@@ -485,7 +485,8 @@ document.getElementById('backBtn').addEventListener('click', () => setView('back
 document.getElementById('topBtn').addEventListener('click', () => setView('top'));
 document.getElementById('resetBtn').addEventListener('click', resetView);
 document.getElementById('shootBtn').addEventListener('click', () => {
-  pendingAnim = 'Shooting_Pistol'; modelSel.value = 'Kyle'; weaponSel.value = 'white glock'; // option values come from filenames, lowercase loadModel('Kyle');
+  pendingAnim = 'Shooting_Pistol'; modelSel.value = 'Kyle'; weaponSel.value = 'white glock';
+  loadModel('Kyle'); // weapon option values come from filenames, lowercase
 });
 document.getElementById('camBtn').addEventListener('click', e => {
   camMode = camMode === 'orbit' ? 'free' : 'orbit';
@@ -554,7 +555,7 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
-loadModel('Kyle');
+modelSel.value = 'Kyle'; loadModel('Kyle');
 animate();
 </script>
 </body>
