@@ -379,10 +379,14 @@ function loadWeapon(name) {
       model.updateMatrixWorld(true);
       const hp = new THREE.Vector3(); hand.getWorldPosition(hp);
       scene.attach(pivot);
-      pivot.position.copy(hp).add(new THREE.Vector3(0, 0, 0.08));
+      pivot.position.copy(hp);
       pivot.quaternion.setFromEuler(new THREE.Euler(0, 0, 0));
       pivot.scale.setScalar(1);
       hand.attach(pivot);
+      // Palm: the hand bone sits at the wrist, so put the pivot 8 cm from the wrist
+      // along the finger direction (hand -Y) — that is the palm, where the grip belongs.
+      // The old world +0.08 forward offset orbited with the hand and ended up below/behind the fist.
+      pivot.position.set(0, -0.08, 0);
       // Grip orientation: the courtyard's yaw-based pivot leaves the barrel pointing
       // wherever the player faces, so in a chest-held pose it hangs down off the fist.
       // In the viewer's hand-local space, point the barrel along the hand's finger
