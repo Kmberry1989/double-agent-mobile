@@ -127,6 +127,10 @@ dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/
 gltfLoader.setDRACOLoader(dracoLoader);
 const texLoader = new THREE.TextureLoader();
 
+// Bump this whenever a model, texture, or animation file is replaced in the
+// repo — asset URLs carry it, so browsers never serve a stale cached FBX/GLB
+// under the same filename (that's how the rigged Kyle_combat looked static).
+const ASSET_V = '20261106c';
 const modelSel = document.getElementById('modelSel');
 const animSel = document.getElementById('animSel');
 const statusEl = document.getElementById('status');
@@ -202,10 +206,10 @@ const PBR = {
   },
 };
 function applyPBR(obj, set) {
-  const base = texLoader.load(set.base); base.colorSpace = THREE.SRGBColorSpace;
-  const normal = texLoader.load(set.normal);
-  const rough = texLoader.load(set.rough);
-  const metal = texLoader.load(set.metal);
+  const base = texLoader.load(set.base + '?v=' + ASSET_V); base.colorSpace = THREE.SRGBColorSpace;
+  const normal = texLoader.load(set.normal + '?v=' + ASSET_V);
+  const rough = texLoader.load(set.rough + '?v=' + ASSET_V);
+  const metal = texLoader.load(set.metal + '?v=' + ASSET_V);
   obj.traverse(o => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach(m => {
     m.map = base; m.normalMap = normal; m.roughnessMap = rough; m.metalnessMap = metal;
     m.metalness = 1; m.roughness = 1; m.needsUpdate = true;
@@ -213,7 +217,7 @@ function applyPBR(obj, set) {
 }
 function applyBasecolor(obj, texPath) {
   if (!texPath) return;
-  const tex = texLoader.load(texPath); tex.colorSpace = THREE.SRGBColorSpace;
+  const tex = texLoader.load(texPath + '?v=' + ASSET_V); tex.colorSpace = THREE.SRGBColorSpace;
   obj.traverse(o => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach(m => { m.map = tex; m.color.set(0xffffff); m.needsUpdate = true; }); } });
 }
 function clearModel() {
@@ -226,8 +230,8 @@ function afterModel(obj, info) {
   const isCat = info[0] === 'Mabel' || info[0] === 'Margo' || info[0] === 'Moxie';
   const fit = fitModel(obj, isCat ? 0.35 : 1.8);
   collectBones(obj);
-  let hasBones = false;
-  obj.traverse(o => { if (o.isBone) hasBones = true; });
+  let hasBones = false, boneCount = 0;
+  obj.traverse(o => { if (o.isBone) { hasBones = true; boneCount++; } });
   mixer = new THREE.AnimationMixer(obj);
   if (!hasBones && !embeddedAnims.length) setAnimOptions([]);
   else setAnimOptions(embeddedAnims.length ? embeddedAnims.map(a => a.name) : (info[2] === 'fbx' ? ANIMS : []));
@@ -235,15 +239,15 @@ function afterModel(obj, info) {
   else if (embeddedAnims.length) playAnim(embeddedAnims[0].name);
   else if (info[2] === 'fbx' && hasBones) playAnim('Standing_Idle');
   resetView();
-  setStatus(`${info[0]} — ${info[1]}\nsize ${(fit.size.x).toFixed(2)} x ${(fit.size.y).toFixed(2)} x ${(fit.size.z).toFixed(2)} m${hasBones ? '' : '\nSTATIC MODEL — no skeleton, so no animation can play on it'}${bones.hips ? '' : '\n(no Hips bone found)'}`);
+  setStatus(`${info[0]} — ${info[1]}\nsize ${(fit.size.x).toFixed(2)} x ${(fit.size.y).toFixed(2)} x ${(fit.size.z).toFixed(2)} m, ${boneCount} bones${hasBones ? '' : '\nSTATIC MODEL — no skeleton, so no animation can play on it'}${bones.hips ? '' : '\n(no Hips bone found)'}`);
 }
 function loadModel(name) {
   const info = findModel(name); if (!info) return;
   clearModel(); setStatus('Loading ' + info[1] + '…');
   if (info[2] === 'fbx') {
-    fbxLoader.load(info[1], obj => { if (PBR[info[0]]) applyPBR(obj, PBR[info[0]]); else applyBasecolor(obj, info[3]); afterModel(obj, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
+    fbxLoader.load(info[1] + '?v=' + ASSET_V, obj => { if (PBR[info[0]]) applyPBR(obj, PBR[info[0]]); else applyBasecolor(obj, info[3]); afterModel(obj, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
   } else {
-    gltfLoader.load(info[1], gltf => { embeddedAnims = gltf.animations || []; afterModel(gltf.scene, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
+    gltfLoader.load(info[1] + '?v=' + ASSET_V, gltf => { embeddedAnims = gltf.animations || []; afterModel(gltf.scene, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
   }
 }
 function playAnim(name) {
@@ -253,7 +257,7 @@ function playAnim(name) {
     clip = c;
   } else {
     setStatus('Loading animation ' + name + '…');
-    fbxLoader.load('assets/animations/' + name + '.fbx', obj => {
+    fbxLoader.load('assets/animations/' + name + '.fbx?v=' + ASSET_V, obj => {
       const raw = obj.animations && obj.animations[0]; if (!raw) { setStatus('No clip in ' + name); return; }
       clip = stripRoot ? stripRootTravel(raw) : raw;
       startClip(name, raw);
