@@ -13,6 +13,13 @@
   #bar select, #bar button { font-size: 13px; padding: 6px 8px; background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; max-width: 180px; }
   #bar button.on { background: #2e7d32; border-color: #66bb6a; }
   #bar label { font-size: 12px; color: #bbb; }
+  #wOff { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; padding-top: 2px; }
+  #wOff[hidden] { display: none; }
+  #wOff .wOffTitle { font-size: 12px; color: #bbb; }
+  #wOff label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #bbb; }
+  #wOff input[type=range] { width: 110px; height: 28px; }
+  #wOff input[type=number] { width: 72px; font-size: 13px; padding: 6px 4px; background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; }
+  #offRead { font-size: 12px; color: #ccc; }
   #timeline { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px 10px; background: rgba(0,0,0,0.72); z-index: 5; }
   #timeline input[type=range] { width: 100%; }
   #status { font-size: 12px; color: #ccc; margin-top: 4px; white-space: pre-wrap; }
@@ -28,6 +35,15 @@
   <select id="modelSel" aria-label="Model"></select>
   <select id="animSel" aria-label="Animation"></select>
   <select id="weaponSel" aria-label="Weapon in right hand"></select>
+  <div id="wOff" hidden>
+    <span class="wOffTitle">Weapon offset</span>
+    <label>X <input id="offX" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset X"><input id="offXn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset X value"></label>
+    <label>Y <input id="offY" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Y"><input id="offYn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Y value"></label>
+    <label>Z <input id="offZ" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Z"><input id="offZn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Z value"></label>
+    <span id="offRead">Offset: x 0.000, y 0.000, z 0.000 m</span>
+    <button id="offCopy" type="button">Copy</button>
+    <button id="offReset" type="button">Reset</button>
+  </div>
   <button id="playBtn" type="button">Pause</button>
   <select id="speedSel" aria-label="Speed"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option></select>
   <button id="loopBtn" type="button" class="on">Loop</button>
@@ -366,6 +382,78 @@ function fitWeapon(obj) {
   return true;
 }
 let weaponPivot = null;
+// Weapon offset — hand-local nudge (metres) on top of the computed grip
+// placement. Per weapon, remembered in memory while the page is open, so
+// switching weapons and back restores each weapon's offset. The offset is
+// applied to the pivot's hand-local position, so it rides with the hand
+// through the animation instead of sitting in world space.
+const weaponOffsets = new Map(); // weapon name -> {x, y, z}
+let curWeaponName = '';
+const wOffEl = document.getElementById('wOff');
+const offReadEl = document.getElementById('offRead');
+const OFF_AXES = ['x', 'y', 'z'];
+const offSliders = {}, offNums = {};
+OFF_AXES.forEach(a => {
+  offSliders[a] = document.getElementById('off' + a.toUpperCase());
+  offNums[a] = document.getElementById('off' + a.toUpperCase() + 'n');
+});
+const fmt3 = v => (v === 0 ? 0 : v).toFixed(3);
+function getOffset(name) {
+  if (!weaponOffsets.has(name)) weaponOffsets.set(name, { x: 0, y: 0, z: 0 });
+  return weaponOffsets.get(name);
+}
+function updateOffsetReadout() {
+  const o = getOffset(curWeaponName);
+  offReadEl.textContent = `Offset: x ${fmt3(o.x)}, y ${fmt3(o.y)}, z ${fmt3(o.z)} m`;
+}
+function syncOffsetUI() {
+  const o = getOffset(curWeaponName);
+  OFF_AXES.forEach(a => { offSliders[a].value = o[a]; offNums[a].value = fmt3(o[a]); });
+  updateOffsetReadout();
+}
+function applyWeaponOffset() {
+  if (!weaponPivot || !weaponPivot.userData.basePos) return;
+  const o = getOffset(curWeaponName);
+  const b = weaponPivot.userData.basePos;
+  weaponPivot.position.set(b.x + o.x, b.y + o.y, b.z + o.z);
+}
+function setOffsetAxis(a, v) {
+  const o = getOffset(curWeaponName);
+  o[a] = Math.max(-0.2, Math.min(0.2, v));
+  offSliders[a].value = o[a];
+  offNums[a].value = fmt3(o[a]);
+  updateOffsetReadout();
+  applyWeaponOffset();
+}
+OFF_AXES.forEach(a => {
+  offSliders[a].addEventListener('input', e => setOffsetAxis(a, parseFloat(e.target.value) || 0));
+  offNums[a].addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (isNaN(v)) v = 0;
+    setOffsetAxis(a, v);
+  });
+});
+document.getElementById('offCopy').addEventListener('click', async e => {
+  const o = getOffset(curWeaponName);
+  const text = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)}`;
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch (_) {}
+    ta.remove();
+  }
+  const btn = e.target;
+  btn.textContent = ok ? 'Copied' : 'Copy';
+  setTimeout(() => { btn.textContent = 'Copy'; }, 1000);
+});
+document.getElementById('offReset').addEventListener('click', () => {
+  const o = getOffset(curWeaponName);
+  o.x = 0; o.y = 0; o.z = 0;
+  syncOffsetUI();
+  applyWeaponOffset();
+});
 // Hand axes, MEASURED 2026-11-06 (Node/Three.js on assets/characters/Agent_Kyle.fbx):
 // the four finger-base bones sit along hand-local +Y (avg dir (-0.012, 1.000,
 // 0.027)), so the fingers point along +Y — NOT -Y, which is why the old code
@@ -378,7 +466,10 @@ const FINGER_DIR = new THREE.Vector3(-0.012, 1.000, 0.027).normalize();
 const DORSAL_DIR = new THREE.Vector3(0.569, 0.029, -0.822).normalize();
 function loadWeapon(name) {
   if (weaponPivot) { weaponPivot.removeFromParent(); weaponPivot = null; }
+  curWeaponName = name || '';
+  wOffEl.hidden = !name;
   if (!name) return;
+  syncOffsetUI();
   const w = WEAPONS.find(x => x.name === name); if (!w) return;
   gltfLoader.load(w.file + '?v=' + ASSET_V, (gltf) => {
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
@@ -425,6 +516,10 @@ function loadWeapon(name) {
       // old offset along hand -Y (the forearm direction) is what put the gun
       // along the forearm with an empty fist.
       pivot.position.copy(gripLocal.clone().applyQuaternion(q).negate());
+      // Hand-local base position, captured AFTER hand.attach: the offset
+      // applies on top of this and rides with the hand through the clip.
+      pivot.userData.basePos = pivot.position.clone();
+      applyWeaponOffset();
       weaponPivot = pivot;
     } catch (e) { pivot.removeFromParent(); }
   }, undefined, () => { statusEl.textContent += ' / weapon failed to load: ' + w.file; });
