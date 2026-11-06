@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Double Agent — Model &amp; Animation Viewer</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #141414; color: #eee; font-family: system-ui, -apple-system, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; touch-action: none; }
+  #bar { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: rgba(0,0,0,0.72); align-items: center; z-index: 5; }
+  #bar select, #bar button { font-size: 13px; padding: 6px 8px; background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; max-width: 180px; }
+  #bar button.on { background: #2e7d32; border-color: #66bb6a; }
+  #bar label { font-size: 12px; color: #bbb; }
+  #timeline { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px 10px; background: rgba(0,0,0,0.72); z-index: 5; }
+  #timeline input[type=range] { width: 100%; }
+  #status { font-size: 12px; color: #ccc; margin-top: 4px; white-space: pre-wrap; }
+  #movePad { position: absolute; right: 12px; bottom: 90px; display: none; grid-template-columns: repeat(3, 48px); gap: 4px; z-index: 6; }
+  #movePad button { height: 48px; font-size: 18px; background: rgba(40,40,40,0.8); color: #eee; border: 1px solid #555; border-radius: 8px; }
+  #movePad.show { display: grid; }
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="bar">
+  <select id="modelSel" aria-label="Model"></select>
+  <select id="animSel" aria-label="Animation"></select>
+  <button id="playBtn" type="button">Pause</button>
+  <select id="speedSel" aria-label="Speed"><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option></select>
+  <button id="loopBtn" type="button" class="on">Loop</button>
+  <button id="rootBtn" type="button" class="on">Strip root travel</button>
+  <button id="arrowBtn" type="button" class="on">Torso / hips arrows</button>
+  <button id="targetBtn" type="button">Target</button>
+  <button id="camBtn" type="button">Camera: Orbit</button>
+  <button id="frontBtn" type="button">Front</button>
+  <button id="sideBtn" type="button">Side</button>
+  <button id="backBtn" type="button">Back</button>
+  <button id="topBtn" type="button">Top</button>
+  <button id="resetBtn" type="button">Reset view</button>
+  <button id="shootBtn" type="button">Kyle shoot test</button>
+</div>
+<div id="movePad">
+  <span></span><button data-mv="f" type="button">▲</button><span></span>
+  <button data-mv="l" type="button">◀</button><button data-mv="b" type="button">▼</button><button data-mv="r" type="button">▶</button>
+</div>
+<div id="timeline">
+  <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Animation time">
+  <div id="status">Loading…</div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+const MODELS = [
+  { group: 'Characters (FBX)', items: [
+    ['Kyle', 'assets/models/Kyle_undercover.fbx', 'fbx', ''],
+    ['Rochelle', 'assets/models/Rochelle_undercover.fbx', 'fbx', 'assets/models/textures/Rochelle_basecolor.jpg'],
+    ['Vickie', 'assets/models/Vickie.fbx', 'fbx', 'assets/models/textures/Vickie_basecolor.png'],
+    ['Eric', 'assets/models/Eric.fbx', 'fbx', 'assets/models/textures/Eric_basecolor.png'],
+    ['Kristen', 'assets/models/Kristen.fbx', 'fbx', 'assets/models/textures/Kristen_basecolor.png'],
+    ['Donald', 'assets/models/Donald.fbx', 'fbx', 'assets/models/textures/Donald_basecolor.png'],
+    ['Enemy terror 1', 'assets/enemy-terror1.fbx', 'fbx', ''],
+    ['Enemy terror 2', 'assets/enemy-terror2.fbx', 'fbx', ''],
+    ['Enemy terror 3', 'assets/enemy-terror3.fbx', 'fbx', ''],
+    ['Enemy terror 4', 'assets/enemy-terror4.fbx', 'fbx', ''],
+  ]},
+  { group: 'Cats (GLB, animations inside)', items: [
+    ['Mabel', 'assets/models/cats/Mabel.glb', 'glb', ''],
+    ['Margo', 'assets/models/cats/Margo.glb', 'glb', ''],
+    ['Moxie', 'assets/models/cats/Moxie.glb', 'glb', ''],
+  ]},
+  { group: 'Props (GLB)', items: [
+    ['Ballroom chandelier', 'assets/models/ballroom_chandelier.glb', 'glb', ''],
+    ['Ballroom table', 'assets/models/ballroom_table.glb', 'glb', ''],
+    ['Ballroom chair', 'assets/models/ballroom_chair.glb', 'glb', ''],
+    ['Ballroom bar', 'assets/models/ballroom_bar.glb', 'glb', ''],
+    ['Barrel', 'assets/models/barrel.glb', 'glb', ''],
+    ['Crate', 'assets/models/crate.glb', 'glb', ''],
+    ['Roadblock', 'assets/models/roadblock.glb', 'glb', ''],
+    ['Sandbags', 'assets/models/sandbags.glb', 'glb', ''],
+    ['Cat collar', 'assets/models/cat_collar.glb', 'glb', ''],
+    ['Cat scanner', 'assets/models/cat_scanner.glb', 'glb', ''],
+  ]},
+  { group: 'Weapons (GLB, Draco)', items: [
+    ['White glock', 'assets/white_glock.glb', 'glb', ''],
+    ['Black glock', 'assets/black_glock_threaded.glb', 'glb', ''],
+    ['White walther', 'assets/white_walther.glb', 'glb', ''],
+    ['White makarov', 'assets/white_makarov.glb', 'glb', ''],
+    ['White MP5K', 'assets/white_mp5k.glb', 'glb', ''],
+    ['White AKS74U', 'assets/white_aks74u.glb', 'glb', ''],
+    ['White RPG7', 'assets/white_RPG7.glb', 'glb', ''],
+  ]},
+  { group: 'Vehicle (GLB, Draco)', items: [
+    ['White Lambo', 'assets/white_lambo.glb', 'glb', ''],
+  ]},
+];
+const ANIMS = ["Climbing_Ladder","Crawling","Crouch_Death","Crouch_Idle","Crouched_Walking","Death","Death_From_Front_Headshot","Driving","Drunk_Idle","Drunk_Stumbling_Walking","Drunk_Walk","Dying_Backwards","Entering_Car","Exiting_Car","Falling","Falling_Back_Death","Falling_Down","Female_Crouch_Pose","Firing_Rifle","Firing_Rifle_Crouch_Walking","Grabbing_Pistol","Head_Nod_Yes","Hit_Reaction","Honking_Horn","Idle_Crouching","Idle_To_Running","Jump","Knocked_Out","Landing","Looking_Around","Male_Crouch_Pose","Opening_Door_Inwards","Picking_Up_Object","Pistol_Aim","Pistol_Idle","Pistol_Kneeling_Idle","Pistol_Run","Pistol_Walk","Pistol_Walk_Arc","Pointing_Forward","Punching","Reloading_Rifle","Reloading_Walking","Rifle_Aiming_Idle","Rifle_Crouch_Walk","Rifle_Death","Rifle_Idle","Rifle_Run","Rifle_Walk","Rumba_Dancing","Running","Salsa_Dancing__1","Salsa_Dancing__4","Salsa_Dancing__5","Salsa_Dancing__6","Salsa_Dancing__7","Shaking_Head_No","Shooting_Pistol","Shrugging","Side_Kick","Sitting_Idle","Sneaking_Forward","Sprint_Forward","Standing_Idle","Standing_React_Death_Forward","Standing_Sprint_Forward","Standing_Up","Taking_Cover_Idle","Talking","Talking_On_A_Cell_Phone","Turning","Typing","Vault_Over_Box","Walking","Walking_While_Aiming_Rifle","Waving"];
+
+const app = document.getElementById('app');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1a22);
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.05, 500);
+camera.position.set(2.5, 1.8, 4);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+app.appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 0.7));
+const key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(3, 6, 4); scene.add(key);
+const grid = new THREE.GridHelper(20, 20, 0x666666, 0x333333); scene.add(grid);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial({ color: 0x2a2a2a }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.01; scene.add(ground);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.target.set(0, 0.9, 0);
+const fbxLoader = new FBXLoader();
+const gltfLoader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+gltfLoader.setDRACOLoader(dracoLoader);
+const texLoader = new THREE.TextureLoader();
+
+const modelSel = document.getElementById('modelSel');
+const animSel = document.getElementById('animSel');
+const statusEl = document.getElementById('status');
+const scrub = document.getElementById('scrub');
+MODELS.forEach(g => {
+  const og = document.createElement('optgroup'); og.label = g.group;
+  g.items.forEach(([name]) => { const o = document.createElement('option'); o.value = name; o.textContent = name; og.appendChild(o); });
+  modelSel.appendChild(og);
+});
+function setAnimOptions(names) {
+  animSel.innerHTML = '';
+  if (!names.length) { const o = document.createElement('option'); o.value = ''; o.textContent = '— no animations —'; animSel.appendChild(o); return; }
+  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; animSel.appendChild(o); });
+}
+setAnimOptions(ANIMS);
+
+let model = null, mixer = null, action = null, clip = null, embeddedAnims = [];
+let playing = true, loop = true, stripRoot = true, showArrows = true, showTarget = false;
+let camMode = 'orbit', yaw = 0, pitch = -0.1, freePos = new THREE.Vector3(2.5, 1.8, 4);
+let fitDist = 4, fitCenter = new THREE.Vector3(0, 0.9, 0);
+let scrubbing = false, bones = {};
+let pendingAnim = null;
+const hipsArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(), 1, 0x00ff00, 0.15, 0.08);
+const torsoArrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(), 1, 0xff4400, 0.15, 0.08);
+hipsArrow.visible = torsoArrow.visible = false; scene.add(hipsArrow, torsoArrow);
+const target = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 8, 32), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+target.position.set(0, 1.4, 5); target.visible = false; scene.add(target);
+
+function setStatus(s) { statusEl.textContent = s; }
+function findModel(name) { for (const g of MODELS) for (const it of g.items) if (it[0] === name) return it; return null; }
+function stripRootTravel(c) {
+  const tracks = c.tracks.map(t => {
+    const nt = t.clone(); const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') >= 0 && t.name.endsWith('.position') && nt.values && nt.values.length >= 3) {
+      const x0 = nt.values[0], z0 = nt.values[2];
+      for (let i = 0; i + 2 < nt.values.length; i += 3) { nt.values[i] = x0; nt.values[i + 2] = z0; }
+    } return nt;
+  });
+  return new THREE.AnimationClip(c.name, c.duration, tracks);
+}
+function rootTravel(c) {
+  const hips = c.tracks.find(t => t.name.toLowerCase().includes('hips') && t.name.endsWith('.position'));
+  if (!hips) return 'hips track: none';
+  let xs = [], zs = [];
+  for (let i = 0; i < hips.values.length; i += 3) { xs.push(hips.values[i]); zs.push(hips.values[i + 2]); }
+  return `hips X ${Math.min(...xs).toFixed(2)}..${Math.max(...xs).toFixed(2)}  Z ${Math.min(...zs).toFixed(2)}..${Math.max(...zs).toFixed(2)}`;
+}
+function fitModel(obj, targetH) {
+  const bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size); const c = new THREE.Vector3(); bb.getCenter(c);
+  if (!size.y) return;
+  const s = targetH / size.y; obj.scale.multiplyScalar(s);
+  const bb2 = new THREE.Box3().setFromObject(obj); const c2 = new THREE.Vector3(); bb2.getCenter(c2); const size2 = new THREE.Vector3(); bb2.getSize(size2);
+  obj.position.sub(c2); obj.position.y -= bb2.min.y;
+  fitCenter.set(0, size2.y * 0.5, 0); fitDist = Math.max(size2.x, size2.y, size2.z) * 2.2 + 0.5;
+  return { size: size2, center: fitCenter.clone() };
+}
+function collectBones(obj) {
+  bones = {};
+  obj.traverse(o => { const n = (o.name || '').toLowerCase(); if (n.includes('hips')) bones.hips = o; else if (n.includes('chest')) bones.chest = o; else if (n.includes('spine')) bones.spine = o; });
+}
+function applyBasecolor(obj, texPath) {
+  if (!texPath) return;
+  const tex = texLoader.load(texPath); tex.colorSpace = THREE.SRGBColorSpace;
+  obj.traverse(o => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach(m => { m.map = tex; m.color.set(0xffffff); m.needsUpdate = true; }); } });
+}
+function clearModel() {
+  if (model) { scene.remove(model); model = null; }
+  if (mixer) { mixer.stopAllAction(); mixer = null; }
+  action = null; clip = null; embeddedAnims = []; hipsArrow.visible = torsoArrow.visible = false;
+}
+function afterModel(obj, info) {
+  model = obj; scene.add(obj);
+  const isCat = info[0] === 'Mabel' || info[0] === 'Margo' || info[0] === 'Moxie';
+  const fit = fitModel(obj, isCat ? 0.35 : 1.8);
+  collectBones(obj);
+  mixer = new THREE.AnimationMixer(obj);
+  setAnimOptions(embeddedAnims.length ? embeddedAnims.map(a => a.name) : (info[2] === 'fbx' ? ANIMS : []));
+  if (pendingAnim) { const pa = pendingAnim; pendingAnim = null; animSel.value = pa; playAnim(pa); setView('side'); }
+  else if (embeddedAnims.length) playAnim(embeddedAnims[0].name);
+  else if (info[2] === 'fbx') playAnim('Standing_Idle');
+  resetView();
+  setStatus(`${info[0]} — ${info[1]}\nsize ${(fit.size.x).toFixed(2)} x ${(fit.size.y).toFixed(2)} x ${(fit.size.z).toFixed(2)} m${bones.hips ? '' : '\n(no Hips bone found)'}`);
+}
+function loadModel(name) {
+  const info = findModel(name); if (!info) return;
+  clearModel(); setStatus('Loading ' + info[1] + '…');
+  if (info[2] === 'fbx') {
+    fbxLoader.load(info[1], obj => { applyBasecolor(obj, info[3]); afterModel(obj, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
+  } else {
+    gltfLoader.load(info[1], gltf => { embeddedAnims = gltf.animations || []; afterModel(gltf.scene, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
+  }
+}
+function playAnim(name) {
+  if (!mixer || !model) return;
+  if (embeddedAnims.length) {
+    const c = embeddedAnims.find(a => a.name === name); if (!c) return;
+    clip = c;
+  } else {
+    setStatus('Loading animation ' + name + '…');
+    fbxLoader.load('assets/animations/' + name + '.fbx', obj => {
+      const raw = obj.animations && obj.animations[0]; if (!raw) { setStatus('No clip in ' + name); return; }
+      clip = stripRoot ? stripRootTravel(raw) : raw;
+      startClip(name, raw);
+    }, undefined, () => setStatus('Failed to load animation ' + name));
+    return;
+  }
+  startClip(name, clip);
+}
+function startClip(name, raw) {
+  if (action) action.stop();
+  action = mixer.clipAction(clip);
+  action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+  action.clampWhenFinished = !loop;
+  action.timeScale = parseFloat(document.getElementById('speedSel').value);
+  action.reset().play(); playing = true; document.getElementById('playBtn').textContent = 'Pause';
+  setStatus(`${modelSel.value} — ${name}\nduration ${clip.duration.toFixed(2)} s, ${clip.tracks.length} tracks\n${rootTravel(raw)}${stripRoot ? ' (root XZ stripped)' : ' (root travel kept)'}`);
+}
+modelSel.addEventListener('change', () => loadModel(modelSel.value));
+animSel.addEventListener('change', () => playAnim(animSel.value));
+document.getElementById('playBtn').addEventListener('click', e => {
+  playing = !playing; e.target.textContent = playing ? 'Pause' : 'Play';
+  if (action) action.paused = !playing;
+});
+document.getElementById('speedSel').addEventListener('change', e => { if (action) action.timeScale = parseFloat(e.target.value); });
+document.getElementById('loopBtn').addEventListener('click', e => {
+  loop = !loop; e.target.classList.toggle('on', loop);
+  if (action) { action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity); action.clampWhenFinished = !loop; }
+});
+document.getElementById('rootBtn').addEventListener('click', e => {
+  stripRoot = !stripRoot; e.target.classList.toggle('on', stripRoot);
+  if (animSel.value) playAnim(animSel.value);
+});
+document.getElementById('arrowBtn').addEventListener('click', e => { showArrows = !showArrows; e.target.classList.toggle('on', showArrows); });
+document.getElementById('targetBtn').addEventListener('click', e => { showTarget = !showTarget; e.target.classList.toggle('on', showTarget); target.visible = showTarget; });
+scrub.addEventListener('pointerdown', () => scrubbing = true);
+scrub.addEventListener('pointerup', () => scrubbing = false);
+scrub.addEventListener('input', () => {
+  if (!action || !clip) return;
+  action.time = (scrub.value / 1000) * clip.duration;
+  if (playing) { playing = false; action.paused = true; document.getElementById('playBtn').textContent = 'Play'; }
+});
+
+function setView(dir) {
+  const d = fitDist, c = fitCenter;
+  if (dir === 'front') camera.position.set(c.x, c.y, c.z + d);
+  if (dir === 'back') camera.position.set(c.x, c.y, c.z - d);
+  if (dir === 'side') camera.position.set(c.x + d, c.y, c.z);
+  if (dir === 'top') camera.position.set(c.x + 0.01, c.y + d, c.z + 0.01);
+  controls.target.copy(c); controls.update();
+  yaw = Math.atan2(camera.position.x - c.x, camera.position.z - c.z); pitch = -0.1;
+  freePos.copy(camera.position);
+}
+function resetView() { setView('front'); }
+document.getElementById('frontBtn').addEventListener('click', () => setView('front'));
+document.getElementById('sideBtn').addEventListener('click', () => setView('side'));
+document.getElementById('backBtn').addEventListener('click', () => setView('back'));
+document.getElementById('topBtn').addEventListener('click', () => setView('top'));
+document.getElementById('resetBtn').addEventListener('click', resetView);
+document.getElementById('shootBtn').addEventListener('click', () => {
+  pendingAnim = 'Shooting_Pistol'; modelSel.value = 'Kyle'; loadModel('Kyle');
+});
+document.getElementById('camBtn').addEventListener('click', e => {
+  camMode = camMode === 'orbit' ? 'free' : 'orbit';
+  e.target.textContent = 'Camera: ' + (camMode === 'orbit' ? 'Orbit' : 'Free look');
+  e.target.classList.toggle('on', camMode === 'free');
+  controls.enabled = camMode === 'orbit';
+  document.getElementById('movePad').classList.toggle('show', camMode === 'free');
+  if (camMode === 'free') { freePos.copy(camera.position); yaw = Math.atan2(camera.position.x - controls.target.x, camera.position.z - controls.target.z); }
+});
+const keys = {};
+addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+let lookDrag = null;
+renderer.domElement.addEventListener('pointerdown', e => { if (camMode === 'free') lookDrag = { x: e.clientX, y: e.clientY }; });
+addEventListener('pointermove', e => {
+  if (!lookDrag || camMode !== 'free') return;
+  yaw -= (e.clientX - lookDrag.x) * 0.005; pitch -= (e.clientY - lookDrag.y) * 0.005;
+  pitch = Math.max(-1.4, Math.min(1.4, pitch)); lookDrag = { x: e.clientX, y: e.clientY };
+});
+addEventListener('pointerup', () => lookDrag = null);
+const mv = { f: false, b: false, l: false, r: false };
+document.querySelectorAll('#movePad button').forEach(b => {
+  const k = b.dataset.mv;
+  b.addEventListener('pointerdown', () => mv[k] = true);
+  b.addEventListener('pointerup', () => mv[k] = false);
+  b.addEventListener('pointerleave', () => mv[k] = false);
+});
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (mixer && playing) mixer.update(dt);
+  if (action && clip && !scrubbing) scrub.value = Math.round((action.time / clip.duration) * 1000);
+  if (camMode === 'free') {
+    camera.rotation.order = 'YXZ'; camera.rotation.y = yaw; camera.rotation.x = pitch; camera.rotation.z = 0;
+    const sp = (keys['shift'] ? 5 : 2.5) * dt;
+    const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+    if (keys['w'] || mv.f) freePos.addScaledVector(fwd, sp);
+    if (keys['s'] || mv.b) freePos.addScaledVector(fwd, -sp);
+    if (keys['a'] || mv.l) freePos.addScaledVector(right, -sp);
+    if (keys['d'] || mv.r) freePos.addScaledVector(right, sp);
+    camera.position.copy(freePos);
+  } else {
+    controls.update();
+  }
+  if (showArrows && model) {
+    const show = !!bones.hips;
+    hipsArrow.visible = torsoArrow.visible = show;
+    if (show) {
+      const hp = new THREE.Vector3(); bones.hips.getWorldPosition(hp);
+      const hd = new THREE.Vector3(); bones.hips.getWorldDirection(hd);
+      hipsArrow.position.copy(hp); hipsArrow.setDirection(hd);
+      const tb = bones.chest || bones.spine;
+      if (tb) {
+        const tp = new THREE.Vector3(); tb.getWorldPosition(tp);
+        const td = new THREE.Vector3(); tb.getWorldDirection(td);
+        torsoArrow.position.copy(tp); torsoArrow.setDirection(td);
+      }
+    }
+  } else { hipsArrow.visible = torsoArrow.visible = false; }
+  renderer.render(scene, camera);
+}
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+loadModel('Kyle');
+animate();
+</script>
+</body>
+</html>
