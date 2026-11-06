@@ -1,6 +1,6 @@
 # Double Agent — Asset Inventory
 
-Generated from `assets/` in Kmberry1989/double-agent-mobile. 251 files, 212.5 MB total. The folders are the categories: characters, cats, weapons, vehicles, props, animations, textures (with subfolders), audio. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
+Generated from `assets/` in Kmberry1989/double-agent-mobile. 252 files, 212.6 MB total. The folders are the categories: characters, cats, weapons, vehicles, props, animations, textures (with subfolders), audio. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
 
 ## Contents
 - Characters — 17 files, 62.7 MB
@@ -24,7 +24,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 251 files, 212.5 MB
 - Animations — driving — 4 files, 2.6 MB
 - Animations — ActionForge clips (unreferenced) — 4 files, 2.6 MB
 - Textures — ballroom — 14 files, 9.8 MB
-- Textures — exterior (mansion/drive) — 7 files, 1.5 MB
+- Textures — exterior (mansion/drive) — 8 files, 1.7 MB
 - Textures — ground — 6 files, 7.7 MB
 - Textures — props — 9 files, 7.8 MB
 - Textures — walls — 3 files, 1.8 MB
@@ -338,7 +338,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 251 files, 212.5 MB
 | `textures/ballroom/ballroom_wall_damask_burgundy_gold_1024.webp` | 1.2 MB |  |
 | `textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp` | 356.7 KB |  |
 
-## Textures — exterior (mansion/drive) (7 files, 1.5 MB)
+## Textures — exterior (mansion/drive) (8 files, 1.7 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
@@ -348,6 +348,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 251 files, 212.5 MB
 | `textures/exterior/exterior_mansion_entrance_dark_brick_1024.webp` | 152.1 KB |  |
 | `textures/exterior/exterior_mansion_entrance_ivory_1024.webp` | 93.2 KB |  |
 | `textures/exterior/exterior_mansion_entrance_ivory_wide_2080.webp` | 95.0 KB |  |
+| `textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080.webp` | 136.2 KB |  |
 | `textures/exterior/exterior_mansion_facade_windows_1024.webp` | 112.5 KB |  |
 
 ## Textures — ground (6 files, 7.7 MB)
