@@ -43,7 +43,8 @@
     <label>Rot X <input id="offRX" type="range" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation X"><input id="offRXn" type="number" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation X value"></label>
     <label>Rot Y <input id="offRY" type="range" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Y"><input id="offRYn" type="number" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Y value"></label>
     <label>Rot Z <input id="offRZ" type="range" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Z"><input id="offRZn" type="number" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Z value"></label>
-    <span id="offRead">offset: x=0.000, y=0.000, z=0.000 m | rot x=0, y=0, z=0 deg</span>
+    <label>Scale <input id="offS" type="range" min="0.5" max="2" step="0.01" value="1" aria-label="Weapon scale"><input id="offSn" type="number" min="0.5" max="2" step="0.01" value="1" aria-label="Weapon scale value"></label>
+    <span id="offRead">offset: x=0.000, y=0.000, z=0.000 m | rot x=0, y=0, z=0 deg | scale 1.00</span>
     <button id="offCopy" type="button">Copy</button>
     <button id="offReset" type="button">Reset</button>
   </div>
@@ -390,10 +391,11 @@ let weaponPivot = null;
 // switching weapons and back restores each weapon's offset. The offset is
 // applied to the pivot's hand-local position, so it rides with the hand
 // through the animation instead of sitting in world space.
-const weaponOffsets = new Map(); // weapon name -> {x, y, z, rx, ry, rz}
+const weaponOffsets = new Map(); // weapon name -> {x, y, z, rx, ry, rz, s}
 // Baked weapon offsets, approved by Kyle in the viewer (hand-local metres /
-// degrees). A weapon loads at its baked placement; Reset returns to the raw
-// computed placement (0,0,0) for comparison, and reloading re-seeds the bake.
+// degrees, optional scale factor). A weapon loads at its baked placement;
+// Reset returns to the raw computed placement (0,0,0) for comparison, and
+// reloading re-seeds the bake.
 const BAKED_OFFSETS = {
   'white aks74u': { x: -0.002, y: -0.024, z: 0.074 },
 };
@@ -409,22 +411,26 @@ OFF_AXES.forEach(a => {
   rotSliders[a] = document.getElementById('offR' + a.toUpperCase());
   rotNums[a] = document.getElementById('offR' + a.toUpperCase() + 'n');
 });
+const offScale = document.getElementById('offS');
+const offScaleN = document.getElementById('offSn');
 const fmt3 = v => (v === 0 ? 0 : v).toFixed(3);
 function getOffset(name) {
   if (!weaponOffsets.has(name)) {
     const b = BAKED_OFFSETS[name] || {};
-    weaponOffsets.set(name, { x: b.x || 0, y: b.y || 0, z: b.z || 0, rx: 0, ry: 0, rz: 0 });
+    weaponOffsets.set(name, { x: b.x || 0, y: b.y || 0, z: b.z || 0, rx: 0, ry: 0, rz: 0, s: b.s || 1 });
   }
   return weaponOffsets.get(name);
 }
 function updateOffsetReadout() {
   const o = getOffset(curWeaponName);
-  offReadEl.textContent = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)} m | rot x=${o.rx}, y=${o.ry}, z=${o.rz} deg`;
+  offReadEl.textContent = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)} m | rot x=${o.rx}, y=${o.ry}, z=${o.rz} deg | scale ${o.s.toFixed(2)}`;
 }
 function syncOffsetUI() {
   const o = getOffset(curWeaponName);
   OFF_AXES.forEach(a => { offSliders[a].value = o[a]; offNums[a].value = fmt3(o[a]); });
   ROT_AXES.forEach(a => { rotSliders[a].value = o['r' + a]; rotNums[a].value = o['r' + a]; });
+  offScale.value = o.s;
+  offScaleN.value = o.s.toFixed(2);
   updateOffsetReadout();
 }
 function applyWeaponOffset() {
@@ -444,6 +450,16 @@ function applyWeaponRotation() {
   ));
   weaponPivot.quaternion.copy(weaponPivot.userData.baseQuat).multiply(off);
 }
+// Scale factor, a uniform multiplier on top of the computed fitWeapon
+// scale: pivot.scale = baseScale * s. One factor only — it never distorts
+// the weapon. Like position and rotation it lives on the pivot and rides
+// with the hand through the animation.
+function applyWeaponScale() {
+  if (!weaponPivot || !weaponPivot.userData.baseScale) return;
+  const o = getOffset(curWeaponName);
+  const b = weaponPivot.userData.baseScale;
+  weaponPivot.scale.set(b.x * o.s, b.y * o.s, b.z * o.s);
+}
 function setOffsetAxis(a, v) {
   const o = getOffset(curWeaponName);
   o[a] = Math.max(-0.2, Math.min(0.2, v));
@@ -460,6 +476,14 @@ function setRotationAxis(a, v) {
   updateOffsetReadout();
   applyWeaponRotation();
 }
+function setScale(v) {
+  const o = getOffset(curWeaponName);
+  o.s = Math.max(0.5, Math.min(2, v));
+  offScale.value = o.s;
+  offScaleN.value = o.s.toFixed(2);
+  updateOffsetReadout();
+  applyWeaponScale();
+}
 OFF_AXES.forEach(a => {
   offSliders[a].addEventListener('input', e => setOffsetAxis(a, parseFloat(e.target.value) || 0));
   offNums[a].addEventListener('change', e => {
@@ -475,6 +499,12 @@ ROT_AXES.forEach(a => {
     if (isNaN(v)) v = 0;
     setRotationAxis(a, v);
   });
+});
+offScale.addEventListener('input', e => setScale(parseFloat(e.target.value) || 1));
+offScaleN.addEventListener('change', e => {
+  let v = parseFloat(e.target.value);
+  if (isNaN(v)) v = 1;
+  setScale(v);
 });
 document.getElementById('offCopy').addEventListener('click', async e => {
   updateOffsetReadout();
@@ -493,10 +523,11 @@ document.getElementById('offCopy').addEventListener('click', async e => {
 });
 document.getElementById('offReset').addEventListener('click', () => {
   const o = getOffset(curWeaponName);
-  o.x = 0; o.y = 0; o.z = 0; o.rx = 0; o.ry = 0; o.rz = 0;
+  o.x = 0; o.y = 0; o.z = 0; o.rx = 0; o.ry = 0; o.rz = 0; o.s = 1;
   syncOffsetUI();
   applyWeaponOffset();
   applyWeaponRotation();
+  applyWeaponScale();
 });
 // Hand axes, MEASURED 2026-11-06 (Node/Three.js on assets/characters/Agent_Kyle.fbx):
 // the four finger-base bones sit along hand-local +Y (avg dir (-0.012, 1.000,
@@ -566,9 +597,15 @@ function loadWeapon(name) {
       // Hand-local base rotation, captured the same way (the grip quaternion
       // was just copied onto the pivot above).
       pivot.userData.baseQuat = pivot.quaternion.clone();
+      // Base scale from fitWeapon, captured the same way: the scale control
+      // multiplies this, it never replaces it.
+      pivot.userData.baseScale = pivot.scale.clone();
+      // Assign BEFORE the applies: they guard on weaponPivot, so calling
+      // them first would silently skip the baked offset on load.
+      weaponPivot = pivot;
       applyWeaponOffset();
       applyWeaponRotation();
-      weaponPivot = pivot;
+      applyWeaponScale();
     } catch (e) { pivot.removeFromParent(); }
   }, undefined, () => { statusEl.textContent += ' / weapon failed to load: ' + w.file; });
 }
