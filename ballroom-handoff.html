@@ -213,11 +213,14 @@ colliders.push({ x: 17.5, z: 6, r: 2.6 });
 // so a 6-step flight climbs from the drive to the double doors.
 // Bushes and mansion wings are procedural geometry (no bush/car model was
 // supplied for these); the white Lamborghini is the real repo GLB.
-flatPlane(0, -1.5, 32, 80, 50, 0x2e5a2e, 'assets/textures/exterior_lawn_grass_clover_1024.webp', 8, 5); // lawn
+flatPlane(0, -1.5, 42, 80, 70, 0x2e5a2e, 'assets/textures/exterior_lawn_grass_clover_1024.webp', 8, 7); // lawn, extended south past the new road
 const driveMesh = cyl(0, -1.48, 32, 13, 13, 0.1, 0x333333); // round drive
 applyTex(driveMesh, 'assets/textures/exterior_drive_asphalt_1024.webp', 4, 4);
 const islandMesh = cyl(0, -1.47, 32, 5, 5, 0.2, 0x2e5a2e); // drive island
 applyTex(islandMesh, 'assets/textures/exterior_lawn_grass_clover_1024.webp', 2, 2);
+// Road leading off the driveway, south beyond where the player can walk (player limit z 45).
+// A thin asphalt box, z 45-75, top at -1.43 to match the round drive top; it only touches the drive at the z 45 edge, so no coplanar overlap.
+const roadMesh = box(0, -1.48, 60, 8, 0.1, 30, 0x333333); applyTex(roadMesh, 'assets/textures/exterior_drive_asphalt_1024.webp', 1, 4);
 function bush(x, z, r) {
   const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshStandardMaterial({ color: 0x1e4d1e }));
   m.position.set(x, -1.5 + r * 0.7, z); scene.add(m); return m;
@@ -256,11 +259,28 @@ function updateDoors(dt) {
   doorR.rotation.y = doorOpen * Math.PI / 2;
 }
 // White Lamborghini, parked in the drive (real repo GLB, not driven)
+// White Lamborghini, parked curbside on the east edge of the round drive (was in the middle of the drive).
 gltfLoader.load('assets/white_lambo.glb', (gltf) => {
   const g = fitPropGroup(gltf.scene, 2.0, 1.2, 4.5); if (!g) return;
-  g.position.set(8, -0.9, 34); g.rotation.y = 0.4; scene.add(g);
-  colliders.push({ x: 8, z: 34, r: 2.8 });
+  g.position.set(11, -0.9, 32); g.rotation.y = 0.4; scene.add(g);
+  colliders.push({ x: 11, z: 32, r: 2.8 });
 }, undefined, () => {});
+// Placeholder cars (procedural, not real models — replace with real GLBs later).
+// Body bottom sits 0.02 above the ground so no face is coplanar with the lawn/drive.
+function makePlaceholderCar(x, z, rotY, color) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.6, 4.2), new THREE.MeshStandardMaterial({ color })); body.position.y = -1.18; g.add(body);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 2.2), new THREE.MeshStandardMaterial({ color: 0x222222 })); cabin.position.set(0, -0.61, -0.2); // 0.02 above the body top, not coplanar with it g.add(cabin);
+  const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12); wheelGeo.rotateZ(Math.PI / 2);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+  [[-0.85, 1.4], [0.85, 1.4], [-0.85, -1.4], [0.85, -1.4]].forEach(([wx, wz]) => { const w = new THREE.Mesh(wheelGeo, wheelMat); w.position.set(wx, -1.15, wz); g.add(w); });
+  const lightMat = new THREE.MeshStandardMaterial({ color: 0xffeebb, emissive: 0x332200 });
+  [-0.6, 0.6].forEach((lx) => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.06), lightMat); l.position.set(lx, -1.1, 2.12); g.add(l); });
+  g.position.set(x, 0, z); g.rotation.y = rotY; scene.add(g);
+  colliders.push({ x, z, r: 2.6 }); return g;
+}
+makePlaceholderCar(-11, 32, Math.PI, 0x8a1a1a); // red sedan, west curb of the round drive, facing north
+makePlaceholderCar(2, 58, 0, 0x1a3a5a); // blue car on the south road, beyond the player limit, facing south
 
 
 // ---- ActionForge characters: real GLB models + baked clips ----
@@ -1074,7 +1094,19 @@ const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in win
 if (isTouch) document.body.classList.add('touch');
 // Ballroom waltz (user-supplied, mono AAC): looping background music, started on the Enter tap (the user gesture iPhone Safari needs for audio).
 const waltzAudio = new Audio('assets/audio/ballroom_waltz.m4a');
-waltzAudio.loop = true; waltzAudio.volume = 0.7;
+waltzAudio.loop = true; waltzAudio.volume = 0.12; // starts outside, faint
+// Music is loudest in the ballroom (0.7), faint outside (0.12), fading through the doors/steps.
+function waltzTargetVolume() {
+  const z = player.position.z;
+  if (z <= 13) return 0.7;
+  if (z >= 20) return 0.12;
+  return 0.7 + (0.12 - 0.7) * (z - 13) / 7;
+}
+function updateWaltzVolume(dt) {
+  if (!started || won || waltzAudio.paused) return;
+  const target = waltzTargetVolume();
+  waltzAudio.volume += (target - waltzAudio.volume) * Math.min(1, dt * 3);
+}
 function startWaltz(){ if (waltzAudio.paused) waltzAudio.play().catch(()=>{}); }
 function stopWaltz(){ if (!waltzAudio.paused) waltzAudio.pause(); }
 document.addEventListener('pointerdown', ()=>{ if (started && !won) startWaltz(); });
@@ -1158,6 +1190,7 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
+  updateWaltzVolume(dt);
   if (handoffCine) {
     handoffCine.t += dt;
     if (handoffPhase === 'donald' && handoffCine.t >= handoffCine.dur) {
