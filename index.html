@@ -688,6 +688,12 @@ addGLBToObstacle(lamboBase, 'assets/vehicles/white_lambo.glb', 2.0, 1.2, 4.5, [[
       o.material.emissiveMap = o.material.map;
       o.material.emissiveIntensity = 1.5;
     }
+    // Missing-normals fix (2026-11-07): the Lambo mesh has NO normal
+    // attribute (diagnostic: hasNormal: false), so MeshStandardMaterial
+    // cannot shade it and the emissive does not lift it — it reads as a
+    // flat dark box with no car silhouette. Compute the normals at load
+    // time; does not change the file.
+    if (o.geometry && o.geometry.attributes && o.geometry.attributes.position && !o.geometry.attributes.normal) o.geometry.computeVertexNormals();
   } });
 });
 // ?debug=lambo overlay (2026-11-07): shows every GLB load status plus the
