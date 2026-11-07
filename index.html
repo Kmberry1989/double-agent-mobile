@@ -1266,9 +1266,16 @@ function setWeather(name, announce){
 }
 // ---------- Lightning (Storm only) ----------
 // Strike timing: next strike in 6–18 s, randomized. A strike is a full
-// flash that decays fast (~70 ms), and 70% of the time a weaker second
-// pulse ~0.2 s later — the classic double flash. applyFlash() pushes the
-// flash into the sky shader, both lights, and the background/fog colours.
+// flash (peak 1.0, applied whole on the strike frame) that decays over
+// ~1.3 s — bright above half for ~0.23 s and visible for ~0.75 s — and
+// 70% of the time a weaker second pulse ~0.3 s later, after the first
+// has dipped to ~0.26, so the double flash reads as two distinct pulses.
+// The old envelope decayed in ~70 ms (bright for ~0.05 s), which a
+// screenshot cadence of seconds could never catch; the flash fired, but
+// nobody could see it. applyFlash() pushes the flash into the sky shader,
+// both lights, and the background/fog colours. Decay runs BEFORE the
+// strike check so a strike frame always shows the full 1.0 peak instead
+// of losing ~20% to the same-frame decay.
 const FLASH_BG = new THREE.Color(0xcfd8e6);
 let boltNext = 5 + Math.random() * 8, boltFlash = 0, boltSecond = -1;
 function applyFlash(){
@@ -1285,15 +1292,15 @@ function updateLightning(dt){
     boltSecond = -1;
     return;
   }
+  boltFlash *= Math.exp(-dt * 4);
+  if (boltFlash < 0.01) boltFlash = 0;
+  if (boltSecond > 0){ boltSecond -= dt; if (boltSecond <= 0){ boltFlash = Math.max(boltFlash, 0.65); boltSecond = -1; } }
   boltNext -= dt;
   if (boltNext <= 0){
     boltFlash = 1.0;
-    boltSecond = Math.random() < 0.7 ? 0.16 + Math.random() * 0.08 : -1;
+    boltSecond = Math.random() < 0.7 ? 0.28 + Math.random() * 0.12 : -1;
     boltNext = 6 + Math.random() * 12; // next strike in 6–18 s
   }
-  if (boltSecond > 0){ boltSecond -= dt; if (boltSecond <= 0){ boltFlash = Math.max(boltFlash, 0.65); boltSecond = -1; } }
-  boltFlash *= Math.exp(-dt * 14);
-  if (boltFlash < 0.01) boltFlash = 0;
   applyFlash();
 }
 function cycleWeather(){ setWeather(WEATHER_ORDER[(WEATHER_ORDER.indexOf(weather) + 1) % WEATHER_ORDER.length], true); }
