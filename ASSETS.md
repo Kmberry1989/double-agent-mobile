@@ -1,17 +1,17 @@
 # Double Agent — Asset Inventory
 
-Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 214.0 MB total. The folders are the categories: characters, cats, weapons, vehicles, props, animations, textures (with subfolders), audio. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
+Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 207.8 MB total. The folders are the categories: characters, cats, weapons, vehicles, props, animations, textures (with subfolders), audio. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
 
 ## Contents
 - Characters — 17 files, 62.7 MB
 - Characters — enemies — 4 files, 10.5 MB
-- Character textures — 13 files, 23.0 MB
+- Character textures — 13 files, 17.2 MB
 - Cats — 4 files, 19.2 MB
 - Weapons — player (white/black sets) — 15 files, 1.1 MB
 - Weapons — player gear, throwable/placeable (systems unwired) — 10 files, 675.9 KB
 - Weapons — player gear, suppressors — 2 files, 78.8 KB
 - Weapons — player gear, accessories — 9 files, 472.1 KB
-- Weapons — enemy (unprefixed) — 8 files, 388.6 KB
+- Weapons — enemy (unprefixed) — 9 files, 1.2 MB
 - Vehicles — 3 files, 203.6 KB
 - Ballroom & office props — 20 files, 781.4 KB
 - Animations — locomotion & poses — 21 files, 9.0 MB
@@ -25,11 +25,11 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 214.0 MB
 - Animations — ActionForge clips (unreferenced) — 4 files, 2.6 MB
 - Textures — ballroom — 14 files, 9.8 MB
 - Textures — exterior (mansion/drive) — 10 files, 1.8 MB
-- Textures — ground — 6 files, 7.7 MB
+- Textures — ground — 6 files, 7.6 MB
 - Textures — props — 9 files, 7.8 MB
 - Textures — walls — 3 files, 1.8 MB
-- Textures — facility (unwired) — 3 files, 1.4 MB
-- Textures — decals (unused) — 5 files, 6.4 MB
+- Textures — facility (unwired) — 2 files, 512.7 KB
+- Textures — decals (unused) — 5 files, 6.2 MB
 - Textures — raw photo JPGs — 17 files, 11.2 MB
 - Audio — 15 files, 560.5 KB
 - Data — 1 files, 5.1 KB
@@ -65,22 +65,22 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 214.0 MB
 | `characters/enemy-terror3.fbx` | 1.7 MB |  |
 | `characters/enemy-terror4.fbx` | 1.7 MB |  |
 
-## Character textures (13 files, 23.0 MB)
+## Character textures (13 files, 17.2 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `characters/textures/Donald_basecolor.png` | 2.2 MB |  |
-| `characters/textures/Eric_basecolor.png` | 2.9 MB |  |
-| `characters/textures/Kristen_basecolor.png` | 4.0 MB |  |
+| `characters/textures/Donald_basecolor.png` | 1.4 MB |  |
+| `characters/textures/Eric_basecolor.png` | 1.7 MB |  |
+| `characters/textures/Kristen_basecolor.png` | 2.5 MB |  |
 | `characters/textures/Rochelle_basecolor.jpg` | 581.1 KB |  |
-| `characters/textures/Vickie_basecolor.png` | 4.1 MB |  |
+| `characters/textures/Vickie_basecolor.png` | 2.5 MB |  |
 | `characters/textures/cyberpunk_warrior_3d_model_basecolor.JPEG` | 1.5 MB |  |
 | `characters/textures/cyberpunk_warrior_3d_model_metallic.JPEG` | 971.2 KB |  |
-| `characters/textures/cyberpunk_warrior_3d_model_normal.PNG` | 2.5 MB |  |
+| `characters/textures/cyberpunk_warrior_3d_model_normal.PNG` | 1.8 MB |  |
 | `characters/textures/cyberpunk_warrior_3d_model_roughness.JPEG` | 867.8 KB |  |
 | `characters/textures/tactical_combat_suit_3d_model_basecolor.JPEG` | 801.8 KB |  |
 | `characters/textures/tactical_combat_suit_3d_model_metallic.JPEG` | 346.2 KB |  |
-| `characters/textures/tactical_combat_suit_3d_model_normal.PNG` | 2.0 MB |  |
+| `characters/textures/tactical_combat_suit_3d_model_normal.PNG` | 1.9 MB |  |
 | `characters/textures/tactical_combat_suit_3d_model_roughness.JPEG` | 356.4 KB |  |
 
 ## Cats (4 files, 19.2 MB)
@@ -148,12 +148,13 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 214.0 MB
 | `weapons/white_open_glasses.glb` | 67.8 KB |  |
 | `weapons/white_pen.glb` | 35.0 KB |  |
 
-## Weapons — enemy (unprefixed) (8 files, 388.6 KB)
+## Weapons — enemy (unprefixed) (9 files, 1.2 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
 | `weapons/aks74u.glb` | 46.1 KB | Enemy weapons; unprefixed = enemies |
 | `weapons/cufflinks.glb` | 81.5 KB | Enemy weapons; unprefixed = enemies |
+| `weapons/katana.glb` | 862.8 KB | Rochelle (Combat) dual-wield katana in the viewer; origin re-set to the grip (handle centre 0.022 m off), blade along local -Z, Draco |
 | `weapons/mp5k.glb` | 32.2 KB | Enemy weapons; unprefixed = enemies |
 | `weapons/ppk.glb` | 78.2 KB | Enemy weapons; unprefixed = enemies |
 | `weapons/ppk_magazine.glb` | 51.0 KB | Enemy weapons; unprefixed = enemies |
@@ -324,20 +325,20 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 214.0 MB
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/ballroom/ballroom_bar_counter_wood_marble_1024.webp` | 417.4 KB |  |
+| `textures/ballroom/ballroom_bar_counter_wood_marble_1024.webp` | 416.9 KB |  |
 | `textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp` | 1.0 MB |  |
-| `textures/ballroom/ballroom_ceiling_plaster_moulding_1024.webp` | 1004.3 KB |  |
+| `textures/ballroom/ballroom_ceiling_plaster_moulding_1024.webp` | 1003.8 KB |  |
 | `textures/ballroom/ballroom_chair_upholstery_velvet_brocade_1024.webp` | 1.1 MB |  |
-| `textures/ballroom/ballroom_chandelier_crystal_glass_1024.webp` | 649.9 KB |  |
-| `textures/ballroom/ballroom_curtain_velvet_1024.webp` | 389.9 KB |  |
+| `textures/ballroom/ballroom_chandelier_crystal_glass_1024.webp` | 649.4 KB |  |
+| `textures/ballroom/ballroom_curtain_velvet_1024.webp` | 389.4 KB |  |
 | `textures/ballroom/ballroom_door_double_mahogany_1024.webp` | 83.9 KB |  |
-| `textures/ballroom/ballroom_door_entrance_mahogany_1024.webp` | 383.5 KB |  |
-| `textures/ballroom/ballroom_floor_herringbone_marble_border_1024.webp` | 793.4 KB |  |
-| `textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp` | 573.7 KB |  |
+| `textures/ballroom/ballroom_door_entrance_mahogany_1024.webp` | 383.0 KB |  |
+| `textures/ballroom/ballroom_floor_herringbone_marble_border_1024.webp` | 792.9 KB |  |
+| `textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp` | 573.2 KB |  |
 | `textures/ballroom/ballroom_rug_medallion_large_1024.webp` | 1.3 MB |  |
-| `textures/ballroom/ballroom_tablecloth_linen_cream_1024.webp` | 727.3 KB |  |
+| `textures/ballroom/ballroom_tablecloth_linen_cream_1024.webp` | 726.8 KB |  |
 | `textures/ballroom/ballroom_wall_damask_burgundy_gold_1024.webp` | 1.2 MB |  |
-| `textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp` | 356.7 KB |  |
+| `textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp` | 356.2 KB |  |
 
 ## Textures — exterior (mansion/drive) (10 files, 1.8 MB)
 
@@ -347,20 +348,20 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 214.0 MB
 | `textures/exterior/exterior_drive_cobblestone_1024.webp` | 293.2 KB |  |
 | `textures/exterior/exterior_lawn_grass_clover_1024.webp` | 468.0 KB |  |
 | `textures/exterior/exterior_mansion_entrance_dark_brick_1024.webp` | 152.1 KB |  |
-| `textures/exterior/exterior_mansion_entrance_ivory_1024.webp` | 93.2 KB |  |
+| `textures/exterior/exterior_mansion_entrance_ivory_1024.webp` | 81.4 KB |  |
 | `textures/exterior/exterior_mansion_entrance_ivory_wide_2080.webp` | 95.0 KB |  |
 | `textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080.webp` | 136.2 KB |  |
 | `textures/exterior/exterior_mansion_entrance_ivory_wide_centered_2080x640.webp` | 106.2 KB |  |
 | `textures/exterior/exterior_mansion_facade_windows_1024.webp` | 112.5 KB |  |
 | `textures/exterior/exterior_mansion_facade_windows_1024x768.webp` | 77.4 KB |  |
 
-## Textures — ground (6 files, 7.7 MB)
+## Textures — ground (6 files, 7.6 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
 | `textures/ground/ground_asphalt_1024.webp` | 1.2 MB |  |
 | `textures/ground/ground_asphalt_tire_marks_oil_stains_1024.webp` | 1.1 MB |  |
-| `textures/ground/ground_concrete_slab_1024.webp` | 969.1 KB |  |
+| `textures/ground/ground_concrete_slab_1024.webp` | 968.6 KB |  |
 | `textures/ground/ground_dirt_path_1024.webp` | 1.2 MB |  |
 | `textures/ground/ground_grass_1024.webp` | 1.7 MB |  |
 | `textures/ground/ground_gravel_1024.webp` | 1.6 MB |  |
@@ -369,13 +370,13 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 214.0 MB
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/props/prop_barrel_metal_faded_blue_1024.webp` | 770.5 KB |  |
-| `textures/props/prop_barrel_metal_olive_drab_1024.webp` | 362.1 KB |  |
-| `textures/props/prop_barrel_metal_rusty_red_1024.webp` | 498.0 KB |  |
-| `textures/props/prop_concrete_barrier_weathered_1024.webp` | 890.4 KB |  |
+| `textures/props/prop_barrel_metal_faded_blue_1024.webp` | 769.9 KB |  |
+| `textures/props/prop_barrel_metal_olive_drab_1024.webp` | 361.6 KB |  |
+| `textures/props/prop_barrel_metal_rusty_red_1024.webp` | 497.5 KB |  |
+| `textures/props/prop_concrete_barrier_weathered_1024.webp` | 889.9 KB |  |
 | `textures/props/prop_crate_wood_pine_diagonal_brace_1024.webp` | 1.1 MB |  |
-| `textures/props/prop_crate_wood_pine_no_nails_1024.webp` | 945.1 KB |  |
-| `textures/props/prop_crate_wood_pine_no_stains_1024.webp` | 938.0 KB |  |
+| `textures/props/prop_crate_wood_pine_no_nails_1024.webp` | 944.6 KB |  |
+| `textures/props/prop_crate_wood_pine_no_stains_1024.webp` | 937.5 KB |  |
 | `textures/props/prop_sandbag_wall_hessian_1024.webp` | 1.2 MB |  |
 | `textures/props/prop_sandbag_wall_sagging_spill_1024.webp` | 1.2 MB |  |
 
@@ -383,49 +384,48 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 214.0 MB
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/walls/wall_brick_running_bond_red_brown_1024.webp` | 1020.9 KB |  |
-| `textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp` | 277.0 KB |  |
-| `textures/walls/wall_metal_vent_grille_dark_louvre_1024.webp` | 549.7 KB |  |
+| `textures/walls/wall_brick_running_bond_red_brown_1024.webp` | 1020.4 KB |  |
+| `textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp` | 276.5 KB |  |
+| `textures/walls/wall_metal_vent_grille_dark_louvre_1024.webp` | 549.1 KB |  |
 
-## Textures — facility (unwired) (3 files, 1.4 MB)
+## Textures — facility (unwired) (2 files, 512.7 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/facility/facility_concrete_barrier_weathered_copy_1024.webp` | 890.4 KB |  |
-| `textures/facility/facility_door_exfil_gate_dark_green_rivets_1024.webp` | 338.4 KB |  |
-| `textures/facility/facility_window_tinted_smoky_grey_blue_mullions_1024.webp` | 175.4 KB |  |
+| `textures/facility/facility_door_exfil_gate_dark_green_rivets_1024.webp` | 337.8 KB |  |
+| `textures/facility/facility_window_tinted_smoky_grey_blue_mullions_1024.webp` | 174.9 KB |  |
 
-## Textures — decals (unused) (5 files, 6.4 MB)
+## Textures — decals (unused) (5 files, 6.2 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
 | `textures/decals/decal_blood_spatter_heavy_smear_1024.png` | 1.6 MB |  |
 | `textures/decals/decal_blood_spatter_pool_drips_1024.png` | 1.4 MB |  |
-| `textures/decals/decal_blood_spatter_small_splatter_1024.png` | 939.3 KB |  |
-| `textures/decals/decal_bullet_hole_64px.png` | 2.7 KB |  |
-| `textures/decals/decal_chainlink_fence_flat_highlights.png` | 2.5 MB |  |
+| `textures/decals/decal_blood_spatter_small_splatter_1024.png` | 921.4 KB |  |
+| `textures/decals/decal_bullet_hole_64px.png` | 2.6 KB |  |
+| `textures/decals/decal_chainlink_fence_flat_highlights.png` | 2.3 MB |  |
 
 ## Textures — raw photo JPGs (17 files, 11.2 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `textures/raw/asphalt.jpg` | 723.2 KB |  |
-| `textures/raw/brick.jpg` | 595.6 KB |  |
-| `textures/raw/chain-link-fence.jpg` | 472.1 KB |  |
+| `textures/raw/asphalt.jpg` | 720.3 KB |  |
+| `textures/raw/brick.jpg` | 593.0 KB |  |
+| `textures/raw/chain-link-fence.jpg` | 472.0 KB |  |
 | `textures/raw/chain-link-fence.png` | 1.7 MB |  |
-| `textures/raw/concrete-slabs.jpg` | 591.8 KB |  |
-| `textures/raw/corrugated-metal.jpg` | 295.3 KB |  |
-| `textures/raw/dirt-path.jpg` | 700.9 KB |  |
-| `textures/raw/grass.jpg` | 998.7 KB |  |
+| `textures/raw/concrete-slabs.jpg` | 591.6 KB |  |
+| `textures/raw/corrugated-metal.jpg` | 292.7 KB |  |
+| `textures/raw/dirt-path.jpg` | 700.7 KB |  |
+| `textures/raw/grass.jpg` | 995.8 KB |  |
 | `textures/raw/gravel.jpg` | 1.0 MB |  |
-| `textures/raw/painted-metal-blue.jpg` | 493.3 KB |  |
-| `textures/raw/painted-metal-olive.jpg` | 280.1 KB |  |
-| `textures/raw/painted-metal-red.jpg` | 339.5 KB |  |
-| `textures/raw/sandbags-1.jpg` | 767.2 KB |  |
-| `textures/raw/sandbags-2.jpg` | 734.9 KB |  |
-| `textures/raw/vent-grille.jpg` | 405.3 KB |  |
-| `textures/raw/wood-planks-1.jpg` | 624.5 KB |  |
-| `textures/raw/wood-planks-2.jpg` | 687.9 KB |  |
+| `textures/raw/painted-metal-blue.jpg` | 490.4 KB |  |
+| `textures/raw/painted-metal-olive.jpg` | 277.3 KB |  |
+| `textures/raw/painted-metal-red.jpg` | 336.6 KB |  |
+| `textures/raw/sandbags-1.jpg` | 764.3 KB |  |
+| `textures/raw/sandbags-2.jpg` | 732.0 KB |  |
+| `textures/raw/vent-grille.jpg` | 402.4 KB |  |
+| `textures/raw/wood-planks-1.jpg` | 621.9 KB |  |
+| `textures/raw/wood-planks-2.jpg` | 685.0 KB |  |
 
 ## Audio (15 files, 560.5 KB)
 

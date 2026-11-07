@@ -40,6 +40,7 @@
   <select id="modelSel" aria-label="Model"></select>
   <select id="animSel" aria-label="Animation"></select>
   <select id="weaponSel" aria-label="Weapon in right hand"></select>
+  <select id="weaponSelL" aria-label="Weapon in left hand"></select>
   <div id="wOff" hidden>
     <span class="wOffTitle">Weapon offset</span>
     <label>X <input id="offX" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset X"><input id="offXn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset X value"></label>
@@ -162,6 +163,7 @@ const MODELS = [
     ['black walther', 'assets/weapons/black_walther.glb', 'glb', ''],
     ['black watch', 'assets/weapons/black_watch.glb', 'glb', ''],
     ['cufflinks', 'assets/weapons/cufflinks.glb', 'glb', ''],
+    ['katana', 'assets/weapons/katana.glb', 'glb', ''],
     ['mp5k', 'assets/weapons/mp5k.glb', 'glb', ''],
     ['ppk', 'assets/weapons/ppk.glb', 'glb', ''],
     ['ppk magazine', 'assets/weapons/ppk_magazine.glb', 'glb', ''],
@@ -211,6 +213,7 @@ const WEAPONS = [
   { name: 'black walther', file: 'assets/weapons/black_walther.glb' },
   { name: 'black watch', file: 'assets/weapons/black_watch.glb' },
   { name: 'cufflinks', file: 'assets/weapons/cufflinks.glb' },
+  { name: 'katana', file: 'assets/weapons/katana.glb' },
   { name: 'mp5k', file: 'assets/weapons/mp5k.glb' },
   { name: 'ppk', file: 'assets/weapons/ppk.glb' },
   { name: 'ppk magazine', file: 'assets/weapons/ppk_magazine.glb' },
@@ -267,7 +270,7 @@ const texLoader = new THREE.TextureLoader();
 // Bump this whenever a model, texture, or animation file is replaced in the
 // repo — asset URLs carry it, so browsers never serve a stale cached FBX/GLB
 // under the same filename (that's how the rigged Kyle_combat looked static).
-const ASSET_V = '20261106i';
+const ASSET_V = '20261107a';
 const modelSel = document.getElementById('modelSel');
 const animSel = document.getElementById('animSel');
 const statusEl = document.getElementById('status');
@@ -286,6 +289,9 @@ setAnimOptions(ANIMS);
 const weaponSel = document.getElementById('weaponSel');
 { const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'No weapon'; weaponSel.appendChild(o0);
   WEAPONS.forEach(w => { const o = document.createElement('option'); o.value = w.name; o.textContent = w.name; weaponSel.appendChild(o); }); }
+const weaponSelL = document.getElementById('weaponSelL');
+{ const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'No weapon'; weaponSelL.appendChild(o0);
+  WEAPONS.forEach(w => { const o = document.createElement('option'); o.value = w.name; o.textContent = w.name; weaponSelL.appendChild(o); }); }
 
 let model = null, mixer = null, action = null, clip = null, embeddedAnims = [];
 let playing = true, loop = true, stripRoot = true, showArrows = true, showTarget = false;
@@ -377,6 +383,61 @@ function findHandBone(model) {
   if (!found) model.traverse((o) => { if (!o.isBone || found) return; if (boneKey(o.name).indexOf('righthand') >= 0) found = o; });
   return found;
 }
+function findLeftHandBone(model) {
+  let found = null;
+  model.traverse((o) => { if (!o.isBone || found) return; if (boneKey(o.name) === 'lefthand') found = o; });
+  if (!found) model.traverse((o) => { if (!o.isBone || found) return; if (boneKey(o.name).indexOf('lefthand') >= 0) found = o; });
+  return found;
+}
+// Left-hand state — the second weapon pivot, mirroring the right-hand one.
+// The offset tools still edit the right-hand weapon only; the left weapon
+// loads at its own per-weapon offset, and follows the right hand's edits
+// when both hands hold the same weapon (shared offset entry, hand-local).
+let weaponPivotL = null;
+let curWeaponNameL = '';
+// Hand axes, measured from the loaded model's own skeleton in bind pose
+// (afterModel, before any animation plays): the finger-base bones sit along
+// hand-local +Y and the back of the hand is cross(finger, thumb) — the same
+// measurement the FINGER_DIR / DORSAL_DIR constants came from on Agent_Kyle.
+// Per-model measurement matters because Rochelle_combat's hands differ (only
+// Index + Thumb fingers, thumb in a different plane: her right dorsal is
+// (-0.034, 0.016, -0.999) vs Kyle's (0.569, 0.029, -0.822)), and the left
+// hand is a mirror of the right (its dorsal flips Y and Z), so the right-hand
+// constants would roll the left weapon ~148 deg off. Measured on Agent_Kyle
+// this reproduces the constants exactly, so the verified gun grip is unchanged.
+let handAxes = { R: null, L: null };
+function measureHandAxes(model, side) {
+  const handKey = side === 'R' ? 'righthand' : 'lefthand';
+  let hand = null;
+  model.traverse((o) => { if (!o.isBone || hand) return; if (boneKey(o.name) === handKey) hand = o; });
+  if (!hand) model.traverse((o) => { if (!o.isBone || hand) return; if (boneKey(o.name).indexOf(handKey) >= 0) hand = o; });
+  if (!hand) return null;
+  const fingers = {};
+  for (const f of ['index', 'middle', 'ring', 'pinky', 'thumb']) {
+    const fk = handKey + f + '1';
+    model.traverse((o) => { if (!o.isBone || fingers[f]) return; if (boneKey(o.name).indexOf(fk) >= 0) fingers[f] = o; });
+  }
+  model.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(hand.matrixWorld).invert();
+  const dirs = {};
+  for (const [f, bone] of Object.entries(fingers)) {
+    const p = new THREE.Vector3();
+    bone.getWorldPosition(p).applyMatrix4(inv);
+    if (p.lengthSq() > 1e-12) dirs[f] = p.normalize();
+  }
+  const four = ['index', 'middle', 'ring', 'pinky'].map((f) => dirs[f]).filter(Boolean);
+  if (!four.length || !dirs.thumb) return null;
+  const finger = four.reduce((a, d) => a.add(d), new THREE.Vector3()).normalize();
+  const dorsal = new THREE.Vector3().crossVectors(finger, dirs.thumb).normalize();
+  if (!isFinite(dorsal.x) || !isFinite(dorsal.y) || !isFinite(dorsal.z)) return null;
+  return { finger, dorsal };
+}
+// Mirror of the right-hand constants, for the left hand when its own axes
+// cannot be measured (finger X flips, dorsal Y and Z flip). Measured on
+// Agent_Kyle's left hand: (0.016, 1, 0.024) / (0.563, -0.029, 0.826) — the
+// mirror below is within 0.006 of those.
+const LEFT_FINGER_DIR = new THREE.Vector3(0.012, 1.000, 0.027).normalize();
+const LEFT_DORSAL_DIR = new THREE.Vector3(0.569, -0.029, 0.822).normalize();
 function fitWeapon(obj) {
   // Kyle's Blender sizes (2026-11-06): the file's own size is used as-is —
   // NO length normalization. The old pistol 0.32 m / rifle 0.60 m targets
@@ -424,6 +485,11 @@ function classDefault(name) {
 // re-seeds it.
 const BAKED_OFFSETS = {
   'white aks74u': { x: -0.021, y: 0.014, z: 0.055, rx: -12, ry: 2, rz: 61, s: 1.32 },
+  // Katana (Rochelle's dual-wield): neutral — the file's own origin is the
+  // grip (the handle centre is 0.022 m from it), the blade runs along local
+  // -Z, and the computed grip rotation already puts the blade along the
+  // fingers, so no nudge, rotation, or scale is applied on top of it.
+  'katana': { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, s: 1 },
 };
 let curWeaponName = '';
 const wOffEl = document.getElementById('wOff');
@@ -470,32 +536,35 @@ function syncOffsetUI() {
   offScaleN.value = o.s.toFixed(2);
   updateOffsetReadout();
 }
-function applyWeaponOffset() {
-  if (!weaponPivot || !weaponPivot.userData.basePos) return;
-  const o = getOffset(curWeaponName);
-  const b = weaponPivot.userData.basePos;
-  weaponPivot.position.set(b.x + o.x, b.y + o.y, b.z + o.z);
+function applyWeaponOffset(pivot, name) {
+  pivot = pivot || weaponPivot; name = name || curWeaponName;
+  if (!pivot || !pivot.userData.basePos) return;
+  const o = getOffset(name);
+  const b = pivot.userData.basePos;
+  pivot.position.set(b.x + o.x, b.y + o.y, b.z + o.z);
 }
 // Rotation offset (degrees), applied in the pivot's own local frame on top
 // of the computed grip rotation: pivot.quaternion = baseQuat * offsetQuat.
 // Like the position offset it rides with the hand through the animation.
-function applyWeaponRotation() {
-  if (!weaponPivot || !weaponPivot.userData.baseQuat) return;
-  const o = getOffset(curWeaponName);
+function applyWeaponRotation(pivot, name) {
+  pivot = pivot || weaponPivot; name = name || curWeaponName;
+  if (!pivot || !pivot.userData.baseQuat) return;
+  const o = getOffset(name);
   const off = new THREE.Quaternion().setFromEuler(new THREE.Euler(
     THREE.MathUtils.degToRad(o.rx), THREE.MathUtils.degToRad(o.ry), THREE.MathUtils.degToRad(o.rz)
   ));
-  weaponPivot.quaternion.copy(weaponPivot.userData.baseQuat).multiply(off);
+  pivot.quaternion.copy(pivot.userData.baseQuat).multiply(off);
 }
 // Scale factor, a uniform multiplier on top of the computed fitWeapon
 // scale: pivot.scale = baseScale * s. One factor only — it never distorts
 // the weapon. Like position and rotation it lives on the pivot and rides
 // with the hand through the animation.
-function applyWeaponScale() {
-  if (!weaponPivot || !weaponPivot.userData.baseScale) return;
-  const o = getOffset(curWeaponName);
-  const b = weaponPivot.userData.baseScale;
-  weaponPivot.scale.set(b.x * o.s, b.y * o.s, b.z * o.s);
+function applyWeaponScale(pivot, name) {
+  pivot = pivot || weaponPivot; name = name || curWeaponName;
+  if (!pivot || !pivot.userData.baseScale) return;
+  const o = getOffset(name);
+  const b = pivot.userData.baseScale;
+  pivot.scale.set(b.x * o.s, b.y * o.s, b.z * o.s);
 }
 function setOffsetAxis(a, v) {
   const o = getOffset(curWeaponName);
@@ -504,6 +573,9 @@ function setOffsetAxis(a, v) {
   offNums[a].value = fmt3(o[a]);
   updateOffsetReadout();
   applyWeaponOffset();
+  // Same weapon in the left hand shares the offset entry (hand-local, so it
+  // is the mirrored equivalent there) — keep it in step.
+  if (weaponPivotL && curWeaponNameL === curWeaponName) applyWeaponOffset(weaponPivotL, curWeaponNameL);
 }
 function setRotationAxis(a, v) {
   const o = getOffset(curWeaponName);
@@ -512,6 +584,7 @@ function setRotationAxis(a, v) {
   rotNums[a].value = o['r' + a];
   updateOffsetReadout();
   applyWeaponRotation();
+  if (weaponPivotL && curWeaponNameL === curWeaponName) applyWeaponRotation(weaponPivotL, curWeaponNameL);
 }
 function setScale(v) {
   const o = getOffset(curWeaponName);
@@ -520,6 +593,7 @@ function setScale(v) {
   offScaleN.value = o.s.toFixed(2);
   updateOffsetReadout();
   applyWeaponScale();
+  if (weaponPivotL && curWeaponNameL === curWeaponName) applyWeaponScale(weaponPivotL, curWeaponNameL);
 }
 OFF_AXES.forEach(a => {
   offSliders[a].addEventListener('input', e => setOffsetAxis(a, parseFloat(e.target.value) || 0));
@@ -567,6 +641,11 @@ document.getElementById('offReset').addEventListener('click', () => {
   applyWeaponOffset();
   applyWeaponRotation();
   applyWeaponScale();
+  if (weaponPivotL && curWeaponNameL === curWeaponName) {
+    applyWeaponOffset(weaponPivotL, curWeaponNameL);
+    applyWeaponRotation(weaponPivotL, curWeaponNameL);
+    applyWeaponScale(weaponPivotL, curWeaponNameL);
+  }
 });
 // Hand axes, MEASURED 2026-11-06 (Node/Three.js on assets/characters/Agent_Kyle.fbx):
 // the four finger-base bones sit along hand-local +Y (avg dir (-0.012, 1.000,
@@ -615,7 +694,10 @@ function loadWeapon(name) {
       // fist through the clip with the barrel tracking the fingers.
       const e1 = muzzleDir.clone(), e2 = slideTop.clone();
       const e3 = new THREE.Vector3().crossVectors(e1, e2).normalize();
-      const f1 = FINGER_DIR.clone(), f2 = DORSAL_DIR.clone();
+      // Hand axes for this model (measured in bind pose at load); falls back
+      // to the Agent_Kyle constants, which the measurement reproduces exactly.
+      const axesR = handAxes.R || { finger: FINGER_DIR, dorsal: DORSAL_DIR };
+      const f1 = axesR.finger.clone(), f2 = axesR.dorsal.clone();
       const f3 = new THREE.Vector3().crossVectors(f1, f2).normalize();
       const R = new THREE.Matrix4().multiplyMatrices(
         new THREE.Matrix4().makeBasis(f1, f2, f3),
@@ -649,6 +731,71 @@ function loadWeapon(name) {
   }, undefined, () => { statusEl.textContent += ' / weapon failed to load: ' + w.file; });
 }
 weaponSel.addEventListener('change', () => loadWeapon(weaponSel.value));
+// Left-hand weapon — same attach as the right hand, but on the actual left
+// hand bone (not a mirror of the right-hand pivot) and with the left hand's
+// own measured axes, so a dual-wield reads symmetric. The offset tools still
+// edit the right-hand weapon only; the left weapon loads at its per-weapon
+// offset and follows the right hand's edits when both hands hold the same
+// weapon (see setOffsetAxis / setRotationAxis / setScale).
+function loadWeaponL(name) {
+  if (weaponPivotL) { weaponPivotL.removeFromParent(); weaponPivotL = null; }
+  curWeaponNameL = name || '';
+  if (!name) return;
+  const w = WEAPONS.find(x => x.name === name); if (!w) return;
+  gltfLoader.load(w.file + '?v=' + ASSET_V, (gltf) => {
+    const pivot = new THREE.Group(); pivot.add(gltf.scene);
+    if (!fitWeapon(gltf.scene)) return;
+    scene.add(pivot);
+    if (!model) { pivot.removeFromParent(); return; }
+    const hand = findLeftHandBone(model);
+    if (!hand) { pivot.removeFromParent(); statusEl.textContent += ' / no left-hand bone — left weapon not attached'; return; }
+    try {
+      model.updateMatrixWorld(true);
+      pivot.updateMatrixWorld(true);
+      // Same grip logic as the right hand: the Blender object origin (= grip)
+      // is the mesh node's origin, the muzzle is the end of the long axis
+      // farther from the grip.
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const size = new THREE.Vector3(); box.getSize(size);
+      let meshNode = null;
+      gltf.scene.traverse((o) => { if (!meshNode && o.isMesh) meshNode = o; });
+      const gripLocal = pivot.worldToLocal(meshNode.getWorldPosition(new THREE.Vector3()));
+      const axes = ['x', 'y', 'z'];
+      const longAxis = axes.reduce((a, b) => (size[a] >= size[b] ? a : b));
+      const muzzleSign = (box.max[longAxis] - gripLocal[longAxis]) >= (gripLocal[longAxis] - box.min[longAxis]) ? 1 : -1;
+      const muzzleDir = new THREE.Vector3(0, 0, 0); muzzleDir[longAxis] = muzzleSign;
+      const slideTop = new THREE.Vector3(0, 1, 0);
+      // Rotation (hand-local): muzzle -> finger direction, slide top -> back
+      // of the hand, using the LEFT hand's own measured axes (mirrored
+      // constants as fallback — the right-hand constants would roll the
+      // left weapon ~148 deg off).
+      const e1 = muzzleDir.clone(), e2 = slideTop.clone();
+      const e3 = new THREE.Vector3().crossVectors(e1, e2).normalize();
+      const axesL = handAxes.L || { finger: LEFT_FINGER_DIR, dorsal: LEFT_DORSAL_DIR };
+      const f1 = axesL.finger.clone(), f2 = axesL.dorsal.clone();
+      const f3 = new THREE.Vector3().crossVectors(f1, f2).normalize();
+      const R = new THREE.Matrix4().multiplyMatrices(
+        new THREE.Matrix4().makeBasis(f1, f2, f3),
+        new THREE.Matrix4().makeBasis(e1, e2, e3).transpose()
+      );
+      const q = new THREE.Quaternion().setFromRotationMatrix(R);
+      hand.attach(pivot);
+      pivot.quaternion.copy(q);
+      // Put the GRIP (not the pivot origin) exactly on the hand bone.
+      pivot.position.copy(gripLocal.clone().applyQuaternion(q).negate());
+      pivot.userData.basePos = pivot.position.clone();
+      pivot.userData.baseQuat = pivot.quaternion.clone();
+      pivot.userData.baseScale = pivot.scale.clone();
+      // Assign BEFORE the applies: they guard on the pivot, so calling them
+      // first would silently skip the baked offset on load.
+      weaponPivotL = pivot;
+      applyWeaponOffset(pivot, name);
+      applyWeaponRotation(pivot, name);
+      applyWeaponScale(pivot, name);
+    } catch (e) { pivot.removeFromParent(); }
+  }, undefined, () => { statusEl.textContent += ' / left weapon failed to load: ' + w.file; });
+}
+weaponSelL.addEventListener('change', () => loadWeaponL(weaponSelL.value));
 function applyBasecolor(obj, texPath) {
   if (!texPath) return;
   const tex = texLoader.load(texPath + '?v=' + ASSET_V); tex.colorSpace = THREE.SRGBColorSpace;
@@ -656,6 +803,8 @@ function applyBasecolor(obj, texPath) {
 }
 function clearModel() {
   if (weaponPivot) { weaponPivot.removeFromParent(); weaponPivot = null; }
+  if (weaponPivotL) { weaponPivotL.removeFromParent(); weaponPivotL = null; }
+  handAxes = { R: null, L: null };
   if (model) { scene.remove(model); model = null; }
   if (mixer) { mixer.stopAllAction(); mixer = null; }
   action = null; clip = null; embeddedAnims = []; hipsArrow.visible = torsoArrow.visible = false;
@@ -665,6 +814,9 @@ function afterModel(obj, info) {
   const isCat = info[0] === 'Mabel' || info[0] === 'Margo' || info[0] === 'Moxie';
   const fit = fitModel(obj, isCat ? 0.35 : 1.8);
   collectBones(obj);
+  // Measure both hands' axes now, while the model is still in bind pose
+  // (before any animation plays) — loadWeapon / loadWeaponL use these.
+  handAxes = { R: measureHandAxes(obj, 'R'), L: measureHandAxes(obj, 'L') };
   let hasBones = false, boneCount = 0;
   obj.traverse(o => { if (o.isBone) { hasBones = true; boneCount++; } });
   mixer = new THREE.AnimationMixer(obj);
@@ -675,11 +827,19 @@ function afterModel(obj, info) {
   else if (info[2] === 'fbx' && hasBones) { animSel.value = 'Standing_Idle'; playAnim('Standing_Idle'); }
   resetView();
   if (weaponSel.value) loadWeapon(weaponSel.value);
+  if (weaponSelL.value) loadWeaponL(weaponSelL.value);
   setStatus(`${info[0]} — ${info[1]}\nsize ${(fit.size.x).toFixed(2)} x ${(fit.size.y).toFixed(2)} x ${(fit.size.z).toFixed(2)} m, ${boneCount} bones${hasBones ? '' : '\nSTATIC MODEL — no skeleton, so no animation can play on it'}${bones.hips ? '' : '\n(no Hips bone found)'}`);
 }
 function loadModel(name) {
   const info = findModel(name); if (!info) return;
   clearModel(); setStatus('Loading ' + info[1] + '…');
+  // Rochelle (Combat) dual-wields: picking her defaults both weapon selects
+  // to a katana, so she holds one in each hand. Any other model keeps the
+  // selects as the user left them.
+  if (info[0] === 'Rochelle (Combat)') {
+    weaponSel.value = 'katana';
+    weaponSelL.value = 'katana';
+  }
   if (info[2] === 'fbx') {
     fbxLoader.load(info[1] + '?v=' + ASSET_V, obj => { if (PBR[info[0]]) applyPBR(obj, PBR[info[0]]); else applyBasecolor(obj, info[3]); afterModel(obj, info); }, undefined, () => setStatus('Failed to load ' + info[1]));
   } else {
@@ -754,6 +914,7 @@ document.getElementById('topBtn').addEventListener('click', () => setView('top')
 document.getElementById('resetBtn').addEventListener('click', resetView);
 document.getElementById('shootBtn').addEventListener('click', () => {
   pendingAnim = 'Pistol_Fire_Recoil'; modelSel.value = 'Kyle'; weaponSel.value = 'white glock';
+  weaponSelL.value = '';
   loadModel('Kyle'); // weapon option values come from filenames, lowercase
 });
 document.getElementById('levelsBtn').addEventListener('click', () => { const p = document.getElementById('levelsPanel'); p.hidden = !p.hidden; });
