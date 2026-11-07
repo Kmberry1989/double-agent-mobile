@@ -394,6 +394,26 @@ gltfLoader.setDRACOLoader(dracoLoader);
 // Preload the Draco decoder now, so its WASM is fetched before any GLB
 // decode is requested (avoids init races when many GLBs load at once).
 dracoLoader.preload();
+// GLB load diagnostics (2026-11-07): the courtyard Lambo has shown as its
+// dark fallback box on three fresh loads while the same GLB renders on the
+// handoff page and decodes fine in Node. The browser checker cannot read
+// the console, so record every GLB load status here; ?debug=lambo shows it
+// on screen (never in normal play). If ALL Draco GLBs fail it is the
+// decoder; if only the Lambo fails it is Lambo-specific.
+const glbStatus = {}; // path -> 'loading' | 'loaded' | 'FAILED: <err>'
+const _gltfLoad = gltfLoader.load.bind(gltfLoader);
+gltfLoader.load = function(path, onLoad, onProgress, onError){
+  glbStatus[path] = 'loading';
+  return _gltfLoad(path, (g)=>{
+    glbStatus[path] = 'loaded';
+    if (onLoad) onLoad(g);
+  }, onProgress, (err)=>{
+    let m = 'unknown';
+    if (err) m = err.message || err.type || (err.target && err.target.status) || String(err);
+    glbStatus[path] = 'FAILED: ' + m;
+    if (onError) onError(err);
+  });
+};
 function normalizeCharacter(obj, targetHeight, yawOffset){
   obj.traverse((o)=>{ if (o.isMesh) o.castShadow = true; });
   obj.rotation.y = yawOffset || 0;
@@ -649,6 +669,33 @@ addGLBToObstacle(lamboBase, 'assets/vehicles/white_lambo.glb', 2.0, 1.2, 4.5, [[
   // Lower the metalness so the white paint gets diffuse light.
   scene.traverse((o) => { if (o.isMesh) { o.material.metalness = 0; o.material.roughness = 0.55; } });
 });
+// ?debug=lambo overlay (2026-11-07): shows every GLB load status plus the
+// Lambo child state, so the live load failure can be read on screen — the
+// browser checker cannot open DevTools. ONLY when ?debug=lambo is in the
+// URL; never in normal play (no extra text in the game).
+if (new URLSearchParams(location.search).get('debug') === 'lambo'){
+  const dbg = document.createElement('div');
+  dbg.id = 'lamboDebug';
+  dbg.style.cssText = 'position:fixed;left:8px;top:8px;z-index:9999;background:rgba(0,0,0,0.88);color:#0f0;font:12px/1.5 monospace;padding:8px;max-width:94vw;white-space:pre-wrap;pointer-events:none';
+  document.body.appendChild(dbg);
+  setInterval(()=>{
+    const lines = ['LAMBO DEBUG (live)'];
+    for (const [p, s] of Object.entries(glbStatus)) lines.push(p + ' => ' + s);
+    lines.push('lamboBase children: ' + lamboBase.mesh.children.length);
+    lines.push('lamboBase box opacity: ' + lamboBase.mesh.material.opacity + ' transparent: ' + lamboBase.mesh.material.transparent);
+    let found = null;
+    lamboBase.mesh.traverse((o)=>{ if (!found && o.isMesh && o !== lamboBase.mesh) found = o; });
+    if (found){
+      const bb = new THREE.Box3().setFromObject(found);
+      lines.push('lambo child world bbox min: ' + bb.min.toArray().map((v)=>v.toFixed(2)).join(','));
+      lines.push('lambo child world bbox max: ' + bb.max.toArray().map((v)=>v.toFixed(2)).join(','));
+      lines.push('lambo child visible: ' + found.visible + ' metalness: ' + (found.material && found.material.metalness) + ' color: #' + (found.material && found.material.color && found.material.color.getHexString()));
+    } else {
+      lines.push('lambo child: NONE in scene');
+    }
+    dbg.textContent = lines.join('\n');
+  }, 500);
+}
 // 2. FLOODLIGHT POLES (3): a lit pole the player cannot walk through.
 // Each is a small box() base (collision) + a cylinder pole + a head box
 // + a SpotLight aimed down at the ground.
