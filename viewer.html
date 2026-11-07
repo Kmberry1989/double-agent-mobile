@@ -226,7 +226,7 @@ const WEAPONS = [
   { name: 'white suppressor', file: 'assets/weapons/white_suppressor.glb' },
   { name: 'white walther', file: 'assets/weapons/white_walther.glb' }
 ];
-const ANIMS = ["Climbing_Ladder","Crawling","Crouch_Death","Crouch_Idle","Crouched_Walking","Death","Death_From_Front_Headshot","Driving","Drunk_Idle","Drunk_Stumbling_Walking","Drunk_Walk","Dying_Backwards","Entering_Car","Exiting_Car","Falling","Falling_Back_Death","Falling_Down","Female_Crouch_Pose","Firing_Rifle","Firing_Rifle_Crouch_Walking","Grabbing_Pistol","Head_Nod_Yes","Hit_Reaction","Honking_Horn","Idle_Crouching","Idle_To_Running","Jump","Knocked_Out","Landing","Looking_Around","Male_Crouch_Pose","Opening_Door_Inwards","Picking_Up_Object","Pistol_Aim","Pistol_Idle","Pistol_Kneeling_Idle","Pistol_Run","Pistol_Walk","Pistol_Walk_Arc","Pointing_Forward","Punching","Reloading_Rifle","Reloading_Walking","Rifle_Aiming_Idle","Rifle_Crouch_Walk","Rifle_Death","Rifle_Idle","Rifle_Run","Rifle_Walk","Rumba_Dancing","Running","Salsa_Dancing__1","Salsa_Dancing__4","Salsa_Dancing__5","Salsa_Dancing__6","Salsa_Dancing__7","Shaking_Head_No","Shooting_Pistol","Shrugging","Side_Kick","Sitting_Idle","Sneaking_Forward","Sprint_Forward","Standing_Idle","Standing_React_Death_Forward","Standing_Sprint_Forward","Standing_Up","Taking_Cover_Idle","Talking","Talking_On_A_Cell_Phone","Turning","Typing","Vault_Over_Box","Walking","Walking_While_Aiming_Rifle","Waving"];
+const ANIMS = ["Climbing_Ladder","Crawling","Crouch_Death","Crouch_Idle","Crouched_Walking","Death","Death_From_Front_Headshot","Driving","Drunk_Idle","Drunk_Stumbling_Walking","Drunk_Walk","Dying_Backwards","Entering_Car","Exiting_Car","Falling","Falling_Back_Death","Falling_Down","Female_Crouch_Pose","Firing_Rifle","Firing_Rifle_Crouch_Walking","Grabbing_Pistol","Head_Nod_Yes","Hit_Reaction","Honking_Horn","Idle_Crouching","Idle_To_Running","Jump","Knocked_Out","Landing","Looking_Around","Male_Crouch_Pose","Opening_Door_Inwards","Picking_Up_Object","Pistol_Aim","Pistol_Fire_Recoil","Pistol_Idle","Pistol_Kneeling_Idle","Pistol_Run","Pistol_Walk","Pistol_Walk_Arc","Pointing_Forward","Punching","Reloading_Rifle","Reloading_Walking","Rifle_Aiming_Idle","Rifle_Crouch_Walk","Rifle_Death","Rifle_Idle","Rifle_Run","Rifle_Walk","Rumba_Dancing","Running","Salsa_Dancing__1","Salsa_Dancing__4","Salsa_Dancing__5","Salsa_Dancing__6","Salsa_Dancing__7","Shaking_Head_No","Shooting_Pistol_Corner","Shrugging","Side_Kick","Sitting_Idle","Sneaking_Forward","Sprint_Forward","Standing_Idle","Standing_React_Death_Forward","Standing_Sprint_Forward","Standing_Up","Taking_Cover_Idle","Talking","Talking_On_A_Cell_Phone","Turning","Typing","Vault_Over_Box","Walking","Walking_While_Aiming_Rifle","Waving"];
 
 const app = document.getElementById('app');
 const scene = new THREE.Scene();
@@ -260,7 +260,7 @@ const texLoader = new THREE.TextureLoader();
 // Bump this whenever a model, texture, or animation file is replaced in the
 // repo — asset URLs carry it, so browsers never serve a stale cached FBX/GLB
 // under the same filename (that's how the rigged Kyle_combat looked static).
-const ASSET_V = '20261106g';
+const ASSET_V = '20261106h';
 const modelSel = document.getElementById('modelSel');
 const animSel = document.getElementById('animSel');
 const statusEl = document.getElementById('status');
@@ -746,7 +746,7 @@ document.getElementById('backBtn').addEventListener('click', () => setView('back
 document.getElementById('topBtn').addEventListener('click', () => setView('top'));
 document.getElementById('resetBtn').addEventListener('click', resetView);
 document.getElementById('shootBtn').addEventListener('click', () => {
-  pendingAnim = 'Shooting_Pistol'; modelSel.value = 'Kyle'; weaponSel.value = 'white glock';
+  pendingAnim = 'Pistol_Fire_Recoil'; modelSel.value = 'Kyle'; weaponSel.value = 'white glock';
   loadModel('Kyle'); // weapon option values come from filenames, lowercase
 });
 document.getElementById('camBtn').addEventListener('click', e => {

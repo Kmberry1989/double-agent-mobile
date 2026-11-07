@@ -101,7 +101,7 @@ const ANIM_MAP = {
   crouchIdle:'Crouch_Idle.fbx', crouchWalk:'Crouched_Walking.fbx', aimIdle:'Rifle_Aiming_Idle.fbx',
   aimWalk:'Walking_While_Aiming_Rifle.fbx', aimPistol:'Pistol_Aim.fbx', fireRifle:'Firing_Rifle.fbx',
   fireRifleCrouch:'Firing_Rifle_Crouch_Walking.fbx', reloadRifle:'Reloading_Rifle.fbx',
-  firePistol:'Shooting_Pistol.fbx', reloadPistol:'Reloading_Walking.fbx', sneak:'Sneaking_Forward.fbx',
+  firePistol:'Pistol_Fire_Recoil.fbx', reloadPistol:'Reloading_Walking.fbx', sneak:'Sneaking_Forward.fbx',
   crawl:'Crawling.fbx', cover:'Taking_Cover_Idle.fbx', punch:'Punching.fbx', kick:'Side_Kick.fbx',
   hitReaction:'Hit_Reaction.fbx', death:'Death.fbx', deathRifle:'Rifle_Death.fbx', deathFallBack:'Falling_Back_Death.fbx',
   deathForward:'Standing_React_Death_Forward.fbx', deathHeadshot:'Death_From_Front_Headshot.fbx', deathBack:'Dying_Backwards.fbx', deathCrouch:'Crouch_Death.fbx',
@@ -122,7 +122,10 @@ const ANIM_MAP = {
   headNodYes:'Head_Nod_Yes.fbx', honkingHorn:'Honking_Horn.fbx', lookingAround:'Looking_Around.fbx',
   openingDoor:'Opening_Door_Inwards.fbx', pointingForward:'Pointing_Forward.fbx',
   shakingHeadNo:'Shaking_Head_No.fbx', shrugging:'Shrugging.fbx', sittingIdle:'Sitting_Idle.fbx',
-  standingUp:'Standing_Up.fbx', typing:'Typing.fbx'
+  standingUp:'Standing_Up.fbx', typing:'Typing.fbx',
+  // Corner shooting (kept, not yet triggered — no lean/peek mechanic yet):
+  // the old pistol-fire clip, renamed; the current fire clip is Pistol_Fire_Recoil.
+  firePistolCorner:'Shooting_Pistol_Corner.fbx'
 };
 // ---------- Real player animation system (Mixamo clips on Agent_Kyle.fbx) ----------
 // Loops crossfade; one-shots play once and return to the current loop;

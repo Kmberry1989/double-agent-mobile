@@ -1,6 +1,6 @@
 # Double Agent — Asset Inventory
 
-Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB total. The folders are the categories: characters, cats, weapons, vehicles, props, animations, textures (with subfolders), audio. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
+Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 214.0 MB total. The folders are the categories: characters, cats, weapons, vehicles, props, animations, textures (with subfolders), audio. Status notes are only stated where they are established; a blank note means no claim is made about whether a page uses the file.
 
 ## Contents
 - Characters — 17 files, 62.7 MB
@@ -15,7 +15,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB
 - Vehicles — 3 files, 203.6 KB
 - Ballroom & office props — 20 files, 781.4 KB
 - Animations — locomotion & poses — 21 files, 9.0 MB
-- Animations — combat — 21 files, 9.6 MB
+- Animations — combat — 22 files, 10.0 MB
 - Animations — deaths — 9 files, 5.3 MB
 - Animations — stealth & interaction — 3 files, 2.2 MB
 - Animations — gestures & talk — 8 files, 7.7 MB
@@ -31,8 +31,8 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB
 - Textures — facility (unwired) — 3 files, 1.4 MB
 - Textures — decals (unused) — 5 files, 6.4 MB
 - Textures — raw photo JPGs — 17 files, 11.2 MB
-- Audio — 1 files, 429.0 KB
-- Data — 1 files, 4.9 KB
+- Audio — 15 files, 560.5 KB
+- Data — 1 files, 5.1 KB
 
 ## Characters (17 files, 62.7 MB)
 
@@ -220,7 +220,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB
 | `animations/Vault_Over_Box.fbx` | 613.0 KB |  |
 | `animations/Walking.fbx` | 357.5 KB |  |
 
-## Animations — combat (21 files, 9.6 MB)
+## Animations — combat (22 files, 10.0 MB)
 
 | File | Size | Note |
 | --- | --- | --- |
@@ -229,6 +229,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB
 | `animations/Grabbing_Pistol.fbx` | 507.8 KB |  |
 | `animations/Hit_Reaction.fbx` | 376.5 KB |  |
 | `animations/Pistol_Aim.fbx` | 813.6 KB |  |
+| `animations/Pistol_Fire_Recoil.fbx` | 432.3 KB |  |
 | `animations/Pistol_Idle.fbx` | 767.8 KB |  |
 | `animations/Pistol_Kneeling_Idle.fbx` | 552.5 KB |  |
 | `animations/Pistol_Run.fbx` | 323.2 KB |  |
@@ -242,7 +243,7 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB
 | `animations/Rifle_Idle.fbx` | 701.0 KB |  |
 | `animations/Rifle_Run.fbx` | 308.6 KB |  |
 | `animations/Rifle_Walk.fbx` | 357.3 KB |  |
-| `animations/Shooting_Pistol.fbx` | 466.8 KB |  |
+| `animations/Shooting_Pistol_Corner.fbx` | 466.8 KB |  |
 | `animations/Side_Kick.fbx` | 418.2 KB |  |
 | `animations/Walking_While_Aiming_Rifle.fbx` | 362.5 KB |  |
 
@@ -426,14 +427,28 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 254 files, 213.4 MB
 | `textures/raw/wood-planks-1.jpg` | 624.5 KB |  |
 | `textures/raw/wood-planks-2.jpg` | 687.9 KB |  |
 
-## Audio (1 files, 429.0 KB)
+## Audio (15 files, 560.5 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
+| `audio/ak74.m4a` | 9.7 KB |  |
 | `audio/ballroom_waltz.m4a` | 429.0 KB | Mono AAC ballroom waltz, loops in rochelle + handoff pages |
+| `audio/gunshot-hit.m4a` | 4.9 KB |  |
+| `audio/gunshot-hit2.m4a` | 4.4 KB |  |
+| `audio/pistol-gunshot.m4a` | 9.5 KB |  |
+| `audio/rifle-gunshots.m4a` | 9.7 KB |  |
+| `audio/slash-hit.m4a` | 8.5 KB |  |
+| `audio/slash-hit2.m4a` | 19.6 KB |  |
+| `audio/slash-hit3.m4a` | 13.9 KB |  |
+| `audio/slash-hit5.m4a` | 13.9 KB |  |
+| `audio/slash-hit6.m4a` | 13.9 KB |  |
+| `audio/slash-miss.m4a` | 6.5 KB |  |
+| `audio/slash-miss3.m4a` | 6.5 KB |  |
+| `audio/suppressed-pistol.m4a` | 4.9 KB |  |
+| `audio/suppressedwalther.m4a` | 5.5 KB |  |
 
-## Data (1 files, 4.9 KB)
+## Data (1 files, 5.1 KB)
 
 | File | Size | Note |
 | --- | --- | --- |
-| `animation-manifest.json` | 4.9 KB | Clip manifest for the animation library |
+| `animation-manifest.json` | 5.1 KB | Clip manifest for the animation library |

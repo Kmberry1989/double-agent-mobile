@@ -161,7 +161,7 @@ file, for example:
 - crouchIdle → Crouch_Idle.fbx, crouchWalk → Crouched_Walking.fbx
 - aimIdle → Rifle_Aiming_Idle.fbx, aimWalk → Walking_While_Aiming_Rifle.fbx
 - fireRifle → Firing_Rifle.fbx, reloadRifle → Reloading_Rifle.fbx
-- firePistol → Shooting_Pistol.fbx, reloadPistol → Reloading_Walking.fbx
+- firePistol → Pistol_Fire_Recoil.fbx, reloadPistol → Reloading_Walking.fbx
   (generic gun reload — no pistol-specific reload was found on Mixamo)
 - sneak → Sneaking_Forward.fbx, crawl → Crawling.fbx, cover → Taking_Cover_Idle.fbx
 - drive → Driving.fbx, enterCar → Entering_Car.fbx, exitCar → Exiting_Car.fbx
@@ -196,7 +196,7 @@ aimIdle → Rifle_Aiming_Idle.fbx, aimWalk →
 Walking_While_Aiming_Rifle.fbx, aimPistol → Pistol_Aim.fbx,
 fireRifle → Firing_Rifle.fbx, fireRifleCrouch →
 Firing_Rifle_Crouch_Walking.fbx, reloadRifle → Reloading_Rifle.fbx,
-firePistol → Shooting_Pistol.fbx, reloadPistol →
+firePistol → Pistol_Fire_Recoil.fbx, reloadPistol →
 Reloading_Walking.fbx (generic gun reload — no pistol-specific
 reload was found), jump → Jump.fbx, fall → Falling.fbx,
 land → Landing.fbx, crawl → Crawling.fbx, cover →
