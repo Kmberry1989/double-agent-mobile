@@ -280,14 +280,28 @@ const chandelier = { x: 0, z: -2, y: 7, dropped: false, falling: false, vy: 0, u
   chain.position.set(0, 1.5, 0); g.add(chain);
   const col = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.2, 12), new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 }));
   col.position.set(0, 0, 0); g.add(col);
+  // A clean ring chandelier: a full gold ring at the arm ends, 8 straight
+  // radial arms from the central column out to the ring, a candle cup +
+  // candle + flame on each arm end, and crystal drops hanging below.
+  // (The old build used 8 quarter-torus arms with tangled rotations and
+  // read as a yellow scribble of candles.)
+  const gold = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.04, 8, 32), gold);
+  ring.rotation.x = Math.PI / 2; ring.position.set(0, -0.15, 0); g.add(ring);
   for (let i = 0; i < 8; i++) {
     const a = i * Math.PI / 4;
-    const arm = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.04, 8, 16, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 }));
-    arm.position.set(Math.cos(a) * 0.35, -0.2, Math.sin(a) * 0.35); arm.rotation.z = a; arm.rotation.y = -a; g.add(arm);
-    const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.25, 8), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.2 }));
-    candle.position.set(Math.cos(a) * 0.7, 0.1, Math.sin(a) * 0.7); g.add(candle);
-    const drop = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
-    drop.position.set(Math.cos(a) * 0.7, -0.35, Math.sin(a) * 0.7); g.add(drop);
+    const dir = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.55, 8), gold);
+    arm.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    arm.position.set(dir.x * 0.425, -0.15, dir.z * 0.425); g.add(arm);
+    const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.05, 10), gold);
+    cup.position.set(dir.x * 0.7, -0.12, dir.z * 0.7); g.add(cup);
+    const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.22, 8), new THREE.MeshStandardMaterial({ color: 0xfff2cc, emissive: 0xffc94d, emissiveIntensity: 1.0 }));
+    candle.position.set(dir.x * 0.7, 0.02, dir.z * 0.7); g.add(candle);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.09, 8), new THREE.MeshStandardMaterial({ color: 0xffcc33, emissive: 0xffaa00, emissiveIntensity: 2.0 }));
+    flame.position.set(dir.x * 0.7, 0.17, dir.z * 0.7); g.add(flame);
+    const drop = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+    drop.position.set(dir.x * 0.7, -0.45, dir.z * 0.7); g.add(drop);
   }
   const finial = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 }));
   finial.position.set(0, -0.7, 0); g.add(finial);
@@ -350,6 +364,21 @@ for (let i = 0; i < 5; i++) {
   }, undefined, () => {});
 }
 const drapeState = { x: 0, z: -5.8, dropped: false, fallT: 0, used: false };
+// The drape spans x -11.4..11.4 (5 copies, centres -9.12..9.12, each
+// ~4.56 m wide). Its slash trigger and defeat must work along the whole
+// width, not just at the centre — otherwise enemies at the far edges are
+// never caught. DRAPE_HALF_W is that half-width; the helpers below use it.
+const DRAPE_HALF_W = 11.4;
+function enemiesNearDrape(r) {
+  // Enemies within r of the drape segment (x -11.4..11.4 at z = the
+  // toppled drape's position, drapeState.z + 1). Distance is measured to
+  // the closest point on the segment, not to the centre.
+  return enemies.filter((e) => {
+    if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing')) return false;
+    const cx = Math.max(-DRAPE_HALF_W, Math.min(DRAPE_HALF_W, e.x));
+    return Math.hypot(e.x - cx, e.z - (drapeState.z + 1)) < r;
+  });
+}
 colliders.push({ x: 0, z: -5.8, r: 1.0 });
 
 // ---- Prop crates + barrel (smashable) ----
@@ -390,6 +419,26 @@ function applyBasecolor(obj, texPath) {
   const tex = texLoader.load(texPath); tex.colorSpace = THREE.SRGBColorSpace;
   obj.traverse((o) => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach((m) => { m.map = tex; m.color.set(0xffffff); m.needsUpdate = true; }); } });
 }
+// Full PBR set for Rochelle_combat (same mapping as viewer.html — the
+// 4 cyberpunk_warrior textures in assets/characters/textures/). The
+// viewer appends '?v=' + ASSET_V to each path; theater.html has no
+// ASSET_V, so the plain paths are used here.
+const ROCHELLE_COMBAT_PBR = {
+  base: 'assets/characters/textures/cyberpunk_warrior_3d_model_basecolor.JPEG',
+  metal: 'assets/characters/textures/cyberpunk_warrior_3d_model_metallic.JPEG',
+  rough: 'assets/characters/textures/cyberpunk_warrior_3d_model_roughness.JPEG',
+  normal: 'assets/characters/textures/cyberpunk_warrior_3d_model_normal.PNG',
+};
+function applyPBR(obj, set) {
+  const base = texLoader.load(set.base); base.colorSpace = THREE.SRGBColorSpace;
+  const normal = texLoader.load(set.normal);
+  const rough = texLoader.load(set.rough);
+  const metal = texLoader.load(set.metal);
+  obj.traverse((o) => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach((m) => {
+    m.map = base; m.normalMap = normal; m.roughnessMap = rough; m.metalnessMap = metal;
+    m.metalness = 1; m.roughness = 1; m.needsUpdate = true;
+  }); } });
+}
 function stripRootTravel(clip) {
   const tracks = clip.tracks.map((t) => {
     const nt = t.clone();
@@ -425,7 +474,7 @@ function fixDriveClip(clip) {
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
 
-// ---- Player (Rochelle_undercover, Mixamo, dual katanas) ----
+// ---- Player (Rochelle_combat, Mixamo, dual katanas) ----
 const player = new THREE.Group(); player.position.set(0, STAGE_TOP, -8); scene.add(player);
 let playerModel = null, mixer = null;
 const mxClips = {};
@@ -566,10 +615,17 @@ function attachKatana(side) {
   }, undefined, () => {});
 }
 
-fbxLoader.load('assets/characters/Rochelle_undercover.fbx', (obj) => {
+fbxLoader.load('assets/characters/Rochelle_combat.fbx', (obj) => {
+  // Measured in Three.js (Node/FBXLoader): bbox 0.920 x 1.000 x 0.226 m,
+  // height 1.000 m, so fitCharacter(obj, 1.8) scales her to 1.8 m — the
+  // same as Rochelle_undercover. Facing: both feet point +Z (toe minus
+  // foot is +Z on both sides), so she faces +Z like undercover did, and
+  // the player turn stays PI. Hand bones are Index + Thumb only (no
+  // Middle/Ring/Pinky) — measureHandAxes handles that (finger = index
+  // direction, dorsal = cross(finger, thumb)), same as the viewer.
   fitCharacter(obj, 1.8);
   obj.rotation.y = Math.PI;
-  applyBasecolor(obj, 'assets/characters/textures/Rochelle_basecolor.jpg');
+  applyPBR(obj, ROCHELLE_COMBAT_PBR);
   player.add(obj); playerModel = obj;
   mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
   handAxes = { R: measureHandAxes(obj, 'R'), L: measureHandAxes(obj, 'L') };
@@ -843,6 +899,16 @@ function updateEnemies(dt, t) {
         const sp = 1.2 * dt;
         e.x += ddx / dd * sp; e.z += ddz / dd * sp;
         if (e.is3D) faceEnemy3D(e, ddx, ddz);
+      } else {
+        // Close enough to this waypoint: snap exactly onto it. Without
+        // this, the enemy stalls within 0.1 m of the target while still
+        // on the far side of the threshold (z 7.59, just short of 7.5)
+        // and never moves or advances again — the stage-edge deadlock
+        // every browser check saw (counter stuck at 0/8). The snap is
+        // at most 0.1 m, imperceptible, and guarantees the next waypoint
+        // branch is taken on the next frame. Simulated: all 8 spawn
+        // points now reach the stage (chasing, z=5, y=0.9) in 7-20 s.
+        e.x = tx; e.z = tz;
       }
       if (e.is3D) playEnemyAnim(e, 'walk');
     } else if (e.state === 'chasing') {
@@ -939,7 +1005,7 @@ function updateDestructibles(dt) {
     drapeState.fallT += dt / 0.8;
     const k = Math.min(drapeState.fallT, 1);
     drape.rotation.x = 1.35 * k;
-    if (k >= 1) enemiesNear(drapeState.x, drapeState.z + 1, 1.8).forEach((e) => defeatEnemy(e));
+    if (k >= 1) enemiesNearDrape(1.8).forEach((e) => defeatEnemy(e));
   }
   if (crates.smashed && crates.group.userData.smashed !== true) {
     crates.group.userData.smashed = true;
@@ -985,7 +1051,12 @@ function trySlash() {
   for (const sb of sandbags) if (!sb.used && inFront(sb.x, sb.z, 2.4)) triggerSandbag(sb);
   if (!chandelier.used && inFront(chandelier.cleat.x, chandelier.cleat.z, 2.4)) triggerChandelier();
   for (const flat of setFlats) if (!flat.used && inFront(flat.x, flat.z, 2.4)) triggerSetFlat(flat);
-  if (!drapeState.used && inFront(drapeState.x, drapeState.z, 2.4)) triggerDrape();
+  if (!drapeState.used) {
+    // Trigger anywhere along the drape's width: the closest point on the
+    // drape segment (x -11.4..11.4, z=-5.8) to the player, not the centre.
+    const dcx = Math.max(-DRAPE_HALF_W, Math.min(DRAPE_HALF_W, player.position.x));
+    if (inFront(dcx, drapeState.z, 2.4)) triggerDrape();
+  }
   if (!crates.used && inFront(crates.x, crates.z, 2.4)) triggerCrates();
   for (const sp of [spotL, spotR]) if (!sp.used && inFront(sp.x, sp.z, 2.4)) triggerSpotlight(sp);
   if (!footlightsState.used && inFront(footlightsState.x, footlightsState.z, 2.4)) triggerFootlights();
