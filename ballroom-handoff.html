@@ -311,8 +311,9 @@ for (let z = -11.75; z <= 11.75; z += 1.5) colliders.push({ x: 17, z, r: 0.8, yM
 // ---- Exterior: mansion drive, round drive, bushes, steps, double doors (2026-11-04) ----
 // Kyle's mission starts outside. Ground is 1.5 m below the ballroom floor,
 // so a 6-step flight climbs from the drive to the double doors.
-// Bushes and mansion wings are procedural geometry (no bush/car model was
-// supplied for these); the white Lamborghini is the real repo GLB.
+// Bushes and mansion wings are procedural geometry (no bush model was
+// supplied for these); both Lamborghinis in the drive are the real repo GLB
+// (the black one is the white model with its paint tinted black at load).
 flatPlane(0, -1.5, 42, 80, 70, 0x2e5a2e, 'assets/textures/exterior/exterior_lawn_grass_clover_1024.webp', 8, 7); // lawn, extended south past the new road
 const driveMesh = cyl(0, -1.48, 32, 13, 13, 0.1, 0x333333); // round drive
 applyTex(driveMesh, 'assets/textures/exterior/exterior_drive_asphalt_1024.webp', 4, 4);
@@ -452,22 +453,18 @@ gltfLoader.load('assets/vehicles/white_lambo.glb', (gltf) => {
   g.position.set(11, -0.9, 32); g.rotation.y = 0.4; scene.add(g);
   colliders.push({ x: 11, z: 32, r: 2.8 });
 }, undefined, () => {});
-// Placeholder cars (procedural, not real models — replace with real GLBs later).
-// Body bottom sits 0.02 above the ground so no face is coplanar with the lawn/drive.
-function makePlaceholderCar(x, z, rotY, color) {
-  const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.6, 4.2), new THREE.MeshStandardMaterial({ color })); body.position.y = -1.18; g.add(body);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 2.2), new THREE.MeshStandardMaterial({ color: 0x222222 })); cabin.position.set(0, -0.61, -0.2); g.add(cabin); // 0.02 above the body top, not coplanar with it
-  const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12); wheelGeo.rotateZ(Math.PI / 2);
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-  [[-0.85, 1.4], [0.85, 1.4], [-0.85, -1.4], [0.85, -1.4]].forEach(([wx, wz]) => { const w = new THREE.Mesh(wheelGeo, wheelMat); w.position.set(wx, -1.25, wz); g.add(w); });
-  const lightMat = new THREE.MeshStandardMaterial({ color: 0xffeebb, emissive: 0x332200 });
-  [-0.6, 0.6].forEach((lx) => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.06), lightMat); l.position.set(lx, -1.1, 2.12); g.add(l); });
-  g.position.set(x, 0, z); g.rotation.y = rotY; scene.add(g);
-  colliders.push({ x, z, r: 2.6 }); return g;
-}
-makePlaceholderCar(-11, 32, Math.PI, 0x8a1a1a); // red sedan, west curb of the round drive, facing north
-makePlaceholderCar(2, 58, 0, 0x1a3a5a); // blue car on the south road, beyond the player limit, facing south
+// Black Lamborghini, west curb of the round drive — the same real repo GLB
+// loaded a second time, with its paint tinted black at load. The model is a
+// single textured mesh (paint baked into its texture), so the tint is a
+// near-black material color multiplied over the texture; no black_lambo.glb
+// exists and none was created — this is a paint job on the real model, not a
+// procedural car. The material is cloned so the white one stays white.
+gltfLoader.load('assets/vehicles/white_lambo.glb', (gltf) => {
+  const g = fitPropGroup(gltf.scene, 2.0, 1.2, 4.5); if (!g) return;
+  g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.color.setHex(0x111111); } });
+  g.position.set(-11, -0.9, 32); g.rotation.y = Math.PI; scene.add(g); // facing north, like the red sedan it replaces
+  colliders.push({ x: -11, z: 32, r: 2.8 });
+}, undefined, () => {});
 
 
 // ---- ActionForge characters: real GLB models + baked clips ----
