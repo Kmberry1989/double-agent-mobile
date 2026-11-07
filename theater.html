@@ -212,14 +212,18 @@ gltfLoader.load('assets/theater/models/audience_seats.glb', (gltf) => {
 box(0, 9.2, 0, 24, 0.4, 0.6, 0x2a1a12);
 
 // Spotlights (the cinematic pair): fixtures mounted in the house at y=8,
-// aimed at centre stage. Off until the cinematic turns them on, left first.
+// aimed at Rochelle at centre stage. Off until the cinematic turns them
+// on, left first.
 function makeSpotlight(x) {
   // The real spotlight.glb (dark metal fixture, 0.57 x 0.68 x 0.80 m).
-  // Aim it at centre stage with lookAt (+Z at the target). The visible
-  // beam cone + SpotLight stay as they were.
+  // Lens axis verified (UV/normal analysis): the lens glass faces the
+  // model's local +Z, the back cap -Z. So lookAt (+Z at the target)
+  // aims the lens at Rochelle. Aim at her torso (y=1.5), not the floor,
+  // so the fixture reads as tilted down toward centre stage, lens on her.
+  // The visible beam cone + SpotLight stay as they were.
   const g = new THREE.Group();
   g.position.set(x, 8, 15); scene.add(g);
-  g.lookAt(0, STAGE_TOP, 0);
+  g.lookAt(0, 1.5, 0);
   const inner = new THREE.Group(); g.add(inner);
   gltfLoader.load('assets/theater/models/spotlight.glb', (gltf) => {
     inner.add(gltf.scene);
@@ -296,11 +300,12 @@ const chandelier = { x: 0, z: -2, y: 7, dropped: false, falling: false, vy: 0, u
 }
 
 // ---- Set flats (topple-able painted backdrops) ----
-// set_flat.glb (painted garden panel, 0.60 x 1.00 m; scale 3.5 -> ~2.1 x
-// 3.5 m). Origin is centred, so the model is raised by half its scaled
-// height to sit on the stage floor. The outer group carries the facing
-// (rotation.y); the inner group carries the topple (rotation.x), pivoting
-// at the floor.
+// set_flat.glb (painted garden panel, 0.60 x 1.00 m; scale 5.0 -> ~3.0 x
+// 5.0 m, so they read as large stage flats, not door-sized panels).
+// Uniform scale, so the painted garden scene does not stretch. Origin is
+// centred, so the model is raised by half its scaled height to sit on
+// the stage floor. The outer group carries the facing (rotation.y); the
+// inner group carries the topple (rotation.x), pivoting at the floor.
 const setFlats = [];
 function makeSetFlat(x, z, rotY) {
   const outer = new THREE.Group();
@@ -309,31 +314,37 @@ function makeSetFlat(x, z, rotY) {
   inner.rotation.x = -0.08; outer.add(inner);
   gltfLoader.load('assets/theater/models/set_flat.glb', (gltf) => {
     const m = gltf.scene;
-    m.scale.setScalar(3.5);
-    m.position.set(0, 1.75, 0);
+    m.scale.setScalar(5.0);
+    m.position.set(0, 2.5, 0);
     inner.add(m);
   }, undefined, () => {});
   const flat = { x, z, mesh: inner, toppled: false, fallT: 0, used: false };
-  setFlats.push(flat); colliders.push({ x, z, r: 1.0 }); return flat;
+  setFlats.push(flat); colliders.push({ x, z, r: 1.5 }); return flat;
 }
 makeSetFlat(-8, -5, 0.3); makeSetFlat(8, -5, -0.3);
 
 // ---- Heavy main curtain (droppable upstage drape) ----
-// curtain.glb (red velvet drape, 1.52 x 2.37 m; scale 3.0 -> ~4.6 x 7.1 m).
-// Origin is centred, so the model is raised by half its scaled height to
-// hang from the floor up. The inner group topples it forward (+z, onto
-// enemies in front) when cut — a 3D model reads better toppling than the
-// old plane's slide-down.
+// curtain.glb (red velvet drape, 1.52 x 2.37 m; scale 3.0 -> ~4.6 x 7.1 m
+// per copy). One copy is only ~1/5 of the 24 m stage width, so the drape
+// is 5 copies side by side (spacing 4.56 m, centres -9.12..9.12, span
+// -11.4..11.4) to fill the proscenium. Repeating keeps the pleats
+// unstretched; a non-uniform scale would stretch them. Origin is
+// centred, so each copy is raised by half its scaled height to hang from
+// the floor up. All 5 copies live in the same inner group, so the whole
+// drape topples forward (+z, onto enemies in front) as one unit when cut.
 const drapeOuter = new THREE.Group();
 drapeOuter.position.set(0, STAGE_TOP, -5.8); scene.add(drapeOuter);
 const drape = new THREE.Group();
 drapeOuter.add(drape);
-gltfLoader.load('assets/theater/models/curtain.glb', (gltf) => {
-  const m = gltf.scene;
-  m.scale.setScalar(3.0);
-  m.position.set(0, 3.55, 0);
-  drape.add(m);
-}, undefined, () => {});
+for (let i = 0; i < 5; i++) {
+  const cx = -9.12 + i * 4.56;
+  gltfLoader.load('assets/theater/models/curtain.glb', (gltf) => {
+    const m = gltf.scene;
+    m.scale.setScalar(3.0);
+    m.position.set(cx, 3.55, 0);
+    drape.add(m);
+  }, undefined, () => {});
+}
 const drapeState = { x: 0, z: -5.8, dropped: false, fallT: 0, used: false };
 colliders.push({ x: 0, z: -5.8, r: 1.0 });
 
