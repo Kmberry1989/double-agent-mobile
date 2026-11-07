@@ -43,9 +43,9 @@
   <select id="weaponSelL" aria-label="Weapon in left hand"></select>
   <div id="wOff" hidden>
     <span class="wOffTitle">Weapon offset</span>
-    <label>X <input id="offX" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset X"><input id="offXn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset X value"></label>
-    <label>Y <input id="offY" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Y"><input id="offYn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Y value"></label>
-    <label>Z <input id="offZ" type="range" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Z"><input id="offZn" type="number" min="-0.2" max="0.2" step="0.001" value="0" aria-label="Weapon offset Z value"></label>
+    <label>X <input id="offX" type="range" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset X"><input id="offXn" type="number" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset X value"></label>
+    <label>Y <input id="offY" type="range" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset Y"><input id="offYn" type="number" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset Y value"></label>
+    <label>Z <input id="offZ" type="range" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset Z"><input id="offZn" type="number" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset Z value"></label>
     <label>Rot X <input id="offRX" type="range" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation X"><input id="offRXn" type="number" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation X value"></label>
     <label>Rot Y <input id="offRY" type="range" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Y"><input id="offRYn" type="number" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Y value"></label>
     <label>Rot Z <input id="offRZ" type="range" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Z"><input id="offRZn" type="number" min="-180" max="180" step="1" value="0" aria-label="Weapon rotation Z value"></label>
@@ -485,11 +485,21 @@ function classDefault(name) {
 // re-seeds it.
 const BAKED_OFFSETS = {
   'white aks74u': { x: -0.021, y: 0.014, z: 0.055, rx: -12, ry: 2, rz: 61, s: 1.32 },
-  // Katana (Rochelle's dual-wield): neutral — the file's own origin is the
-  // grip (the handle centre is 0.022 m from it), the blade runs along local
-  // -Z, and the computed grip rotation already puts the blade along the
-  // fingers, so no nudge, rotation, or scale is applied on top of it.
-  'katana': { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, s: 1 },
+  // Katana (Rochelle's dual-wield): the file's geometry is offset +0.744 m
+  // in mesh-local X from the node origin (the "re-origin" baked the node
+  // translation into the vertices instead of centring the grip on the
+  // origin), so the grip logic — which reads the node origin as the grip —
+  // puts the pivot on the hand while the real handle floats 0.753 m behind
+  // her back. These entries compensate: they move the pivot so the handle
+  // centre (mesh-local (0.744, 0.018, 0.109)) lands on the palm, verified
+  // in the Standing_Idle pose (handle-to-hand 0.000 m both hands, blade
+  // still along the fingers, dot 1.000). The left hand needs its OWN entry
+  // ('katana|L'): the hands are mirrors, so the X correction flips sign
+  // (+0.414 right, -0.412 left) — a single shared offset cannot fix both
+  // (baking the right value on both leaves the left handle 1.49 m off).
+  // The blade runs along local -Z; no rotation or scale is applied.
+  'katana': { x: 0.414, y: 0.060, z: -0.003, rx: 0, ry: 0, rz: 0, s: 1 },
+  'katana|L': { x: -0.412, y: 0.061, z: -0.031, rx: 0, ry: 0, rz: 0, s: 1 },
 };
 let curWeaponName = '';
 const wOffEl = document.getElementById('wOff');
@@ -506,13 +516,21 @@ OFF_AXES.forEach(a => {
 const offScale = document.getElementById('offS');
 const offScaleN = document.getElementById('offSn');
 const fmt3 = v => (v === 0 ? 0 : v).toFixed(3);
-function getOffset(name) {
-  if (!weaponOffsets.has(name)) {
-    // Priority: per-weapon baked entry first, then the weapon's class
-    // default (pistol/rifle), then the universal default (the rifle numbers).
-    const b = BAKED_OFFSETS[name] || {};
+// Side-aware offset lookup: most weapons share one entry for both hands,
+// but a weapon whose geometry sits far from its node origin (the katana)
+// needs a per-hand entry — the hands are mirrors, so the X correction flips
+// sign between them. A '|L' baked entry is used for the left hand when one
+// exists, otherwise the shared entry is used (unchanged behaviour for every
+// other weapon). The cache is keyed by name + side.
+function getOffset(name, forLeft) {
+  const key = forLeft ? name + '|L' : name;
+  if (!weaponOffsets.has(key)) {
+    // Priority: per-weapon baked entry first (side-specific, then shared),
+    // then the weapon's class default (pistol/rifle), then the universal
+    // default (the rifle numbers).
+    const b = (forLeft ? BAKED_OFFSETS[name + '|L'] : null) || BAKED_OFFSETS[name] || {};
     const c = classDefault(name);
-    weaponOffsets.set(name, {
+    weaponOffsets.set(key, {
       x: b.x ?? c.x,
       y: b.y ?? c.y,
       z: b.z ?? c.z,
@@ -522,7 +540,7 @@ function getOffset(name) {
       s: b.s ?? c.s,
     });
   }
-  return weaponOffsets.get(name);
+  return weaponOffsets.get(key);
 }
 function updateOffsetReadout() {
   const o = getOffset(curWeaponName);
@@ -539,7 +557,8 @@ function syncOffsetUI() {
 function applyWeaponOffset(pivot, name) {
   pivot = pivot || weaponPivot; name = name || curWeaponName;
   if (!pivot || !pivot.userData.basePos) return;
-  const o = getOffset(name);
+  // Side: the left pivot uses its own '|L' baked entry when one exists.
+  const o = getOffset(name, pivot === weaponPivotL);
   const b = pivot.userData.basePos;
   pivot.position.set(b.x + o.x, b.y + o.y, b.z + o.z);
 }
@@ -549,7 +568,7 @@ function applyWeaponOffset(pivot, name) {
 function applyWeaponRotation(pivot, name) {
   pivot = pivot || weaponPivot; name = name || curWeaponName;
   if (!pivot || !pivot.userData.baseQuat) return;
-  const o = getOffset(name);
+  const o = getOffset(name, pivot === weaponPivotL);
   const off = new THREE.Quaternion().setFromEuler(new THREE.Euler(
     THREE.MathUtils.degToRad(o.rx), THREE.MathUtils.degToRad(o.ry), THREE.MathUtils.degToRad(o.rz)
   ));
@@ -562,13 +581,16 @@ function applyWeaponRotation(pivot, name) {
 function applyWeaponScale(pivot, name) {
   pivot = pivot || weaponPivot; name = name || curWeaponName;
   if (!pivot || !pivot.userData.baseScale) return;
-  const o = getOffset(name);
+  const o = getOffset(name, pivot === weaponPivotL);
   const b = pivot.userData.baseScale;
   pivot.scale.set(b.x * o.s, b.y * o.s, b.z * o.s);
 }
 function setOffsetAxis(a, v) {
   const o = getOffset(curWeaponName);
-  o[a] = Math.max(-0.2, Math.min(0.2, v));
+  // Range widened ±0.2 -> ±0.5 m: the katana's tuned X (+0.414) sits outside
+  // the old range, and the old clamp would have snapped it to 0.2 the moment
+  // the slider was touched, destroying the grip.
+  o[a] = Math.max(-0.5, Math.min(0.5, v));
   offSliders[a].value = o[a];
   offNums[a].value = fmt3(o[a]);
   updateOffsetReadout();
