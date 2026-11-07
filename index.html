@@ -391,6 +391,9 @@ const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
 gltfLoader.setDRACOLoader(dracoLoader);
+// Preload the Draco decoder now, so its WASM is fetched before any GLB
+// decode is requested (avoids init races when many GLBs load at once).
+dracoLoader.preload();
 function normalizeCharacter(obj, targetHeight, yawOffset){
   obj.traverse((o)=>{ if (o.isMesh) o.castShadow = true; });
   obj.rotation.y = yawOffset || 0;
@@ -508,19 +511,30 @@ function fitPropChild(obj, targetW, targetH, targetD){
 }
 function addGLBToObstacle(obstacle, path, targetW, targetH, targetD, placements, onLoad){
   if (!obstacle) return;
-  gltfLoader.load(path, (gltf)=>{
-    // Optional material fix, applied to the loaded scene BEFORE cloning so
-    // every clone inherits it (clones share the material). Used by the
-    // white Lambo: its single material is metalness 1.0 and this page has
-    // no scene.environment, so without the fix it reads solid black.
-    if (onLoad) onLoad(gltf.scene);
-    (placements || [[0, 0, 0, 0]]).forEach(([px, py, pz, rotY])=>{
-      const child = fitPropChild(gltf.scene.clone(), targetW, targetH, targetD); if (!child) return;
-      const g = new THREE.Group(); g.add(child); g.position.set(px, py, pz); if (rotY) g.rotation.y = rotY;
-      obstacle.mesh.add(g);
+  // One retry on failure: a failed GLB load used to fail silently (empty
+  // error callback) and leave the fallback box visible forever. Log the
+  // failure with the path and error so it leaves a trace, and retry once
+  // after 2 s in case the decoder/fetch was not ready yet.
+  let tries = 0;
+  const attempt = ()=>{
+    gltfLoader.load(path, (gltf)=>{
+      // Optional material fix, applied to the loaded scene BEFORE cloning so
+      // every clone inherits it (clones share the material). Used by the
+      // white Lambo: its single material is metalness 1.0 and this page has
+      // no scene.environment, so without the fix it reads solid black.
+      if (onLoad) onLoad(gltf.scene);
+      (placements || [[0, 0, 0, 0]]).forEach(([px, py, pz, rotY])=>{
+        const child = fitPropChild(gltf.scene.clone(), targetW, targetH, targetD); if (!child) return;
+        const g = new THREE.Group(); g.add(child); g.position.set(px, py, pz); if (rotY) g.rotation.y = rotY;
+        obstacle.mesh.add(g);
+      });
+      obstacle.mesh.material.transparent = true; obstacle.mesh.material.opacity = 0; obstacle.mesh.material.depthWrite = false;
+    }, undefined, (err)=>{
+      console.warn('[double-agent] GLB failed to load:', path, err);
+      if (tries++ < 1) setTimeout(attempt, 2000);
     });
-    obstacle.mesh.material.transparent = true; obstacle.mesh.material.opacity = 0; obstacle.mesh.material.depthWrite = false;
-  }, undefined, ()=>{});
+  };
+  attempt();
 }
 // Sandbag walls (destructible): sandbag stacks repeated along the wall,
 // 3 rows high. Wall boxes are 16x2x3 at (-8,10) and 12x2x3 at (22,18).
@@ -627,6 +641,7 @@ groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground/ground_asphalt_tire_
 // Z side and the player could walk through them.
 const lamboBase = box(-24, 32, 4.5, 5.0, 1.2, 0x223344, undefined, { material: 'metal' });
 addGLBToObstacle(lamboBase, 'assets/vehicles/white_lambo.glb', 2.0, 1.2, 4.5, [[0, 0, 0, 0.6]], (scene) => {
+  console.info('[double-agent] white_lambo.glb loaded');
   // White paint fix (same as ballroom-handoff.html): the GLB's single
   // material is metalness 1.0 / roughness 1.0 with the white paint baked
   // into its texture, and this page has no scene.environment — a metal
