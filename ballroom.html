@@ -646,7 +646,7 @@ function loadGuestModel(npc, path) {
 }
 const NPCS = [
   makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/characters/Vickie.fbx', texture: 'assets/characters/textures/Vickie_basecolor.png', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Enjoy the music — and keep an eye on the cats.'] }),
-  makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/characters/Eric.fbx', texture: 'assets/characters/textures/Eric_basecolor.png', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
+  makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/characters/Eric.fbx', texture: 'assets/characters/textures/Eric_basecolor.png', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Photograph a collar if you get close to one — they seem to carry something.'] }),
   makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/characters/Kristen.fbx', texture: 'assets/characters/textures/Kristen_basecolor.png', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'Have you seen the cats? They run the place, really.'] }),
 ];
 // ---- Donald: always has a drink in hand, stumbles, falls over at times ----
@@ -676,8 +676,8 @@ puddle.rotation.x = -Math.PI / 2; puddle.position.set(9, 0.03, 4); scene.add(pud
 const PUDDLE = { x: 9, z: 4 };
 
 // ---- Cats: clue sources, friendly, never fightable/damageable ----
-// Each cat wears a collar with an electronic ID tag. Walking up and
-// pressing E / USE scans the tag and collects that cat's clue word.
+// Each cat wears a collar with a symbol tag. Walking up and
+// pressing E / USE photographs the collar and collects that cat's photo.
 function makeCat(cat) {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 12), new THREE.MeshStandardMaterial({ color: cat.color }));
@@ -717,12 +717,12 @@ function makeCat(cat) {
 const CATS = [
   // Margo: tortoiseshell gray (mottled gray coat), harder to find — she
   // sticks to secluded corners/edges and pauses much longer between moves.
-  makeCat({ name: 'Margo', role: 'cat', clue: 'velvet', color: 0x8a8a8a, patches: [0x555555, 0xb0b0b0, 0x666666], earColor: 0x555555, noseColor: 0x111111, shy: true, hidden: true, x: -17, z: 11, wps: [[-17, 11]], lines: ['*purr* — Tag scan: velvet. Collar ID registered.', 'Margo stretches and pads away.'] }),
+  makeCat({ name: 'Margo', role: 'cat', clue: 'velvet', color: 0x8a8a8a, patches: [0x555555, 0xb0b0b0, 0x666666], earColor: 0x555555, noseColor: 0x111111, shy: true, hidden: true, x: -17, z: 11, wps: [[-17, 11]], lines: ['*purr* — Photo: velvet. Collar symbol captured.', 'Margo stretches and pads away.'] }),
   // Moxie: black and white, black ears, black nose. Easy to find, but she
-  // runs from point to point — give her a treat at each stop to try a scan.
-  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0x111111, noseColor: 0x111111, chase: true, fed: false, fedTimer: 0, fleeing: false, treatsGiven: 0, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5], [-5, 9], [10, 2], [-3, 10]], lines: ['*purr* — Tag scan: midnight. Collar ID registered.', 'Moxie flicks her tail and sits down.'] }),
+  // runs from point to point — give her a treat at each stop to try a photo.
+  makeCat({ name: 'Moxie', role: 'cat', clue: 'midnight', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0x111111, noseColor: 0x111111, chase: true, fed: false, fedTimer: 0, fleeing: false, treatsGiven: 0, x: 4, z: 8, wps: [[4, 8], [7, 9], [5, 5], [-5, 9], [10, 2], [-3, 10]], lines: ['*purr* — Photo: midnight. Collar symbol captured.', 'Moxie flicks her tail and sits down.'] }),
   // Mabel: black and white, white ears, pink nose. Same treat rule as Moxie.
-  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0xffffff, noseColor: 0xff9eb0, chase: true, fed: false, fedTimer: 0, fleeing: false, treatsGiven: 0, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4], [-8, -8], [6, -3], [-6, 2]], lines: ['*purr* — Tag scan: waltz. Collar ID registered.', 'Mabel blinks slowly at you.'] }),
+  makeCat({ name: 'Mabel', role: 'cat', clue: 'waltz', color: 0x1a1a1a, patches: [0xf0f0f0, 0xffffff], earColor: 0xffffff, noseColor: 0xff9eb0, chase: true, fed: false, fedTimer: 0, fleeing: false, treatsGiven: 0, x: -1, z: -7, wps: [[-1, -7], [2, -6], [-2, -4], [-8, -8], [6, -3], [-6, 2]], lines: ['*purr* — Photo: waltz. Collar symbol captured.', 'Mabel blinks slowly at you.'] }),
 ];
 // Cats join the talkable/wandering set, so E / USE, prompts, and
 // wandering all work for them exactly like the guests. They have no
@@ -758,7 +758,7 @@ document.getElementById('dialog').addEventListener('pointerdown', (e) => {
 });
 
 // Real cat collars replace the torus collars when loaded (the glowing tag
-// stays — it is the scannable part).
+// stays — it is the part you photograph).
 gltfLoader.load('assets/props/cat_collar.glb', (gltf)=>{
   CATS.forEach((cat)=>{
     const g = fitPropGroup(gltf.scene.clone(), 0.16, 0.04, 0.16); if (!g) return;
@@ -1058,7 +1058,7 @@ function closeWindow() {
 // ---- Cat chase + treats + Margo reveal ----
 // Taming loop, all three cats: a cat runs from point to point away from
 // you. At each stop, press E / USE once to give it a treat — it stays put
-// for a few seconds — then tap USE again to scan its tag. If you
+// for a few seconds — then tap USE again to photograph its collar. If you
 // wait too long after the treat, it runs to the next point and you have
 // to give it another treat to try again. Treats are unlimited; there is
 // no treat pickup or inventory to manage.
@@ -1135,7 +1135,7 @@ function talkTo(npc) {
 function showLine() {
   if (!talking) return;
   let line = talking.lines[lineIdx % talking.lines.length];
-  if (talking.role === 'cat' && !talking.fed) line = 'You offer ' + talking.name + ' a treat. She sniffs it, eats it, and stays put — quick, tap USE again to scan her tag before she changes her mind.';
+  if (talking.role === 'cat' && !talking.fed) line = 'You offer ' + talking.name + ' a treat. She sniffs it, eats it, and stays put — quick, tap USE again to photograph her collar before she changes her mind.';
   typeDialogue(talking.name, line); document.getElementById('dialog').style.display = 'block';
   playClip('talk');
   if (talking.mixer) playMxCharClip(talking, 'talk');
@@ -1273,7 +1273,7 @@ function animate() {
     // The prompt element was removed with the HUD text, so prompt is null:
     // only end a conversation when nobody is nearby, not on every frame.
     // (Without this, dialogue closed one frame after opening.)
-    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — tap USE'; prompt.style.display = 'block'; } }
+    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Photograph ' + best.name + '\'s collar' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — tap USE'; prompt.style.display = 'block'; } }
     else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
       if (prompt) { prompt.textContent = photos.length === 3 ? 'North exit open — tap USE to leave' : 'North exit is locked — photograph all 3 collars first (moon, note, rose)'; prompt.style.display = 'block'; }
     } else { if (prompt) prompt.style.display = 'none'; if (talking) endTalk(); }
@@ -1303,12 +1303,12 @@ function animate() {
       }
       if (n.role === 'cat' && n.hiding) {
         // Margo stays put in her hiding place, but a treat still expires:
-        // wait too long and you have to give her another one to scan.
+        // wait too long and you have to give her another one to photograph.
         if (n.fed) { n.fedTimer -= dt; if (n.fedTimer <= 0) { n.fed = false; setTreat(n, false); } }
         continue;
       }
       if (n.role === 'cat' && n.fed) {
-        // Fed cat sits still, ready to scan — until the treat window runs out.
+        // Fed cat sits still, ready for her photo — until the treat window runs out.
         n.fedTimer -= dt;
         if (n.fedTimer <= 0) { fleeCat(n); continue; }
         continue;
