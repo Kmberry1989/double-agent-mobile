@@ -26,10 +26,14 @@
   button:active { background: #3a3a3a; }
   .copy-all { background: #24384d; border-color: #4a6a8a; }
   .hidden { display: none !important; }
+  .levels{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .levels a{min-height:44px;display:inline-flex;align-items:center;padding:0 16px;font-size:15px;border-radius:8px;border:1px solid #555;background:#2a2a2a;color:#eee;text-decoration:none}
+  .levels a.cur{opacity:.45;pointer-events:none}
   #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #333; color: #eee; padding: 12px 20px; border-radius: 8px; font-size: 15px; display: none; z-index: 10; }
 </style>
 </head>
 <body>
+<nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html" class="cur" aria-current="page">Wishlist</a></nav>
 <h1>Double Agent — Asset Wishlist (2026-11-05)</h1>
 <p class="note">New wishlist, 2026-11-05, checked against the repo. Donald drunk clips, the waltz (with distance-based volume), the south road, curbside Lambo and placeholder cars are now wired in and are NOT re-listed as missing. Items already wired in are NOT re-listed as missing. This mirrors <a href="ASSETS-WISHLIST.md">ASSETS-WISHLIST.md</a> in this repo. Cards marked <b>Wiring note</b> are NOT for regeneration: the asset already exists and is either wired in or waiting to be wired in. Object, character, and weapon textures are already baked into the model files, so they are not listed here — only environment textures are.</p>
 <input id="filter" type="search" placeholder="Filter wishlist…" aria-label="Filter wishlist">

@@ -26,6 +26,10 @@
   #movePad { position: absolute; right: 12px; bottom: 90px; display: none; grid-template-columns: repeat(3, 48px); gap: 4px; z-index: 6; }
   #movePad button { height: 48px; font-size: 18px; background: rgba(40,40,40,0.8); color: #eee; border: 1px solid #555; border-radius: 8px; }
   #movePad.show { display: grid; }
+  #levelsPanel{position:absolute;top:100%;right:8px;z-index:6;background:rgba(0,0,0,.88);border:1px solid #444;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:170px}
+  #levelsPanel[hidden]{display:none}
+  #levelsPanel a{background:#222;color:#eee;border:1px solid #444;border-radius:6px;padding:8px 10px;font-size:13px;text-decoration:none}
+  #levelsPanel a.cur{opacity:.45;pointer-events:none}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
@@ -61,6 +65,8 @@
   <button id="topBtn" type="button">Top</button>
   <button id="resetBtn" type="button">Reset view</button>
   <button id="shootBtn" type="button">Kyle shoot test</button>
+  <button id="levelsBtn" type="button">Levels</button>
+  <nav id="levelsPanel" class="levels" hidden><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html" class="cur" aria-current="page">Viewer</a><a href="wishlist.html">Wishlist</a></nav>
 </div>
 <div id="movePad">
   <span></span><button data-mv="f" type="button">▲</button><span></span>
@@ -749,6 +755,7 @@ document.getElementById('shootBtn').addEventListener('click', () => {
   pendingAnim = 'Pistol_Fire_Recoil'; modelSel.value = 'Kyle'; weaponSel.value = 'white glock';
   loadModel('Kyle'); // weapon option values come from filenames, lowercase
 });
+document.getElementById('levelsBtn').addEventListener('click', () => { const p = document.getElementById('levelsPanel'); p.hidden = !p.hidden; });
 document.getElementById('camBtn').addEventListener('click', e => {
   camMode = camMode === 'orbit' ? 'free' : 'orbit';
   e.target.textContent = 'Camera: ' + (camMode === 'orbit' ? 'Orbit' : 'Free look');
