@@ -857,7 +857,20 @@ function updateEnemies(dt, t) {
     }
   }
   if (started && !won && !cine && !bowPhase && defeated < 8) {
-    const live = enemies.some((e) => e.state === 'rising' || e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'falling');
+    // A 'falling' enemy is dying, not a live fighter — it must not block the
+    // watchdog. (The normal flow already spawns the next enemy the moment
+    // one falls, so the next one is 'rising' while this one tips over. If
+    // that spawn was missed and the corpse is stuck in 'falling', the old
+    // watchdog counted it as live and never fired — the fight stalled at
+    // N/8 with a persistent corpse.) Force-gone any falling enemy past the
+    // 0.6 s fall, then spawn the next one if no live fighter remains.
+    for (const e of enemies) {
+      if (e.state === 'falling' && e.fallT > 0.6) {
+        console.warn('theater: watchdog forcing stuck falling enemy gone', e.i);
+        e.state = 'gone'; if (e.mesh) e.mesh.visible = false;
+      }
+    }
+    const live = enemies.some((e) => e.state === 'rising' || e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing');
     if (!live) { console.warn('theater: no live enemy, watchdog spawning next'); spawnNextEnemy(); }
   }
 }
@@ -907,6 +920,11 @@ function updateOneEnemy(e, dt, t) {
       } else {
         e.mesh.rotation.x = -Math.PI / 2 * k;
         e.mesh.material.opacity = 1 - k;
+        // Lower the corpse to the floor as it tips. The plane is centred at
+        // e.y + 0.9, so tipping it in place would leave it lying flat 1.8 m
+        // in the air; the centre height follows cos(angle) so the bottom
+        // edge stays on the ground and the corpse settles flat on the floor.
+        e.mesh.position.set(e.x, e.y + 0.9 * Math.cos(Math.PI / 2 * k) + 0.02 * k, e.z);
       }
       if (k >= 1) { e.state = 'gone'; e.mesh.visible = false; }
       return;
