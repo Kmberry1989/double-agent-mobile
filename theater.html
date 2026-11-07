@@ -204,6 +204,10 @@ gltfLoader.load('assets/theater/models/audience_seats.glb', (gltf) => {
     for (let i = 0; i < 6; i++) {
       const c = src.clone();
       c.position.set(-3.75 + i * 1.5, 0.22, 0);
+      // The GLB's backrest is at local -Z, so unrotated the seats face
+      // +Z (the back wall). Turn each seat 180 deg so it faces -Z,
+      // toward the stage.
+      c.rotation.y = Math.PI;
       g.add(c);
     }
   }
