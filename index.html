@@ -459,9 +459,11 @@ function texturedMat(color, path, rx, ry){
 // Visual-only ground patch: flat plane just above the ground. It is NOT in
 // obstacles or losMeshes, so it blocks nothing — no movement collision, no
 // guard vision, no shooting. Its fallback colour shows if the texture fails.
+const wetMats = []; // ground materials that get the Storm wet look (setWeather)
 function groundPatch(x, z, w, d, color, path, rx, ry){
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), texturedMat(color, path, rx, ry));
   m.rotation.x = -Math.PI/2; m.position.set(x, 0.02, z); m.receiveShadow = true; scene.add(m);
+  wetMats.push(m.material);
 }
 const obstacles = []; // {mesh, minX,maxX,minZ,maxZ} for collision + LOS
 const losMeshes = [];
@@ -476,6 +478,7 @@ function box(x,z,w,d,h,color,y,opts){
 }
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(90,90), texturedMat(0x6f7d5a, 'assets/textures/ground/ground_concrete_slab_1024.webp', 12, 12));
 ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+wetMats.push(ground.material);
 // Perimeter + courtyard structures. Coordinates are in metres, centre is (0,0).
 box(0,-42,90,2,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(0,42,90,2,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(-42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]});
 box(-20,-18,14,2,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(18,-12,2,16,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/props/prop_sandbag_wall_hessian_1024.webp',texRepeat:[5,1]});
@@ -1130,10 +1133,17 @@ function damageDestructible(o, dmg, point, normal){
 // can never leave it, and it is in no gameplay list — it blocks no movement,
 // shooting, or guard vision. Clouds are 8 shared-material sprites with a
 // canvas-generated soft-puff texture (no external assets, no per-frame
-// texture regeneration). Rain is 600 line segments in a box around the
-// player (capped for phones). Weather NEVER changes guard vision ranges,
-// detection, weapon damage, or movement — fog only changes what the player
-// sees; hasLOS() and guard AI read the same lists as before.
+// texture regeneration). Rain is 1000 line segments in a box around the
+// player (capped for phones; ~1000 trivial JS ops + one small buffer upload
+// per frame, far below 0.1 ms). Storm adds lightning: a brief whole-scene
+// flash (sky shader + lights + background/fog) at random 6–18 s intervals,
+// sometimes a double flash. Storm also wets the ground: the ground slab +
+// ground patches get shinier (roughness 0.9 -> 0.4) and darker (x0.72) — a
+// material tweak only, no wet textures exist. There is NO thunder audio:
+// assets/audio/ holds gunshot/slash sounds only, and no thunder sound is
+// invented. Weather NEVER changes guard vision ranges, detection, weapon
+// damage, or movement — fog only changes what the player sees; hasLOS()
+// and guard AI read the same lists as before.
 const skyGroup = new THREE.Group(); scene.add(skyGroup);
 const SUN_DIR = new THREE.Vector3(0.5, 0.62, 0.35).normalize();
 const skyUniforms = {
@@ -1141,12 +1151,14 @@ const skyUniforms = {
   horizonColor: { value: new THREE.Color(0xd9e8e6) },
   sunDir: { value: SUN_DIR },
   sunColor: { value: new THREE.Color(0xfff2b0) },
-  sunIntensity: { value: 1.0 }
+  sunIntensity: { value: 1.0 },
+  flashColor: { value: new THREE.Color(0xdfe8ff) },
+  flashIntensity: { value: 0 }
 };
 const skyMat = new THREE.ShaderMaterial({
   uniforms: skyUniforms, side: THREE.BackSide, depthWrite: false, fog: false,
   vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: 'varying vec3 vDir; uniform vec3 topColor; uniform vec3 horizonColor; uniform vec3 sunDir; uniform vec3 sunColor; uniform float sunIntensity; void main(){ float h = clamp(vDir.y, -1.0, 1.0); vec3 col = mix(horizonColor, topColor, pow(max(h, 0.0), 0.55)); if (h < 0.0) col = mix(horizonColor, horizonColor * 0.72, clamp(-h * 3.0, 0.0, 1.0)); float s = max(dot(normalize(vDir), sunDir), 0.0); col += sunColor * (pow(s, 350.0) * 1.2 + pow(s, 8.0) * 0.18) * sunIntensity; gl_FragColor = vec4(col, 1.0); }'
+  fragmentShader: 'varying vec3 vDir; uniform vec3 topColor; uniform vec3 horizonColor; uniform vec3 sunDir; uniform vec3 sunColor; uniform float sunIntensity; uniform vec3 flashColor; uniform float flashIntensity; void main(){ float h = clamp(vDir.y, -1.0, 1.0); vec3 col = mix(horizonColor, topColor, pow(max(h, 0.0), 0.55)); if (h < 0.0) col = mix(horizonColor, horizonColor * 0.72, clamp(-h * 3.0, 0.0, 1.0)); float s = max(dot(normalize(vDir), sunDir), 0.0); col += sunColor * (pow(s, 350.0) * 1.2 + pow(s, 8.0) * 0.18) * sunIntensity; col += flashColor * flashIntensity; gl_FragColor = vec4(col, 1.0); }'
 });
 skyGroup.add(new THREE.Mesh(new THREE.SphereGeometry(200, 24, 16), skyMat));
 // Sun sprites (always face the camera): a bright core + a soft glow.
@@ -1182,9 +1194,12 @@ for (let i = 0; i < 8; i++){
   sp.position.set(-140 + Math.random() * 280, 45 + Math.random() * 45, -140 + Math.random() * 280);
   skyGroup.add(sp); clouds.push(sp);
 }
-// Rain: 600 short line segments in a 60x30x60 box. Reused every frame;
+// Rain: 1000 short line segments in a 60x30x60 box. Reused every frame;
 // the group is re-centred on the player, so rain always falls around you.
-const RAIN_COUNT = 600;
+// Fall speed / slant come from the active weather preset (Storm falls
+// faster and slants harder than plain Rain).
+const RAIN_COUNT = 1000;
+let rainFallSpeed = 30, rainSlant = 2;
 const rainPos = new Float32Array(RAIN_COUNT * 6);
 const rainDrops = [];
 for (let i = 0; i < RAIN_COUNT; i++) rainDrops.push({ x: -30 + Math.random() * 60, y: Math.random() * 30, z: -30 + Math.random() * 60 });
@@ -1197,41 +1212,98 @@ function updateRain(dt){
   if (!rainGroup.visible) return;
   for (let i = 0; i < RAIN_COUNT; i++){
     const d = rainDrops[i];
-    d.y -= 30 * dt; d.x -= 2 * dt;
+    d.y -= rainFallSpeed * dt; d.x -= rainSlant * dt;
     if (d.y < 0){ d.y = 28 + Math.random() * 4; d.x = -30 + Math.random() * 60; d.z = -30 + Math.random() * 60; }
     rainPos[i * 6] = d.x; rainPos[i * 6 + 1] = d.y; rainPos[i * 6 + 2] = d.z;
-    rainPos[i * 6 + 3] = d.x + 0.15; rainPos[i * 6 + 4] = d.y - 0.7; rainPos[i * 6 + 5] = d.z;
+    rainPos[i * 6 + 3] = d.x + rainSlant * 0.075; rainPos[i * 6 + 4] = d.y - 0.7; rainPos[i * 6 + 5] = d.z;
   }
   rainGeo.attributes.position.needsUpdate = true;
 }
 const WEATHERS = {
-  Clear:  { fogColor: 0x87a5a0, fogNear: 60, fogFar: 140, top: 0x2f6fc0, horizon: 0xd9e8e6, sunI: 1.0,  hemi: 0.9,  sun: 1.2, cloudOp: 0.75, cloudTint: 0xffffff, rain: false },
-  Cloudy: { fogColor: 0x9aa5a8, fogNear: 45, fogFar: 110, top: 0x5a7a94, horizon: 0xc8cfcf, sunI: 0.25, hemi: 0.7,  sun: 0.7, cloudOp: 1.0,  cloudTint: 0xd0d5d8, rain: false },
-  Rain:   { fogColor: 0x6f7d82, fogNear: 30, fogFar: 85,  top: 0x3d4f5e, horizon: 0x8a9499, sunI: 0.05, hemi: 0.55, sun: 0.4, cloudOp: 1.0,  cloudTint: 0x8f979c, rain: true },
-  Fog:    { fogColor: 0xb8c0bd, fogNear: 8,  fogFar: 45,  top: 0x9aa8a6, horizon: 0xcdd2cd, sunI: 0.1,  hemi: 0.65, sun: 0.5, cloudOp: 0.35, cloudTint: 0xe8ecea, rain: false }
+  Clear:  { fogColor: 0x87a5a0, fogNear: 60, fogFar: 140, top: 0x2f6fc0, horizon: 0xd9e8e6, sunI: 1.0,  hemi: 0.9,  sun: 1.2, cloudOp: 0.75, cloudTint: 0xffffff, rain: false, rainSpeed: 30, rainSlant: 2, wet: false },
+  Cloudy: { fogColor: 0x9aa5a8, fogNear: 45, fogFar: 110, top: 0x5a7a94, horizon: 0xc8cfcf, sunI: 0.25, hemi: 0.7,  sun: 0.7, cloudOp: 1.0,  cloudTint: 0xd0d5d8, rain: false, rainSpeed: 30, rainSlant: 2, wet: false },
+  Rain:   { fogColor: 0x6f7d82, fogNear: 30, fogFar: 85,  top: 0x3d4f5e, horizon: 0x8a9499, sunI: 0.05, hemi: 0.55, sun: 0.4, cloudOp: 1.0,  cloudTint: 0x8f979c, rain: true,  rainSpeed: 30, rainSlant: 2, wet: false },
+  Storm:  { fogColor: 0x4a5458, fogNear: 22, fogFar: 90,  top: 0x1e2a33, horizon: 0x5a6468, sunI: 0.0,  hemi: 0.5,  sun: 0.3, cloudOp: 1.0,  cloudTint: 0x565e63, rain: true,  rainSpeed: 42, rainSlant: 5, wet: true },
+  Fog:    { fogColor: 0xb8c0bd, fogNear: 8,  fogFar: 45,  top: 0x9aa8a6, horizon: 0xcdd2cd, sunI: 0.1,  hemi: 0.65, sun: 0.5, cloudOp: 0.35, cloudTint: 0xe8ecea, rain: false, rainSpeed: 30, rainSlant: 2, wet: false }
 };
-const WEATHER_ORDER = ['Clear', 'Cloudy', 'Rain', 'Fog'];
+const WEATHER_ORDER = ['Clear', 'Cloudy', 'Rain', 'Storm', 'Fog'];
 let weather = 'Clear';
+// Base light/fog colours for the active preset; the lightning flash lerps
+// off these each frame so a strike never leaves the scene stuck bright.
+let baseHemi = 0.9, baseSun = 1.2;
+const baseBg = new THREE.Color(0x87a5a0), baseFog = new THREE.Color(0x87a5a0);
 function setWeather(name, announce){
   weather = name; const w = WEATHERS[name];
   skyUniforms.topColor.value.setHex(w.top); skyUniforms.horizonColor.value.setHex(w.horizon); skyUniforms.sunIntensity.value = w.sunI;
   scene.fog.color.setHex(w.fogColor); scene.fog.near = w.fogNear; scene.fog.far = w.fogFar;
   scene.background.setHex(w.horizon);
   hemi.intensity = w.hemi; sun.intensity = w.sun;
+  baseHemi = w.hemi; baseSun = w.sun; baseBg.setHex(w.horizon); baseFog.setHex(w.fogColor);
   cloudMat.opacity = w.cloudOp; cloudMat.color.setHex(w.cloudTint);
   sunCore.material.opacity = 0.25 + 0.75 * w.sunI; sunGlow.material.opacity = w.sunI;
   rainGroup.visible = w.rain;
+  rainLines.material.opacity = w.rain ? (name === 'Storm' ? 0.7 : 0.55) : 0.55;
+  rainFallSpeed = w.rainSpeed; rainSlant = w.rainSlant;
+  // Wet ground (Storm only, material tweak — no new textures): the main
+  // ground slab + all ground patches get shinier (roughness 0.9 -> 0.4)
+  // and darker (x0.72). darkFrac makes a late texture load re-apply the
+  // darkening; the multiply handles the colour already on screen, and
+  // wetFrac tracks it so toggling weather never compounds the factor.
+  const wet = !!w.wet;
+  for (const m of wetMats){
+    m.roughness = wet ? 0.4 : 0.9;
+    m.userData.darkFrac = wet ? 0.72 : undefined;
+    const target = wet ? 0.72 : 1, cur = m.userData.wetFrac || 1;
+    if (target !== cur){ m.color.multiplyScalar(target / cur); m.userData.wetFrac = target; }
+  }
+  // Lightning state: a fresh strike a few seconds after entering Storm.
+  boltFlash = 0; boltSecond = -1;
+  boltNext = name === 'Storm' ? 3 + Math.random() * 3 : 5 + Math.random() * 8;
+  applyFlash();
   const el = document.getElementById('weatherText'); if (el) el.textContent = 'Weather: ' + name;
   const btn = document.getElementById('btnWeather'); if (btn) btn.textContent = 'WX';
   if (announce) showMsg('Weather: ' + name, 1400);
 }
+// ---------- Lightning (Storm only) ----------
+// Strike timing: next strike in 6–18 s, randomized. A strike is a full
+// flash that decays fast (~70 ms), and 70% of the time a weaker second
+// pulse ~0.2 s later — the classic double flash. applyFlash() pushes the
+// flash into the sky shader, both lights, and the background/fog colours.
+const FLASH_BG = new THREE.Color(0xcfd8e6);
+let boltNext = 5 + Math.random() * 8, boltFlash = 0, boltSecond = -1;
+function applyFlash(){
+  const f = boltFlash;
+  skyUniforms.flashIntensity.value = f;
+  hemi.intensity = baseHemi + f * 1.6;
+  sun.intensity = baseSun + f * 2.2;
+  scene.background.copy(baseBg).lerp(FLASH_BG, f * 0.6);
+  scene.fog.color.copy(baseFog).lerp(FLASH_BG, f * 0.6);
+}
+function updateLightning(dt){
+  if (weather !== 'Storm'){
+    if (boltFlash !== 0){ boltFlash = 0; applyFlash(); }
+    boltSecond = -1;
+    return;
+  }
+  boltNext -= dt;
+  if (boltNext <= 0){
+    boltFlash = 1.0;
+    boltSecond = Math.random() < 0.7 ? 0.16 + Math.random() * 0.08 : -1;
+    boltNext = 6 + Math.random() * 12; // next strike in 6–18 s
+  }
+  if (boltSecond > 0){ boltSecond -= dt; if (boltSecond <= 0){ boltFlash = Math.max(boltFlash, 0.65); boltSecond = -1; } }
+  boltFlash *= Math.exp(-dt * 14);
+  if (boltFlash < 0.01) boltFlash = 0;
+  applyFlash();
+}
 function cycleWeather(){ setWeather(WEATHER_ORDER[(WEATHER_ORDER.indexOf(weather) + 1) % WEATHER_ORDER.length], true); }
-setWeather('Clear', false);
+setWeather('Storm', false);
 function updateSky(dt){
   skyGroup.position.copy(player.position);
   rainGroup.position.set(player.position.x, 0, player.position.z);
   for (const c of clouds){ c.position.x += dt * 1.5; if (c.position.x > 160) c.position.x = -160; }
   updateRain(dt);
+  updateLightning(dt);
 }
 
 
