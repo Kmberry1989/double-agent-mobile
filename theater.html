@@ -131,13 +131,25 @@ flatPlane(0, 10, 10, 28, 40, 0x2a3a3a, TEX + 'theater_ceiling_1024.webp', 6, 8, 
 const pilL = box(-12.4, 4, 6, 0.8, 8, 0.8, 0xc9a227); applyTex(pilL, TEX + 'theater_gold_trim_1024.webp', 1, 4);
 const pilR = box(12.4, 4, 6, 0.8, 8, 0.8, 0xc9a227); applyTex(pilR, TEX + 'theater_gold_trim_1024.webp', 1, 4);
 const archTop = box(0, 8.2, 6, 25.6, 0.8, 0.8, 0xc9a227); applyTex(archTop, TEX + 'theater_gold_trim_1024.webp', 12, 1);
-// Footlights: a low brass strip along the stage front edge + a row of
-// small glowing lamps.
-const footStrip = new THREE.Mesh(new THREE.BoxGeometry(22, 0.18, 0.3), new THREE.MeshStandardMaterial({ color: 0x8a6b3a }));
-footStrip.position.set(0, STAGE_TOP + 0.09, 5.85); scene.add(footStrip);
+// Footlights: the real footlights.glb (gold strip with round lamps),
+// repeated along the stage front edge. The GLB is 2.12 m wide, so 10
+// copies spaced 2.2 m cover the 22 m front. The glowing lamp spheres
+// stay (raised to sit above the GLB strip).
+const footlightsGroup = new THREE.Group();
+footlightsGroup.position.set(0, STAGE_TOP + 0.09, 5.85); scene.add(footlightsGroup);
+const footlightsParts = [];
+gltfLoader.load('assets/theater/models/footlights.glb', (gltf) => {
+  for (let i = 0; i < 10; i++) {
+    const c = gltf.scene.clone();
+    c.position.set(-9.9 + i * 2.2, 0, 0);
+    footlightsGroup.add(c);
+    footlightsParts.push(c);
+  }
+}, undefined, () => {});
+const footlightsState = { x: 0, z: 5.85, used: false, smashed: false, parts: footlightsParts };
 for (let x = -10; x <= 10; x += 2.5) {
   const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.6 }));
-  lamp.position.set(x, STAGE_TOP + 0.2, 5.85); scene.add(lamp);
+  lamp.position.set(x, STAGE_TOP + 0.3, 5.85); scene.add(lamp);
 }
 const footLight = new THREE.PointLight(0xffc94d, 30, 18); footLight.position.set(0, 2, 8); scene.add(footLight);
 
@@ -166,18 +178,11 @@ applyTex(valance, TEX + 'theater_red_velvet_curtain_1024.webp', 6, 1);
 // seat velvet. The blocks are colliders (the seating area is not walkable;
 // the player uses the centre aisle and the side aisles).
 const colliders = [];
-function seatBlock(cx, cz, noCollider) {
+const seatGroups = []; // holders filled once audience_seats.glb loads
+function seatBlock(cx, cz, noCollider, baseY) {
   const g = new THREE.Group();
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(9, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0x7a1a1a }));
-  seat.position.set(0, 0.45, 0); g.add(seat);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(9, 1.0, 0.25), new THREE.MeshStandardMaterial({ color: 0x7a1a1a }));
-  back.position.set(0, 0.95, 0.35); g.add(back);
-  for (let i = 0; i <= 6; i++) {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.35, 0.6), new THREE.MeshStandardMaterial({ color: 0x7a1a1a }));
-    arm.position.set(-4.5 + i * 1.5, 0.85, 0); g.add(arm);
-  }
-  g.traverse((o) => { if (o.isMesh) applyTex(o, TEX + 'theater_seat_velvet_1024.webp', 3, 1); });
-  g.position.set(cx, 0, cz); scene.add(g);
+  g.position.set(cx, baseY || 0, cz); scene.add(g);
+  seatGroups.push(g);
   if (!noCollider) colliders.push({ x: cx, z: cz, r: 4.5 });
   return g;
 }
@@ -187,27 +192,46 @@ for (let z = 10; z <= 28; z += 2) { seatBlock(-6.5, z); seatBlock(6.5, z); }
 // balcony seats add no colliders (they sit on the tier, above the player).
 box(0, 3.5, 28.5, 26, 1, 3, 0x2a1a12);
 const balRail = box(0, 4.6, 27.1, 26, 0.9, 0.15, 0xc9a227); applyTex(balRail, TEX + 'theater_gold_trim_1024.webp', 12, 1);
-const balSeatL = seatBlock(-6.5, 29, true); balSeatL.position.y = 4;
-const balSeatR = seatBlock(6.5, 29, true); balSeatR.position.y = 4;
+const balSeatL = seatBlock(-6.5, 29, true, 4);
+const balSeatR = seatBlock(6.5, 29, true, 4);
+// audience_seats.glb is 1.50 m wide; a 9 m block takes 6 copies side by
+// side (spacing 1.50). Origin is centred (min Y -0.22), so each copy sits
+// at y=+0.22 above its block's base. Seats are static scenery, NOT
+// destructible (enemies rise from them). Loaded once, then cloned.
+gltfLoader.load('assets/theater/models/audience_seats.glb', (gltf) => {
+  const src = gltf.scene;
+  for (const g of seatGroups) {
+    for (let i = 0; i < 6; i++) {
+      const c = src.clone();
+      c.position.set(-3.75 + i * 1.5, 0.22, 0);
+      g.add(c);
+    }
+  }
+}, undefined, () => {});
 // Fly loft: a beam above the stage the rigging hangs from.
 box(0, 9.2, 0, 24, 0.4, 0.6, 0x2a1a12);
 
 // Spotlights (the cinematic pair): fixtures mounted in the house at y=8,
 // aimed at centre stage. Off until the cinematic turns them on, left first.
 function makeSpotlight(x) {
+  // The real spotlight.glb (dark metal fixture, 0.57 x 0.68 x 0.80 m).
+  // Aim it at centre stage with lookAt (+Z at the target). The visible
+  // beam cone + SpotLight stay as they were.
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.9, 16), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
-  body.rotation.x = Math.PI / 3; g.add(body);
-  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.32, 16), new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x000000 }));
-  lens.position.set(0, -0.32, 0.32); lens.rotation.x = -Math.PI / 3 + Math.PI / 2; g.add(lens);
-  const yoke = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 8, 20, Math.PI), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
-  yoke.position.y = 0.4; g.add(yoke);
   g.position.set(x, 8, 15); scene.add(g);
+  g.lookAt(0, STAGE_TOP, 0);
+  const inner = new THREE.Group(); g.add(inner);
+  gltfLoader.load('assets/theater/models/spotlight.glb', (gltf) => {
+    inner.add(gltf.scene);
+  }, undefined, () => {});
   const cone = new THREE.Mesh(new THREE.ConeGeometry(2.2, 9, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
   cone.position.set(x, 4.2, 7.5); cone.rotation.x = Math.PI / 2 + 0.55; scene.add(cone);
   const spot = new THREE.SpotLight(0xfff2c0, 0, 30, 0.35, 0.4, 1.2);
   spot.position.set(x, 8, 15); spot.target.position.set(0, STAGE_TOP, 0); scene.add(spot); scene.add(spot.target);
-  return { group: g, cone, spot, lens };
+  // No separate lens mesh on the GLB (single material), so lens is null;
+  // the cinematic guards the lens-glow lines. Smashable: slash near the
+  // fixture's floor position (x, 15) to knock it down.
+  return { group: g, inner, cone, spot, lens: null, x, z: 15, used: false, falling: false, vy: 0 };
 }
 const spotL = makeSpotlight(-6), spotR = makeSpotlight(6);
 
@@ -221,11 +245,18 @@ function makeSandbag(x, z) {
   const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 5.8, 8), new THREE.MeshStandardMaterial({ color: 0x8a6b3a }));
   rope.position.set(0, 6.1, 0); g.add(rope);
   applyTex(rope, TEX + 'theater_rope_1024.webp', 1, 6);
-  const bag = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.4, 6, 12), new THREE.MeshStandardMaterial({ color: 0xb0a080 }));
-  bag.position.set(0, 2.9, 0); g.add(bag);
-  applyTex(bag, TEX + 'theater_sandbag_canvas_1024.webp', 1, 1);
+  // The real sandbag.glb (canvas bag + a SHORT rope stub on top, Kyle's
+  // pick). Its top (+0.68) meets the long rope's bottom (y=3.2), so the
+  // bag origin sits at y=2.52. The long rope is the part Rochelle cuts.
+  const bagHolder = new THREE.Group();
+  bagHolder.position.set(0, 2.52, 0); g.add(bagHolder);
+  const sb = { x, z, group: g, rope, bag: bagHolder, cut: false, falling: false, vy: 0, used: false };
+  gltfLoader.load('assets/theater/models/sandbag.glb', (gltf) => {
+    bagHolder.add(gltf.scene);
+    // If the rope was already cut before the model loaded, rest it on the floor.
+    if (sb.cut) bagHolder.position.y = 1.2;
+  }, undefined, () => {});
   g.position.set(x, 0, z); scene.add(g);
-  const sb = { x, z, group: g, rope, bag, cut: false, falling: false, vy: 0, used: false };
   sandbags.push(sb); return sb;
 }
 makeSandbag(-6, -2); makeSandbag(6, -2); makeSandbag(-6, 3); makeSandbag(6, 3);
@@ -265,26 +296,44 @@ const chandelier = { x: 0, z: -2, y: 7, dropped: false, falling: false, vy: 0, u
 }
 
 // ---- Set flats (topple-able painted backdrops) ----
-// set_flat.png on planes, leaning at the back of the stage. Slash near the
-// base to topple one onto an enemy in front of it.
+// set_flat.glb (painted garden panel, 0.60 x 1.00 m; scale 3.5 -> ~2.1 x
+// 3.5 m). Origin is centred, so the model is raised by half its scaled
+// height to sit on the stage floor. The outer group carries the facing
+// (rotation.y); the inner group carries the topple (rotation.x), pivoting
+// at the floor.
 const setFlats = [];
 function makeSetFlat(x, z, rotY) {
-  const tex = texLoader.load('assets/theater/objects/set_flat.png');
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), new THREE.MeshStandardMaterial({ map: tex, transparent: true, side: THREE.DoubleSide }));
-  m.position.set(x, STAGE_TOP + 2, z); m.rotation.y = rotY; m.rotation.x = -0.08; scene.add(m);
-  const flat = { x, z, mesh: m, toppled: false, fallT: 0, used: false };
+  const outer = new THREE.Group();
+  outer.position.set(x, STAGE_TOP, z); outer.rotation.y = rotY; scene.add(outer);
+  const inner = new THREE.Group();
+  inner.rotation.x = -0.08; outer.add(inner);
+  gltfLoader.load('assets/theater/models/set_flat.glb', (gltf) => {
+    const m = gltf.scene;
+    m.scale.setScalar(3.5);
+    m.position.set(0, 1.75, 0);
+    inner.add(m);
+  }, undefined, () => {});
+  const flat = { x, z, mesh: inner, toppled: false, fallT: 0, used: false };
   setFlats.push(flat); colliders.push({ x, z, r: 1.0 }); return flat;
 }
 makeSetFlat(-8, -5, 0.3); makeSetFlat(8, -5, -0.3);
 
 // ---- Heavy main curtain (droppable upstage drape) ----
-// main_curtain.png on a tall plane at the back of the stage. Slash near it
-// to drop it on an enemy underneath.
-const drapeTex = texLoader.load('assets/theater/objects/main_curtain.png');
-drapeTex.colorSpace = THREE.SRGBColorSpace;
-const drape = new THREE.Mesh(new THREE.PlaneGeometry(5, 7), new THREE.MeshStandardMaterial({ map: drapeTex, transparent: true, side: THREE.DoubleSide }));
-drape.position.set(0, STAGE_TOP + 3.5, -5.8); scene.add(drape);
+// curtain.glb (red velvet drape, 1.52 x 2.37 m; scale 3.0 -> ~4.6 x 7.1 m).
+// Origin is centred, so the model is raised by half its scaled height to
+// hang from the floor up. The inner group topples it forward (+z, onto
+// enemies in front) when cut — a 3D model reads better toppling than the
+// old plane's slide-down.
+const drapeOuter = new THREE.Group();
+drapeOuter.position.set(0, STAGE_TOP, -5.8); scene.add(drapeOuter);
+const drape = new THREE.Group();
+drapeOuter.add(drape);
+gltfLoader.load('assets/theater/models/curtain.glb', (gltf) => {
+  const m = gltf.scene;
+  m.scale.setScalar(3.0);
+  m.position.set(0, 3.55, 0);
+  drape.add(m);
+}, undefined, () => {});
 const drapeState = { x: 0, z: -5.8, dropped: false, fallT: 0, used: false };
 colliders.push({ x: 0, z: -5.8, r: 1.0 });
 
@@ -294,15 +343,19 @@ colliders.push({ x: 0, z: -5.8, r: 1.0 });
 const crates = { x: 9, z: -3, smashed: false, used: false, group: new THREE.Group(), parts: [] };
 {
   const g = crates.group;
-  const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a26 });
-  const c1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), wood); c1.position.set(0, 0.6, 0); g.add(c1);
-  const c2 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 1.0), wood); c2.position.set(0.1, 1.7, 0); g.add(c2);
-  const c3 = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), wood); c3.position.set(-1.1, 0.4, 0.4); g.add(c3);
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 16), new THREE.MeshStandardMaterial({ color: 0x5a3a1a }));
-  barrel.position.set(1.4, 0.55, 0.3); g.add(barrel);
-  const band = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.03, 8, 20), new THREE.MeshStandardMaterial({ color: 0x333333 }));
-  band.position.set(1.4, 0.55, 0.3); band.rotation.x = Math.PI / 2; g.add(band);
-  crates.parts = [c1, c2, c3, barrel];
+  // crate_1.glb (0.76 x 1.00 m, origin centred, min Y -0.55): on the
+  // floor, so its holder is at y=+0.55.
+  const h1 = new THREE.Group(); h1.position.set(0, 0.55, 0); g.add(h1);
+  gltfLoader.load('assets/theater/models/crate_1.glb', (gltf) => { h1.add(gltf.scene); }, undefined, () => {});
+  // crate_2.glb (1.00 x 0.52 m, origin centred, min Y -0.26): stacked on
+  // crate_1 (1.00 tall), so its holder is at y=1.00+0.26=1.26.
+  const h2 = new THREE.Group(); h2.position.set(0.1, 1.26, 0); g.add(h2);
+  gltfLoader.load('assets/theater/models/crate_2.glb', (gltf) => { h2.add(gltf.scene); }, undefined, () => {});
+  // barrel.glb (0.53 x 0.72 m, origin centred, min Y -0.36): beside the
+  // stack, on the floor, so its holder is at y=+0.36.
+  const h3 = new THREE.Group(); h3.position.set(1.4, 0.36, 0.3); g.add(h3);
+  gltfLoader.load('assets/theater/models/barrel.glb', (gltf) => { h3.add(gltf.scene); }, undefined, () => {});
+  crates.parts = [h1, h2, h3];
   g.position.set(crates.x, STAGE_TOP, crates.z); scene.add(g);
   colliders.push({ x: crates.x, z: crates.z, r: 1.6 });
 }
@@ -658,6 +711,18 @@ function triggerDrape() {
 function triggerCrates() {
   if (crates.used) return; crates.used = true; crates.smashed = true;
 }
+function triggerSpotlight(sp) {
+  if (sp.used) return; sp.used = true; sp.falling = true; sp.vy = 0;
+  sp.spot.intensity = 0; sp.cone.visible = false;
+}
+function triggerFootlights() {
+  if (footlightsState.used) return; footlightsState.used = true; footlightsState.smashed = true;
+  footlightsState.parts.forEach((p, i) => {
+    p.rotation.set((i % 2 ? 1 : -1) * 0.8, i * 0.5, (i % 3 - 1) * 0.7);
+    p.position.y -= 0.08; p.position.z += (i % 2 ? 0.3 : -0.2);
+  });
+  enemiesNear(footlightsState.x, footlightsState.z, 1.4).forEach((e) => defeatEnemy(e));
+}
 function updateDestructibles(dt) {
   for (const sb of sandbags) {
     if (sb.falling) {
@@ -689,8 +754,7 @@ function updateDestructibles(dt) {
   if (drapeState.dropped && drapeState.fallT < 1) {
     drapeState.fallT += dt / 0.8;
     const k = Math.min(drapeState.fallT, 1);
-    drape.position.y = STAGE_TOP + 3.5 - 3.2 * k;
-    drape.material.opacity = 1 - 0.4 * k;
+    drape.rotation.x = 1.35 * k;
     if (k >= 1) enemiesNear(drapeState.x, drapeState.z + 1, 1.8).forEach((e) => defeatEnemy(e));
   }
   if (crates.smashed && crates.group.userData.smashed !== true) {
@@ -700,6 +764,17 @@ function updateDestructibles(dt) {
       p.position.x += (i - 1.5) * 0.5; p.position.z += (i % 2 ? 0.6 : -0.4);
     });
     enemiesNear(crates.x, crates.z, 1.4).forEach((e) => defeatEnemy(e));
+  }
+  for (const sp of [spotL, spotR]) {
+    if (sp.falling) {
+      sp.vy += 22 * dt;
+      const y = sp.group.position.y - sp.vy * dt;
+      if (y <= 0.25) {
+        sp.group.position.y = 0.25; sp.falling = false;
+        sp.inner.rotation.x = 0.9; // tip over on landing
+        enemiesNear(sp.x, sp.z, 1.4).forEach((e) => defeatEnemy(e));
+      } else sp.group.position.y = y;
+    }
   }
 }
 
@@ -728,6 +803,8 @@ function trySlash() {
   for (const flat of setFlats) if (!flat.used && inFront(flat.x, flat.z, 2.4)) triggerSetFlat(flat);
   if (!drapeState.used && inFront(drapeState.x, drapeState.z, 2.4)) triggerDrape();
   if (!crates.used && inFront(crates.x, crates.z, 2.4)) triggerCrates();
+  for (const sp of [spotL, spotR]) if (!sp.used && inFront(sp.x, sp.z, 2.4)) triggerSpotlight(sp);
+  if (!footlightsState.used && inFront(footlightsState.x, footlightsState.z, 2.4)) triggerFootlights();
 }
 
 // ---- Game state / cinematic ----
@@ -785,12 +862,12 @@ function updateCinematic(dt) {
   if (t >= 6 && !cine.spotLOn) {
     cine.spotLOn = true;
     spotL.spot.intensity = 220; spotL.cone.material.opacity = 0.14;
-    spotL.lens.material.emissive.setHex(0xfff2c0); spotL.lens.material.emissiveIntensity = 2;
+    if (spotL.lens) { spotL.lens.material.emissive.setHex(0xfff2c0); spotL.lens.material.emissiveIntensity = 2; }
   }
   if (t >= 7 && !cine.spotROn) {
     cine.spotROn = true;
     spotR.spot.intensity = 220; spotR.cone.material.opacity = 0.14;
-    spotR.lens.material.emissive.setHex(0xfff2c0); spotR.lens.material.emissiveIntensity = 2;
+    if (spotR.lens) { spotR.lens.material.emissive.setHex(0xfff2c0); spotR.lens.material.emissiveIntensity = 2; }
   }
   // Beat alone on stage, then the first enemy rises (10 s) and walks.
   if (t >= 10 && !cine.enemySent) {
@@ -941,6 +1018,7 @@ updateEnemyCount();
 if (new URLSearchParams(location.search).has('test')) {
   window.__theater = {
     player, enemies, sandbags, chandelier, setFlats, drapeState, crates,
+    footlightsState, spotL, spotR,
     get defeated() { return defeated; }, get won() { return won; },
     get cine() { return cine; }, get bowPhase() { return bowPhase; },
     startCinematic, trySlash, defeatEnemy, spawnNextEnemy, startBow, groundHeight,
