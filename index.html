@@ -667,7 +667,28 @@ addGLBToObstacle(lamboBase, 'assets/vehicles/white_lambo.glb', 2.0, 1.2, 4.5, [[
   // into its texture, and this page has no scene.environment — a metal
   // with no env map reflects nothing, so the white car read solid black.
   // Lower the metalness so the white paint gets diffuse light.
-  scene.traverse((o) => { if (o.isMesh) { o.material.metalness = 0; o.material.roughness = 0.55; } });
+  // ROOT CAUSE of the dark-navy-box read (2026-11-07, Blender/UV analysis):
+  // the geometry IS a real car (cabin bump, two wheels, 6,532 verts) and the
+  // load succeeds — but the baked texture, as UV-mapped, is dark: the sides
+  // (the largest visible area from ground level) sample ~0.28 albedo and the
+  // overall is ~0.33, with 68.6% of the UV area dark. In this page's dim
+  // Storm lighting (hemi 0.5 + sun 0.3, no ambient) the sides render at
+  // ~0.07-0.15, essentially black, so the car read as a flat dark mass and
+  // its cabin/wheels were invisible. The same GLB reads white on the
+  // handoff page because that page has a bright warm ambient (0.85) + hemi
+  // (0.6) + chandeliers, which lift the same dark texture into range.
+  // Fix: light the car with its own texture as the emissive map, so it
+  // reads as a white car in the storm while keeping its dark details
+  // (wheels, windshield). Material-only change; position/size/rotY and
+  // the collision box are untouched.
+  scene.traverse((o) => { if (o.isMesh) {
+    o.material.metalness = 0; o.material.roughness = 0.55;
+    if (o.material.map){
+      o.material.emissive = new THREE.Color(0xffffff);
+      o.material.emissiveMap = o.material.map;
+      o.material.emissiveIntensity = 1.5;
+    }
+  } });
 });
 // ?debug=lambo overlay (2026-11-07): shows every GLB load status plus the
 // Lambo child state, so the live load failure can be read on screen — the
@@ -690,6 +711,16 @@ if (new URLSearchParams(location.search).get('debug') === 'lambo'){
       lines.push('lambo child world bbox min: ' + bb.min.toArray().map((v)=>v.toFixed(2)).join(','));
       lines.push('lambo child world bbox max: ' + bb.max.toArray().map((v)=>v.toFixed(2)).join(','));
       lines.push('lambo child visible: ' + found.visible + ' metalness: ' + (found.material && found.material.metalness) + ' color: #' + (found.material && found.material.color && found.material.color.getHexString()));
+      // Extended (2026-11-07): what the child actually IS — geometry, material, map, sub-meshes.
+      const g = found.geometry;
+      lines.push('lambo child type: ' + (found.type || '?') + ' geometry: ' + (g && g.type) + ' verts: ' + (g && g.attributes && g.attributes.position ? g.attributes.position.count : '?') + ' hasNormal: ' + !!(g && g.attributes && g.attributes.normal) + ' hasUV: ' + !!(g && g.attributes && g.attributes.uv));
+      const mt = found.material;
+      if (mt){
+        const mp = mt.map;
+        lines.push('lambo child material: ' + (mt.type || '?') + ' map: ' + (mp ? 'yes ' + (mp.image ? mp.image.width + 'x' + mp.image.height : 'no-image') : 'NO') + ' roughness: ' + mt.roughness + ' emissive: #' + (mt.emissive && mt.emissive.getHexString()) + ' emissiveIntensity: ' + mt.emissiveIntensity + ' emissiveMap: ' + (mt.emissiveMap ? 'yes' : 'no'));
+      }
+      let meshCount = 0; lamboBase.mesh.traverse((o)=>{ if (o.isMesh) meshCount++; });
+      lines.push('lamboBase total meshes (incl box): ' + meshCount);
     } else {
       lines.push('lambo child: NONE in scene');
     }
