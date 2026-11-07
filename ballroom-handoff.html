@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
 <title>Double Agent — Undercover Ballroom Handoff</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#1a120b;font-family:system-ui,sans-serif;color:#fff;touch-action:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:#1a120b;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
   canvas{display:block}
   #hud{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5}
   #hud b{color:#ffd97a}
@@ -1701,6 +1701,7 @@ if (new URLSearchParams(location.search).has('test')) {
 }
 animate();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('contextmenu', e=>e.preventDefault());
 </script>
 </body>
 </html>

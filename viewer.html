@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
 <title>Double Agent — Model &amp; Animation Viewer</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #141414; color: #eee; font-family: system-ui, -apple-system, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #141414; color: #eee; font-family: system-ui, -apple-system, sans-serif; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  input, textarea { -webkit-user-select: text; user-select: text; }
   #app { position: fixed; inset: 0; }
   canvas { display: block; touch-action: none; }
   #bar { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: rgba(0,0,0,0.72); align-items: center; z-index: 5; }
@@ -825,6 +826,7 @@ addEventListener('resize', () => {
 });
 modelSel.value = 'Kyle'; loadModel('Kyle');
 animate();
+addEventListener('contextmenu', e => e.preventDefault());
 </script>
 </body>
 </html>
