@@ -506,9 +506,14 @@ function fitPropChild(obj, targetW, targetH, targetD){
   obj.position.set(-c.x, -c.y, -c.z);
   return obj;
 }
-function addGLBToObstacle(obstacle, path, targetW, targetH, targetD, placements){
+function addGLBToObstacle(obstacle, path, targetW, targetH, targetD, placements, onLoad){
   if (!obstacle) return;
   gltfLoader.load(path, (gltf)=>{
+    // Optional material fix, applied to the loaded scene BEFORE cloning so
+    // every clone inherits it (clones share the material). Used by the
+    // white Lambo: its single material is metalness 1.0 and this page has
+    // no scene.environment, so without the fix it reads solid black.
+    if (onLoad) onLoad(gltf.scene);
     (placements || [[0, 0, 0, 0]]).forEach(([px, py, pz, rotY])=>{
       const child = fitPropChild(gltf.scene.clone(), targetW, targetH, targetD); if (!child) return;
       const g = new THREE.Group(); g.add(child); g.position.set(px, py, pz); if (rotY) g.rotation.y = rotY;
@@ -611,12 +616,161 @@ groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground/ground_asphalt_tire_
     m.material.map = tex; m.material.needsUpdate = true;
   }, undefined, function(){ m.visible = false; });
 })();
-// A parked car prop (visual only; drive clips are for a future vehicle system, not this courtyard)
-(function car(){
-  const g = new THREE.Group(); g.position.set(-24,0,32); g.rotation.y = 0.6;
-  const body = new THREE.Mesh(new THREE.BoxGeometry(4.4,0.9,2), mat(0x223344)); body.position.y = 0.7; g.add(body);
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(2.2,0.8,1.8), mat(0x334455)); cab.position.set(-0.2,1.5,0); g.add(cab);
-  scene.add(g);
+// ---------- New environment objects (2026-11-07) ----------
+// 1. WHITE LAMBO — replaces the procedural two-box car that was here.
+// The GLB is a real repo model (assets/vehicles/white_lambo.glb, 0.60 x
+// 0.27 x 1.00 m raw, fitted to 2.0 x 1.2 x 4.5). The box is the
+// collision/LOS mesh and goes invisible when the GLB loads.
+// NOTE: the box is 4.5 x 5.0, not 4.5 x 2.0 — the car's axis-aligned
+// footprint rotated 0.6 rad is 4.19 x 4.84, so a 4.5 x 2.0 box would
+// leave the nose and tail sticking ~1.4 m past the collision on each
+// Z side and the player could walk through them.
+const lamboBase = box(-24, 32, 4.5, 5.0, 1.2, 0x223344, undefined, { material: 'metal' });
+addGLBToObstacle(lamboBase, 'assets/vehicles/white_lambo.glb', 2.0, 1.2, 4.5, [[0, 0, 0, 0.6]], (scene) => {
+  // White paint fix (same as ballroom-handoff.html): the GLB's single
+  // material is metalness 1.0 / roughness 1.0 with the white paint baked
+  // into its texture, and this page has no scene.environment — a metal
+  // with no env map reflects nothing, so the white car read solid black.
+  // Lower the metalness so the white paint gets diffuse light.
+  scene.traverse((o) => { if (o.isMesh) { o.material.metalness = 0; o.material.roughness = 0.55; } });
+});
+// 2. FLOODLIGHT POLES (3): a lit pole the player cannot walk through.
+// Each is a small box() base (collision) + a cylinder pole + a head box
+// + a SpotLight aimed down at the ground.
+const FLOOD_TEX = 'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp';
+function floodlight(x, z){
+  box(x, z, 0.6, 0.6, 0.5, 0x555a55, undefined, { material: 'metal', texture: FLOOD_TEX, texRepeat: [1, 1] });
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 6, 8), texturedMat(0x555a55, FLOOD_TEX, 1, 2));
+  pole.position.set(x, 3.5, z); pole.castShadow = true; scene.add(pole);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.5), texturedMat(0x333333, FLOOD_TEX, 1, 1));
+  head.position.set(x, 6.5, z); head.castShadow = true; scene.add(head);
+  const spot = new THREE.SpotLight(0xfff2cc, 20, 20, 0.6, 0.5, 1.2);
+  spot.position.set(x, 6.4, z); spot.target.position.set(x, 0, z);
+  scene.add(spot); scene.add(spot.target);
+}
+floodlight(16, -8); floodlight(-24, 16); floodlight(28, 20);
+// 3. DUMPSTER (1) against the west wall: a big metal bin with a lid,
+// not a crate. The box() gives collision + LOS; the lid rides on top.
+box(-38, -8, 2.4, 1.2, 1.2, 0x5a6a5a, undefined, { material: 'metal', texture: 'assets/textures/raw/painted-metal-olive.jpg', texRepeat: [2, 1] });
+const dumpsterLid = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 1.3), texturedMat(0x4a5a4a, 'assets/textures/raw/painted-metal-olive.jpg', 2, 1));
+dumpsterLid.position.set(-38, 1.28, -8); dumpsterLid.castShadow = true; dumpsterLid.receiveShadow = true; scene.add(dumpsterLid);
+// 4. CONCRETE BARRIERS (3): low, wide Jersey barriers. The weathered
+// concrete barrier texture was obtained-but-unwired until now.
+[[20, -30], [-10, 25], [5, 15]].forEach(([x, z]) => {
+  box(x, z, 2.0, 0.6, 1.0, 0x888888, undefined, { material: 'concrete', texture: 'assets/textures/props/prop_concrete_barrier_weathered_1024.webp', texRepeat: [1, 1] });
+});
+// 5. PALLETS (2): low wooden pallets near the crates. Visual-only — no
+// collision, the player steps over them (so NOT box()).
+function pallet(x, z){
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 1.2), texturedMat(0xa0824a, 'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp', 1, 1));
+  base.position.y = 0.075; base.receiveShadow = true; g.add(base);
+  for (let i = -1; i <= 1; i++) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.05, 0.18), texturedMat(0xa0824a, 'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp', 1, 1));
+    slat.position.set(0, 0.175, i * 0.45); slat.receiveShadow = true; g.add(slat);
+  }
+  g.position.set(x, 0, z); scene.add(g);
+}
+pallet(-16, 4); pallet(14, 10);
+// 6. BUSHES (3): 5 flat-shaded icosahedron lobes in varied greens, same
+// approach as the handoff level's bushes, with the lawn grass/clover
+// texture. Each is an obstacle (radius ~1.2) — soft cover. The obstacle
+// entry matches box()'s shape so collides() and LOS treat it the same.
+const bushTex = texLoader.load('assets/textures/exterior/exterior_lawn_grass_clover_1024.webp', (tex) => { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2); tex.colorSpace = THREE.SRGBColorSpace; });
+const BUSH_GREENS = [0x1e4d1e, 0x2a6b2a, 0x3a7d3a, 0x1a421a, 0x2f5e1f];
+function bushRand(seed){ const s = Math.sin(seed) * 43758.5453; return s - Math.floor(s); }
+function courtyardBush(x, z, r){
+  const g = new THREE.Group();
+  const variant = Math.floor(bushRand(x * 12.9898 + z * 78.233) * 3); // 0 round, 1 wide, 2 tall
+  const lobes = variant === 0
+    ? [[0, 0.7, 0, 1.0], [0.5, 0.5, 0.2, 0.65], [-0.45, 0.55, -0.15, 0.6], [0.1, 0.95, -0.3, 0.55], [-0.2, 0.4, 0.45, 0.55]]
+    : variant === 1
+    ? [[0, 0.55, 0, 0.9], [0.7, 0.45, 0.1, 0.6], [-0.65, 0.5, -0.1, 0.65], [0.2, 0.75, -0.25, 0.5], [-0.3, 0.35, 0.4, 0.5]]
+    : [[0, 0.85, 0, 0.9], [0.4, 0.5, 0.15, 0.55], [-0.35, 0.6, -0.2, 0.6], [0.05, 1.25, 0.1, 0.5], [-0.1, 0.35, 0.35, 0.5]];
+  lobes.forEach(([lx, ly, lz, lr], i) => {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r * lr, 1), new THREE.MeshStandardMaterial({ color: BUSH_GREENS[i % BUSH_GREENS.length], roughness: 1, flatShading: true, map: bushTex }));
+    m.position.set(lx * r, ly * r, lz * r); m.castShadow = true; g.add(m);
+  });
+  g.position.set(x, 0, z); scene.add(g);
+  obstacles.push({ mesh: g, cx: x, cz: z, ow: r * 2, od: r * 2, oh: r * 1.5, minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, h: r * 1.5, material: 'bush', destructible: false, hp: 0, maxHp: 0, baseColor: 0x2a6b2a, textured: true });
+  g.traverse((o) => { if (o.isMesh) losMeshes.push(o); });
+  return g;
+}
+courtyardBush(28, -28, 1.2); courtyardBush(34, -36, 1.2); courtyardBush(-28, -28, 1.2);
+// 7. CHAIN-LINK FENCE (1 freestanding section): an 8 m long, 2.5 m tall
+// transparent chain-link panel running north-south, with posts at the
+// ends. It blocks movement and guard LOS (thin AABB along its length).
+// If the texture fails to load, the panel hides (same as the panel on
+// the red building).
+(function chainLinkFence(){
+  const fence = new THREE.Mesh(new THREE.PlaneGeometry(8, 2.5),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+  fence.position.set(20, 1.25, 8); fence.rotation.y = Math.PI / 2; scene.add(fence);
+  texLoader.load('assets/textures/raw/chain-link-fence.png', function(tex){
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4, 2);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    fence.material.map = tex; fence.material.needsUpdate = true;
+  }, undefined, function(){ fence.visible = false; });
+  [[20, 4], [20, 12]].forEach(([x, z]) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.5, 8), mat(0x555555));
+    post.position.set(x, 1.25, z); post.castShadow = true; scene.add(post);
+  });
+  obstacles.push({ mesh: fence, cx: 20, cz: 8, ow: 0.2, od: 8, oh: 2.5, minX: 19.9, maxX: 20.1, minZ: 4, maxZ: 12, h: 2.5, material: 'metal', destructible: false, hp: 0, maxHp: 0, baseColor: 0xffffff, textured: true });
+  losMeshes.push(fence);
+})();
+// 8. TREES (2): a trunk + 3 foliage blobs. The trunk is the obstacle
+// (radius ~0.5); the foliage is visual only.
+// NOTE: the west tree is at (-38,-28), not (-36,-28) — (-36,-28) puts
+// the trunk half inside the 4x4 crate at (-34,-28); (-38,-28) is the
+// actual west edge of the gravel patch and clears the crate by 1.5 m.
+const treeFoliageTex = texLoader.load('assets/textures/ground/ground_grass_1024.webp', (tex) => { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2); tex.colorSpace = THREE.SRGBColorSpace; });
+function courtyardTree(x, z){
+  const g = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.3, 2.5, 8), texturedMat(0x6a4a2a, 'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp', 1, 1));
+  trunk.position.y = 1.25; trunk.castShadow = true; g.add(trunk);
+  const TREE_GREENS = [0x2a6b2a, 0x1e4d1e, 0x3a7d3a];
+  [[0, 3.0, 0, 1.2], [0.7, 2.5, 0.3, 0.8], [-0.6, 2.6, -0.3, 0.75]].forEach(([bx, by, bz, br], i) => {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(br, 1), new THREE.MeshStandardMaterial({ color: TREE_GREENS[i], roughness: 1, flatShading: true, map: treeFoliageTex }));
+    m.position.set(bx, by, bz); m.castShadow = true; g.add(m);
+  });
+  g.position.set(x, 0, z); scene.add(g);
+  obstacles.push({ mesh: g, cx: x, cz: z, ow: 1.0, od: 1.0, oh: 2.5, minX: x - 0.5, maxX: x + 0.5, minZ: z - 0.5, maxZ: z + 0.5, h: 2.5, material: 'wood', destructible: false, hp: 0, maxHp: 0, baseColor: 0x6a4a2a, textured: true });
+  return g;
+}
+courtyardTree(36, -28); courtyardTree(-38, -28);
+// 9. AC UNITS + PIPES on the buildings (visual-only — the buildings
+// already block movement, so no separate collision).
+function acUnit(x, y, z, rotY, texPath){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 0.5), texturedMat(0x5a6a7a, texPath, 1, 1));
+  m.position.set(x, y, z); if (rotY) m.rotation.y = rotY; m.castShadow = true; scene.add(m);
+  return m;
+}
+function wallPipe(x, y, z, h, texPath){
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, h, 8), texturedMat(0x888888, texPath, 1, 1));
+  m.position.set(x, y, z); m.castShadow = true; scene.add(m);
+  return m;
+}
+// Blue building south face (z=-31): 2 AC units + a vertical pipe.
+acUnit(-3, 2.5, -30.9, 0, 'assets/textures/raw/painted-metal-blue.jpg');
+acUnit(3, 2.5, -30.9, 0, 'assets/textures/raw/painted-metal-blue.jpg');
+wallPipe(6, 2, -30.9, 4, 'assets/textures/raw/painted-metal-blue.jpg');
+// Red building east face (x=-28): 1 AC unit + a vertical pipe.
+acUnit(-27.9, 2.5, 8, Math.PI / 2, 'assets/textures/raw/painted-metal-red.jpg');
+wallPipe(-27.9, 2, 12, 4, 'assets/textures/raw/painted-metal-red.jpg');
+// 10. FACILITY SIGN on the blue building south face (z=-31), above the
+// vent/window. A CanvasTexture reading "RESTRICTED AREA" — a generic
+// warning sign; no facility name is invented.
+(function facilitySign(){
+  const c = document.createElement('canvas'); c.width = 512; c.height = 154;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1a1a1a'; g.fillRect(0, 0, 512, 154);
+  g.strokeStyle = '#ffcc00'; g.lineWidth = 8; g.strokeRect(4, 4, 504, 146);
+  g.fillStyle = '#ffcc00'; g.font = 'bold 64px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('RESTRICTED', 256, 55);
+  g.fillText('AREA', 256, 115);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(4, 1.2), new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }));
+  m.position.set(0, 3.5, -30.98); scene.add(m);
 })();
 
 // ---------- Player (procedural capsule, NOT a rigged model) ----------
