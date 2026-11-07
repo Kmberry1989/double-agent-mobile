@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
-<title>Double Agent — Undercover Ballroom</title>
+<title>Double Agent — Rochelle's Photo Mission</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#1a120b;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
   canvas{display:block}
@@ -14,6 +14,9 @@
   #dialog .name{color:#ffd97a;font-weight:700;margin-bottom:4px}
   #dialog .line{font-size:16px;line-height:1.45}
   #dialog .hint{font-size:12px;color:#bbb;margin-top:8px}
+  #mission{position:fixed;top:10px;left:10px;z-index:20;color:#fff;font:16px/1.4 system-ui,sans-serif;text-shadow:0 1px 4px #000}
+  #barTop,#barBottom{position:fixed;left:0;right:0;height:0;background:#000;z-index:25;transition:height .6s}
+  #barTop{top:0} #barBottom{bottom:0}
   #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
   #win{display:none}
   button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
@@ -31,8 +34,9 @@
 <body>
 <div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div></div>
 <nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html" class="cur" aria-current="page">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a></nav>
-<div id="overlay"><h1>Undercover Ballroom</h1><button id="startBtn">Enter the ballroom</button></div>
+<div id="overlay"><h1>Rochelle's Photo Mission</h1><p>Photographer first, agent second. Kyle is on your earpiece.</p><button id="startBtn">Enter as Rochelle</button></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
+<div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span></div><div id="barTop"></div><div id="barBottom"></div>
 <div id="joy"><div id="knob"></div></div>
 <button id="useBtn">USE</button>
 <script type="module">
@@ -263,12 +267,9 @@ function playCharClip(char, key) {
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset().fadeIn(0.15).play(); char._cur = act;
 }
-// ---- Player (Kyle_undercover, Mixamo rig — unarmed, no weapon ever attached) ----
-// The player is the Mixamo-rigged Kyle_undercover.fbx (verified 2026-11-03:
-// same tux mesh/rig/texture as Agent_Kyle.fbx, 65 mixamorig bones), so it
-// runs on the ORIGINAL Mixamo clips in assets/animations/, NOT the baked
-// *_af clips. Guests/contacts stay on the ActionForge GLBs + *_af clips
-// below — Rochelle (contact) is now Mixamo, like the player, and uses mxClips.
+// ---- Player (Rochelle_undercover, Mixamo — no weapon is ever attached) ----
+// The player is Rochelle's Mixamo FBX, basecolor only, one texture —
+// like the guests, a single shared rig, so the same clips play on her.
 // Each character uses only its own skeleton's clips, never mixed.
 // Root XZ travel is stripped from the player clips (game code moves the
 // player), Y bob is kept, so walk stays in place under the player group.
@@ -315,9 +316,12 @@ function playMxClipOnce(key) {
   act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); player._cur = act;
   return true;
 }
-fbxLoader.load('assets/characters/Kyle_undercover.fbx', (obj) => {
+fbxLoader.load('assets/characters/Rochelle_undercover.fbx', (obj) => {
   fitCharacter(obj, 1.8);
-  obj.rotation.y = Math.PI; // same facing convention as the old FBX player
+  // Rochelle's FBX faces +Z in Three.js (0.88 wide in X, 0.23 deep in Z),
+  // like the other guests: PI turns it to face forward for a player.
+  obj.rotation.y = Math.PI;
+  applyBasecolor(obj, 'assets/characters/textures/Rochelle_basecolor.jpg');
   player.add(obj); playerModel = obj;
   mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
 }, undefined, () => {
@@ -382,10 +386,9 @@ function loadGuestModel(npc, path) {
   }, undefined, () => {});
 }
 const NPCS = [
-  makeGuest({ name: 'Rochelle', role: 'contact', model: 'assets/characters/Rochelle_undercover.fbx', texture: 'assets/characters/textures/Rochelle_basecolor.jpg', turn: 0, color: 0x0e5a3a, skin: 0xe8b48a, x: 15, z: 6, wps: [[15, 6], [12, 4], [16, 2]], lines: ['You found me. So — do you know the three words?', 'Come back when you have all three. The cats carry them on their collars.'] }),
-  makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/characters/Vickie.fbx', texture: 'assets/characters/textures/Vickie_basecolor.png', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Rochelle is near the bar, in green. She is the one to find.'] }),
+  makeGuest({ name: 'Vickie', role: 'flavour', model: 'assets/characters/Vickie.fbx', texture: 'assets/characters/textures/Vickie_basecolor.png', color: 0x7a2a5a, skin: 0xe8b48a, x: -12, z: 8, wps: [[-12, 8], [-9, 9], [-12, 5]], lines: ['The music is lovely — have you met the cats yet? One of them wears a tag that glitters.', 'Enjoy the music — and keep an eye on the cats.'] }),
   makeGuest({ name: 'Eric', role: 'flavour', model: 'assets/characters/Eric.fbx', texture: 'assets/characters/textures/Eric_basecolor.png', color: 0x1a3a5a, skin: 0xc98a5a, x: 6, z: -10, wps: [[6, -10], [3, -9], [7, -7]], lines: ['I came for the dancing, but the cats stole the show.', 'Scan a collar tag if you get close to one — they seem to carry something.'] }),
-  makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/characters/Kristen.fbx', texture: 'assets/characters/textures/Kristen_basecolor.png', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'If you are looking for Rochelle, try by the bar.'] }),
+  makeGuest({ name: 'Kristen', role: 'flavour', model: 'assets/characters/Kristen.fbx', texture: 'assets/characters/textures/Kristen_basecolor.png', color: 0x3a1a5a, skin: 0xd9a06b, x: -8, z: -3, wps: [[-8, -3], [-6, -2]], lines: ['The cake at the bar is worth the trip alone.', 'Have you seen the cats? They run the place, really.'] }),
 ];
 // ---- Donald: always has a drink in hand, stumbles, falls over at times ----
 // He is friendly flavour only — talking to him never gives or blocks a clue.
@@ -510,8 +513,294 @@ gltfLoader.load('assets/props/cat_scanner.glb', (gltf)=>{
   g.position.set(0.45, 1.3, 0.2); player.add(g);
 }, undefined, ()=>{});
 
-// ---- Goal state ----
-const clues = new Set(); let contactFound = false, won = false, talking = null, lineIdx = 0;
+// ---- Real GLB cats + pooled animations (2026-11-04) ----
+// Cats load as GLBs (Mabel/Margo/Moxie, 0.22 m tall, faces +Z, no turn),
+// with all animations pooled across cats + the More batch, by canonical
+// label. Each cat uses its own clip for an action when it has one,
+// otherwise another cat's clip (same 33-bone rig, so it plays cleanly).
+// Procedural spheres stay as fallback and hide only on successful load.
+const CAT_LABELS = {
+  Mabel: {
+    '1cf7270f-6184-4446-95fb-65b6e74a7b31': 'walk',
+    '1fe05240-ee28-48bc-8e22-47cf4258a154': 'eat',
+    '67621291-ce2b-4c4d-a1ee-ee78487d16db': 'running leap',
+    'c0c27724-a025-4dfe-a20b-8591afd76fc2': 'trot',
+    'ca2e3dda-fccd-4b09-a631-44ccf0c1f780': 'gallop',
+    'd200fef0-3ff1-4b3e-a7ea-850bbec5ed9d': 'sit',
+    'da96478c-5ab8-4c52-be99-b2e35e4d73db': 'scratch furniture',
+    'f0ae8d58-b419-4d60-9135-c2508b4d5cfe': 'stand',
+    'f7f21fc2-9642-4041-adeb-fab4c47e6e1d': 'start walk',
+    'f849bf50-4d55-47bc-9988-523744d205e1': 'laying'
+  },
+  Margo: {
+    '2f2bdf5a-4a96-4110-b596-cd2c0e1dd9b7': 'from laying to sitting',
+    '1acdce41-81f6-41ca-8592-f8ae3c2023b9': 'slow walk',
+    '3257fce3-6380-453b-8ccd-673700cd6892': 'defensive scared',
+    '3ad68afe-e66c-47e0-995f-56023f277c1c': 'distracted',
+    '703cd6d7-9e07-4ff7-a76d-6f9560e6708c': 'sit',
+    '718dfbcc-f495-4f3b-9742-0b4be26f920c': 'start walk',
+    'c6c3a10d-8b34-495a-b022-2ca3ece6d938': 'running leap',
+    'eae36911-ce00-4c14-8788-203c13f9e9a4': 'eat',
+    'ebc35721-0db8-4541-945b-92dc10289338': 'climb over small obstacle',
+    'f673a63d-42fa-4dec-a26b-1476bbbd1b66': 'stop walk'
+  },
+  Moxie: {
+    '037c9b9a-f766-4261-a518-c9ab8725f4e9': 'from laying to sitting',
+    '24a6632d-93da-4e4d-85d6-f41c145946b8': 'gallop',
+    '2bcac494-fe1d-4be4-b948-b69dff552342': 'idle',
+    '2dcfff75-e05d-4b31-a2a9-98c423315956': 'from sitting to idle',
+    '59d9edbe-6a4a-455d-baeb-285fc9f54679': 'laying, getting comfortable',
+    '66d14cc1-b97e-4c84-9f62-c4cc651c8acb': 'turn left',
+    '79e7714f-38e8-4366-9387-369fc07950f6': 'slow walk',
+    'd220d22d-6ee4-458c-a070-ef9b61901bc5': 'start walk',
+    'dbb539d0-ca9c-41de-b7ac-2e1f6768f58b': 'stop walk',
+    'dbc457af-08b9-49ce-8d9c-fd6b5c200c1a': 'excited trot'
+  },
+  More: {
+    '079d4468-b2c8-4df4-8895-227362325c25': 'idle, curious',
+    '132681f1-e799-4695-b008-c9f1c8f05708': 'sneak',
+    '1aad1a61-9661-4343-97d6-2a438afe1273': 'stand on hind legs',
+    '293527ae-4043-432a-bd9d-4b63c5ea762b': 'eat',
+    '660b1d28-d796-42e0-8adb-ff0aa067edde': 'turn in place',
+    '8fe930ba-1fa5-4476-97f0-451837fee110': 'kick dirt up',
+    'a62e2e95-4b7d-4be7-94d2-31fb07587bb7': 'dodge',
+    'c50e95c1-6c24-4f99-bdaa-a76efdb98cce': 'attack forward leap',
+    'cc9a2fba-3a5c-49ab-b224-317d9111f1b1': 'left paw attack',
+    'f43a965a-34a6-4894-bdc1-5dc73f0b5f97': 'right paw attack'
+  }
+};
+// Canonical merges (user-confirmed): eating -> eat, walk slow -> slow walk, sitting -> sit.
+const CAT_CANON = { 'eating': 'eat', 'walk slow': 'slow walk', 'sitting': 'sit' };
+function catCanon(label) { return CAT_CANON[label] || label; }
+function stripCatClip(clip) {
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    if (t.name === 'Hips.position' && nt.values && nt.values.length >= 3) {
+      const x0 = nt.values[0], z0 = nt.values[2];
+      for (let i = 0; i + 2 < nt.values.length; i += 3) { nt.values[i] = x0; nt.values[i + 2] = z0; }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
+const catClipSources = {};
+let catLoadsDone = 0;
+function buildCatClipLibraries() {
+  for (const cat of CATS) {
+    cat.clips = {};
+    const order = [cat.name, 'Mabel', 'Margo', 'Moxie', 'More'];
+    for (const src of order) {
+      const srcClips = catClipSources[src]; if (!srcClips) continue;
+      for (const action in srcClips) { if (!cat.clips[action]) cat.clips[action] = srcClips[action]; }
+    }
+  }
+}
+function loadCatGLB(cat) {
+  gltfLoader.load('assets/cats/' + cat.name + '.glb', (gltf) => {
+    const obj = gltf.scene;
+    fitCharacter(obj, 0.22);
+    cat.group.add(obj); cat.model = obj;
+    cat.mixer = new THREE.AnimationMixer(obj); cat._curCatClip = null;
+    cat.group.children.forEach((child) => {
+      if (child.isMesh && child.geometry.type !== 'TorusGeometry' && !(child.material && child.material.emissiveIntensity === 1.4)) child.visible = false;
+    });
+    // Shrink the procedural collar/tag to match the 0.22 m GLB cat (they were sized for the 0.5 m procedural cat).
+    cat.group.children.forEach((child) => {
+      if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.44); child.position.set(0, 0.15, 0.14); }
+      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.44); child.position.set(0, 0.10, 0.21); }
+    });
+    const src = {};
+    (gltf.animations || []).forEach((clip) => {
+      const label = CAT_LABELS[cat.name] && CAT_LABELS[cat.name][clip.name];
+      if (label) src[catCanon(label)] = stripCatClip(clip);
+    });
+    catClipSources[cat.name] = src; catLoadsDone++;
+    if (catLoadsDone >= 4) buildCatClipLibraries();
+  }, undefined, () => {});
+}
+CATS.forEach((cat) => loadCatGLB(cat));
+gltfLoader.load('assets/cats/morecatanimations.glb', (gltf) => {
+  const src = {};
+  (gltf.animations || []).forEach((clip) => {
+    const label = CAT_LABELS.More[clip.name];
+    if (label) src[catCanon(label)] = stripCatClip(clip);
+  });
+  catClipSources.More = src; catLoadsDone++;
+  if (catLoadsDone >= 4) buildCatClipLibraries();
+}, undefined, () => {});
+function playCatClip(cat, action, loop) {
+  if (!cat.mixer || !cat.clips || !cat.clips[action]) return;
+  const clip = cat.clips[action];
+  const act = cat.mixer.clipAction(clip);
+  if (cat._curCatClip === act && act.isRunning()) return;
+  if (cat._curCatClip && cat._curCatClip !== act) cat._curCatClip.fadeOut(0.15);
+  act.reset();
+  if (loop === false) { act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; }
+  else { act.setLoop(THREE.LoopRepeat, Infinity); }
+  act.fadeIn(0.15).play(); cat._curCatClip = act;
+}
+function catMoveClip(cat) {
+  if (cat.name === 'Mabel') return 'walk';
+  return 'slow walk';
+}
+function updateCatClips() {
+  for (const cat of CATS) {
+    if (!cat.mixer || !cat.clips) continue;
+    if (cat.playFightOverride) { playCatClip(cat, cat.playFightOverride, cat.playFightLoop !== false); continue; }
+    if (cat.fed) { playCatClip(cat, 'sit', true); continue; }
+    if (cat.hiding) { playCatClip(cat, 'sit', true); continue; }
+    if (cat.fleeing) { playCatClip(cat, cat.clips['gallop'] ? 'gallop' : catMoveClip(cat), true); continue; }
+    if (cat.moving) { playCatClip(cat, catMoveClip(cat), true); continue; }
+    if (cat.pause > 0) { playCatClip(cat, cat.clips['stand'] ? 'stand' : 'idle', true); continue; }
+    playCatClip(cat, cat.clips['idle'] ? 'idle' : 'stand', true);
+  }
+}
+// ---- Play fight: Moxie + Mabel, after both photographed, until Margo photographed / win ----
+// Trigger: photos.length >= 2 (Moxie moon + Mabel note done, mission is now Margo).
+// Flee overrides: approach within 2.0 m calls fleeCat, play fight pauses until flee ends.
+const playFight = { active: false, phase: 'gather', timer: 0, spot: [0, 0], attacker: 'Moxie', attacksDone: 0 };
+function pickPlaySpot() {
+  const x = -12 + Math.random() * 24, z = -10 + Math.random() * 20;
+  playFight.spot = [x, z];
+}
+function updatePlayFight(dt) {
+  const moxie = CATS.find(c => c.name === 'Moxie'), mabel = CATS.find(c => c.name === 'Mabel');
+  if (!moxie || !mabel || won) { playFight.active = false; return; }
+  if (photos.length < 2 || photos.length >= 3) { playFight.active = false; moxie.playFightOverride = null; mabel.playFightOverride = null; return; }
+  if (cinematic || (typeof handoffCine !== 'undefined' && handoffCine)) { return; }
+  for (const cat of [moxie, mabel]) {
+    if (!cat.fed && !cat.fleeing && cat.group.position.distanceTo(player.position) < 2.0 && !(windowOpen && cat === missionTarget())) {
+      fleeCat(cat); playFight.active = false; playFight.phase = 'gather';
+      moxie.playFightOverride = null; mabel.playFightOverride = null; return;
+    }
+    if (cat.fleeing || cat.fed) { playFight.active = false; moxie.playFightOverride = null; mabel.playFightOverride = null; return; }
+  }
+  if (!playFight.active) { playFight.active = true; playFight.phase = 'gather'; pickPlaySpot(); playFight.timer = 0; }
+  const spot = playFight.spot;
+  const targets = { 'Moxie': [spot[0] - 0.6, spot[1]], 'Mabel': [spot[0] + 0.6, spot[1]] };
+  if (playFight.phase === 'gather') {
+    let allArrived = true;
+    for (const cat of [moxie, mabel]) {
+      const tgt = targets[cat.name];
+      const ddx = tgt[0] - cat.group.position.x, ddz = tgt[1] - cat.group.position.z, d = Math.hypot(ddx, ddz);
+      if (d > 0.3) {
+        allArrived = false;
+        const sp = 1.0;
+        cat.group.position.x += ddx / d * sp * dt; cat.group.position.z += ddz / d * sp * dt;
+        cat.group.rotation.y = Math.atan2(ddx, ddz); cat.moving = true;
+        cat.playFightOverride = cat.clips && cat.clips['trot'] ? 'trot' : (cat.clips && cat.clips['gallop'] ? 'gallop' : catMoveClip(cat)); cat.playFightLoop = true;
+      } else {
+        cat.moving = false;
+        const other = cat === moxie ? mabel : moxie;
+        cat.group.rotation.y = Math.atan2(other.group.position.x - cat.group.position.x, other.group.position.z - cat.group.position.z);
+        cat.playFightOverride = 'stand'; cat.playFightLoop = true;
+      }
+    }
+    if (allArrived) { playFight.phase = 'faceoff'; playFight.timer = 1.0; }
+    return;
+  }
+  if (playFight.phase === 'faceoff') {
+    for (const cat of [moxie, mabel]) {
+      cat.moving = false;
+      const other = cat === moxie ? mabel : moxie;
+      cat.group.rotation.y = Math.atan2(other.group.position.x - cat.group.position.x, other.group.position.z - cat.group.position.z);
+      cat.playFightOverride = 'stand'; cat.playFightLoop = true;
+    }
+    playFight.timer -= dt;
+    if (playFight.timer <= 0) { playFight.phase = 'attack'; playFight.attacksDone = 0; playFight.timer = 1.2; }
+    return;
+  }
+  if (playFight.phase === 'attack') {
+    const attacker = playFight.attacker === 'Moxie' ? moxie : mabel;
+    const defender = playFight.attacker === 'Moxie' ? mabel : moxie;
+    for (const cat of [moxie, mabel]) {
+      cat.moving = false;
+      const other = cat === moxie ? mabel : moxie;
+      cat.group.rotation.y = Math.atan2(other.group.position.x - cat.group.position.x, other.group.position.z - cat.group.position.z);
+    }
+    const attacks = ['left paw attack', 'right paw attack', 'attack forward leap'];
+    const attack = attacks[playFight.attacksDone % attacks.length];
+    attacker.playFightOverride = attack; attacker.playFightLoop = false;
+    defender.playFightOverride = 'dodge'; defender.playFightLoop = false;
+    playFight.timer -= dt;
+    if (playFight.timer <= 0) {
+      playFight.attacksDone++;
+      playFight.attacker = playFight.attacker === 'Moxie' ? 'Mabel' : 'Moxie';
+      playFight.timer = 1.2;
+      if (playFight.attacksDone >= 6) { playFight.phase = 'gather'; pickPlaySpot(); }
+    }
+    return;
+  }
+}
+
+
+
+// ---- Goal state: Rochelle's photo mission ----
+// Kyle is off-screen on her earpiece; Rochelle is the player character.
+// Photos must be taken in order — moon (Moxie), note (Mabel), rose (Margo)
+// — each only while its photo window is open (guests looking away), after
+// a treat holds the cat still. The third photo starts the escape.
+let won = false, talking = null, lineIdx = 0;
+const PHOTOS = [
+  { cat: 'Moxie', symbol: 'moon', label: 'crescent moon' },
+  { cat: 'Mabel', symbol: 'note', label: 'musical note' },
+  { cat: 'Margo', symbol: 'rose', label: 'velvet rose' },
+];
+const photos = [];
+let photoIdx = 0, windowOpen = false, windowTimer = 0, cinematic = null, missionStage = 'intro', introIdx = 0, nextCineAt = 0, lastWinSec = -1;
+const INTRO = [
+  ['Kyle (earpiece)', "Rochelle, you're in. Camera out, photographer first, agent second."],
+  ['Rochelle', "Got it. Ball, chandeliers, everybody dancing. Nobody's looking at the photographer. Yet."],
+  ['Kyle (earpiece)', "The passcode isn't on paper. It's on the cats. Three collars, three symbols. Too small to read from across the room. I need photos, clear ones."],
+  ['Rochelle', 'Photos of cats. At a ball. Without anyone noticing. Sure. Why not.'],
+  ['Kyle (earpiece)', "If a guest looks your way, shoot the dance floor. Shoot a chandelier. Shoot anything that isn't a cat."],
+  ['Rochelle', 'And if the cat runs?'],
+  ['Kyle (earpiece)', 'It will. Every time. Treat first. Photo second. Treats are your tripod.'],
+];
+function missionTarget() { return CATS.find(c => c.name === PHOTOS[photoIdx].cat); }
+function updateMissionHUD() {
+  const slots = document.getElementById('photoSlots');
+  if (slots) slots.textContent = PHOTOS.map((p, i) => i < photos.length ? p.symbol : '—').join(' ');
+  // exit door keeps its door texture (no green/red tint, or it would not look like a door)
+}
+function showIntroLine() {
+  typeDialogue(INTRO[introIdx][0], INTRO[introIdx][1]); document.getElementById('dialog').style.display = 'block';
+}
+function showPhotoLine(name, line) {
+  typeDialogue(name, line); dialogMode = 'photo'; document.getElementById('dialog').style.display = 'block';
+}
+function startCinematic(idx) {
+  const p = PHOTOS[idx], target = missionTarget();
+  if (idx === 2) revealMargo();
+  if (talking) endTalk();
+  const camPos = camera.position.clone();
+  const camLook = new THREE.Vector3(player.position.x - Math.sin(yaw) * 3, 1.6, player.position.z - Math.cos(yaw) * 3);
+  let toPos;
+  if (idx === 0) toPos = new THREE.Vector3(0, 2.2, -1); // dance floor, the song
+  else if (idx === 1) toPos = new THREE.Vector3(target.group.position.x, 1.6, target.group.position.z); // Mabel at the piano side
+  else toPos = new THREE.Vector3(donald.group.position.x, 1.6, donald.group.position.z); // Donald's spill
+  cinematic = { t: 0, dur: 6.2, fromPos: camPos, fromLook: camLook, toPos, toLook: toPos.clone() };
+  document.getElementById('barTop').style.height = '8vh';
+  document.getElementById('barBottom').style.height = '8vh';
+  if (idx === 2) donald.falling = 3.5; // Donald spills and tumbles as the camera finds him
+  missionStage = 'cinematic';
+  updateMissionHUD();
+}
+function endCinematic() {
+  cinematic = null;
+  document.getElementById('barTop').style.height = '0';
+  document.getElementById('barBottom').style.height = '0';
+  windowOpen = true; windowTimer = 0; lastWinSec = -1; // no time limit
+  missionStage = 'window';
+  updateMissionHUD();
+}
+function closeWindow() {
+  const target = missionTarget();
+  windowOpen = false; windowTimer = 0;
+  if (target && target.fed) fleeCat(target); // missed window: the cat runs
+  missionStage = 'waiting'; nextCineAt = clock.elapsedTime + 5;
+  updateMissionHUD();
+}
 // ---- Cat chase + treats + Margo reveal ----
 // Taming loop, all three cats: a cat runs from point to point away from
 // you. At each stop, press E / USE once to give it a treat — it stays put
@@ -523,7 +812,7 @@ function setTreat(cat, on) {
   if (!cat.group) return;
   if (!cat.treatMesh) {
     cat.treatMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a5a2e }));
-    cat.treatMesh.position.set(0, 0.06, 0.6); cat.group.add(cat.treatMesh);
+    cat.treatMesh.position.set(0, 0.03, 0.26); cat.group.add(cat.treatMesh);
   }
   cat.treatMesh.visible = on;
 }
@@ -558,38 +847,43 @@ function revealMargo() {
   }
   scene.add(trailGroup);
 }
-const clueEl = document.getElementById('clueCount'), contactEl = document.getElementById('contactState');
-function updateHUD() {
-  if(clueEl) clueEl.textContent = clues.size + '/3';
-  if(contactEl) contactEl.textContent = contactFound ? 'found ✓' : 'not found';
-  // exit door keeps its door texture (no green/red tint, or it would not look like a door)
-}
-updateHUD();
+updateMissionHUD();
 function talkTo(npc) {
   talking = npc; lineIdx = 0;
-  // A cat with no treat yet: this press gives it a treat, it stays put
-  // briefly, and no clue is collected. The next press scans it.
-  if (npc.role === 'cat' && !npc.fed) {
-    showLine(); npc.fed = true; npc.fedTimer = 12; npc.treatsGiven = (npc.treatsGiven || 0) + 1; setTreat(npc, true); return;
+  if (npc.role === 'cat') {
+    const p = PHOTOS[photoIdx];
+    const already = PHOTOS.find(q => q.cat === npc.name && photos.includes(q.symbol));
+    if (already) { showPhotoLine(npc.name, 'Already photographed — ' + already.label + ' is in the set.'); return; }
+    if (npc.name !== p.cat) { showPhotoLine(npc.name, 'Not this one yet — ' + p.cat + ' first. The photos go moon, note, rose, in that order.'); return; }
+    if (!windowOpen) { showPhotoLine('Kyle (earpiece)', 'Guests are watching. Wait for your photo window — the room has to look away first.'); return; }
+    // A cat with no treat yet: this press gives it a treat, it stays put
+    // briefly, and no photo is taken. The next press photographs it.
+    if (!npc.fed) {
+      showLine(); npc.fed = true; npc.fedTimer = 12; npc.treatsGiven = (npc.treatsGiven || 0) + 1; setTreat(npc, true); return;
+    }
+    // Fed, window open, right cat, right order: the photo.
+    npc.fed = false; npc.fedTimer = 0; setTreat(npc, false);
+    photos.push(p.symbol); photoIdx++;
+    windowOpen = false; windowTimer = 0;
+    if (photos.length === 3) {
+      startEscapeCinematic();
+    } else {
+      showPhotoLine('Rochelle', 'Got it — ' + p.label + '. That is ' + photos.length + ' of 3.');
+      missionStage = 'waiting'; nextCineAt = clock.elapsedTime + 3;
+    }
+    if (photos.length === 2) revealMargo();
+    updateMissionHUD(); return;
   }
   showLine();
-  if (npc.role === 'cat' && !clues.has(npc.clue)) {
-    npc.fed = false; npc.fedTimer = 0; setTreat(npc, false);
-    clues.add(npc.clue);
-    if (clues.has('midnight') && clues.has('waltz')) revealMargo();
-  }
-  if (npc.role === 'contact' && clues.size === 3) { contactFound = true; }
-  updateHUD();
+  updateMissionHUD();
 }
 function showLine() {
   if (!talking) return;
   let line = talking.lines[lineIdx % talking.lines.length];
   if (talking.role === 'cat' && !talking.fed) line = 'You offer ' + talking.name + ' a treat. She sniffs it, eats it, and stays put — quick, tap USE again to scan her tag before she changes her mind.';
-  if (talking.role === 'contact' && clues.size < 3 && !contactFound) line = 'I can only trust someone who knows all three passphrase words. The cats carry them — scan the ID tags on Margo, Moxie, and Mabel.';
-  if (talking.role === 'contact' && contactFound) line = 'Velvet, midnight, waltz — that is right. The north door is open. Go, quietly.';
   typeDialogue(talking.name, line); document.getElementById('dialog').style.display = 'block';
   playClip('talk');
-  if (talking.mixer) playGuestClip(talking, 'talk');
+  if (talking.mixer) playMxCharClip(talking, 'talk');
 }
 function endTalk() { if (typeTimer) { clearInterval(typeTimer); typeTimer = null; typing = false; } talking = null; document.getElementById('dialog').style.display = 'none'; }
 
@@ -600,6 +894,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in win
 if (isTouch) document.body.classList.add('touch');
 document.getElementById('startBtn').onclick = () => {
   document.getElementById('overlay').style.display = 'none'; started = true;
+  introIdx = 0; showIntroLine(); updateMissionHUD();
   if (!isTouch) renderer.domElement.requestPointerLock();
 };
 addEventListener('keydown', (e) => {
@@ -637,21 +932,22 @@ renderer.domElement.addEventListener('touchstart', (e)=>{ const tt=e.changedTouc
 renderer.domElement.addEventListener('touchend', (e)=>{ if(!started) return; for(const tt of e.changedTouches){ if(Math.hypot(tt.clientX-tapSX, tt.clientY-tapSY)<15 && Date.now()-tapST<500) nearestTalk(); } }, {passive:true});
 
 function nearestTalk() {
+  if (missionStage === 'intro') {
+    introIdx++;
+    if (introIdx < INTRO.length) { showIntroLine(); return; }
+    document.getElementById('dialog').style.display = 'none';
+    missionStage = 'waiting'; nextCineAt = clock.elapsedTime + 1.5; updateMissionHUD(); return;
+  }
+  if (cinematic || escapeCine) return;
   let best = null, bd = 3.2;
   for (const n of NPCS) { if (!n.group.visible) continue; const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
   if (best) {
-    // A cat fed mid-conversation: a fresh press scans it, instead of just
-    // cycling to its second line and never collecting.
-    if (talking === best && best.role === 'cat' && best.fed && !clues.has(best.clue)) talkTo(best);
+    // Cats always go through the photo logic (treat, then photo); guests
+    // just cycle their flavour lines.
+    if (best.role === 'cat') talkTo(best);
     else if (talking === best) { lineIdx++; showLine(); } else talkTo(best);
   }
   else if (talking) endTalk();
-  else {
-    // Near exit?
-    if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
-      if (contactFound && !won) { won = true; document.getElementById('winText').textContent = 'You scanned all 3 cat collar tags (velvet, midnight, waltz), found Rochelle, and slipped out the north door — without a single fight.'; document.getElementById('win').style.display = 'flex'; }
-    }
-  }
 }
 
 // ---- Loop ----
@@ -659,7 +955,20 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
-  if (started && !won) {
+  if (cinematic) {
+    cinematic.t += dt;
+    const c = cinematic, ph = c.t / c.dur;
+    const ease = (x) => x * x * (3 - 2 * x);
+    if (ph >= 1) endCinematic();
+  }
+  if (missionStage === 'waiting' && photoIdx < 3 && clock.elapsedTime >= nextCineAt && nextCineAt > 0) {
+    nextCineAt = 0; startCinematic(photoIdx);
+  }
+  // Photo window has no countdown: it stays open until you take the photo.
+  // (windowTimer is no longer counted down, and closeWindow is not auto-called.)
+  if (escapeCine) { escapeCine.t += dt; updateEscapeCine(dt); if (escapeCine.t >= escapeCine.dur) endEscapeCinematic(); }
+  if (escapePending && lamboGroup) { escapePending = false; startEscapeCinematic(); }
+  if (started && !won && !cinematic && !escapeCine) {
     let fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
     let fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
     if (joyId !== null) { fx += joyX; fz += -joyY; }
@@ -711,11 +1020,19 @@ function animate() {
     // (Without this, dialogue closed one frame after opening.)
     if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — tap USE'; prompt.style.display = 'block'; } }
     else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
-      if (prompt) { prompt.textContent = contactFound ? 'North exit open — tap USE to leave' : 'North exit is locked — find Rochelle first (gather 3 clues)'; prompt.style.display = 'block'; }
+      if (prompt) { prompt.textContent = photos.length === 3 ? 'North exit open — tap USE to leave' : 'North exit is locked — photograph all 3 collars first (moon, note, rose)'; prompt.style.display = 'block'; }
     } else { if (prompt) prompt.style.display = 'none'; if (talking) endTalk(); }
+    updatePlayFight(dt);
     // NPC wander + sway
     for (const n of NPCS) {
       if (n === talking) continue;
+      if (n.role === 'cat' && (n.name === 'Moxie' || n.name === 'Mabel') && playFight.active && !n.fleeing && !n.fed) continue; // play fight moves these cats, not the wander loop
+      if (windowOpen && n.role !== 'cat') {
+        // Everybody's back is turned: dancing, at the bar, or checking on
+        // Donald. Nobody is watching Rochelle or the cat.
+        n.group.rotation.y = Math.atan2(n.group.position.x - player.position.x, n.group.position.z - player.position.z);
+        n.moving = false; continue;
+      }
       if (!n.group.visible) continue; // hidden Margo: not in the hall yet
       if (n.role === 'donald') {
         // Stumble walk: slow, wobbling, and every so often he falls down
@@ -744,7 +1061,7 @@ function animate() {
       n.group.position.y = Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
       if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
       // Getting close to an unfed chase cat spooks it into running.
-      if (n.role === 'cat' && n.chase && !n.fed && !n.fleeing && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }
+      if (n.role === 'cat' && n.chase && !n.fed && !n.fleeing && !(windowOpen && n === missionTarget()) && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }
       const wp = n.wps[n.wp]; const ddx = wp[0] - n.group.position.x, ddz = wp[1] - n.group.position.z, d = Math.hypot(ddx, ddz);
       if (d < 0.3) {
         n.moving = false;
@@ -753,12 +1070,212 @@ function animate() {
       }
       else { const sp = n.fleeing ? 2.6 : (n.shy ? 0.5 : 0.8); n.group.position.x += ddx / d * sp * dt; n.group.position.z += ddz / d * sp * dt; n.group.rotation.y = Math.atan2(ddx, ddz); n.moving = true; }
     }
+    updateCatClips(); for (const cat of CATS) { if (cat.mixer) cat.mixer.update(dt); }
   }
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
   camera.position.set(player.position.x + back.x * 5, 2.6, player.position.z + back.z * 5);
   camera.lookAt(player.position.x - back.x * 3, 1.6, player.position.z - back.z * 3);
+  if (cinematic) {
+    const c = cinematic, ph = Math.min(c.t / c.dur, 1);
+    const ease = (x) => x * x * (3 - 2 * x);
+    let k;
+    if (ph < 0.2) k = ease(ph / 0.2); // pan out to the event
+    else if (ph < 0.68) k = 1; // hold on the event
+    else k = 1 - ease((ph - 0.68) / 0.32); // pan back to Rochelle
+    camera.position.lerpVectors(c.fromPos, c.toPos, k);
+    const look = new THREE.Vector3().lerpVectors(c.fromLook, c.toLook, k);
+    camera.lookAt(look);
+  }
+  if (escapeCine) {
+    camera.position.copy(escapeCine.camPos);
+    camera.lookAt(escapeCine.camLook);
+  }
   renderer.render(scene, camera);
 }
+
+// ---- Escape ending: cinematic-only exterior (drive, Lambo, lawn, road) ----
+// Built from the handoff page's real exterior assets; the playable
+// interior is untouched. The set sits south of the hall (z 16+) and is
+// only framed by the escape cinematic's camera. On the third photo,
+// all three cats + Kyle + Rochelle escape on the white Lambo.
+let escapeCine = null, escapePending = false, lamboGroup = null, kyleAgent = null;
+const bushTex = texLoader.load('assets/textures/exterior/exterior_lawn_grass_clover_1024.webp', (tex) => { tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2); tex.colorSpace = THREE.SRGBColorSpace; });
+const BUSH_GREENS = [0x1e4d1e, 0x2a6b2a, 0x3a7d3a, 0x1a421a, 0x2f5e1f];
+function bushRand(seed) { const s = Math.sin(seed) * 43758.5453; return s - Math.floor(s); }
+function bush(x, z, r) {
+  const g = new THREE.Group();
+  const variant = Math.floor(bushRand(x * 12.9898 + z * 78.233) * 3); // 0 round, 1 wide, 2 tall
+  const lobes = variant === 0
+    ? [[0, 0.7, 0, 1.0], [0.5, 0.5, 0.2, 0.65], [-0.45, 0.55, -0.15, 0.6], [0.1, 0.95, -0.3, 0.55], [-0.2, 0.4, 0.45, 0.55]]
+    : variant === 1
+    ? [[0, 0.55, 0, 0.9], [0.7, 0.45, 0.1, 0.6], [-0.65, 0.5, -0.1, 0.65], [0.2, 0.75, -0.25, 0.5], [-0.3, 0.35, 0.4, 0.5]]
+    : [[0, 0.85, 0, 0.9], [0.4, 0.5, 0.15, 0.55], [-0.35, 0.6, -0.2, 0.6], [0.05, 1.25, 0.1, 0.5], [-0.1, 0.35, 0.35, 0.5]];
+  lobes.forEach(([lx, ly, lz, lr], i) => {
+    const mat = new THREE.MeshStandardMaterial({ color: BUSH_GREENS[i % BUSH_GREENS.length], roughness: 1, flatShading: true, map: bushTex });
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r * lr, 1), mat);
+    m.position.set(lx * r, -1.5 + ly * r, lz * r); g.add(m);
+  });
+  g.position.set(x, 0, z); scene.add(g); return g;
+}
+function buildEscapeSet() {
+  flatPlane(0, -1.5, 42, 80, 70, 0x777777, 'assets/textures/exterior/exterior_lawn_grass_clover_1024.webp', 8, 7);
+  cyl(0, -1.48, 32, 13, 13, 0.1, 0x333333);
+  flatPlane(0, -1.43, 32, 26, 26, 0x333333, 'assets/textures/exterior/exterior_drive_asphalt_1024.webp', 4, 4);
+  cyl(0, -1.47, 32, 5, 5, 0.2, 0x333333);
+  box(0, -1.48, 60, 8, 0.1, 30, 0x333333);
+  flatPlane(0, -1.43, 60, 8, 30, 0x222222, 'assets/textures/exterior/exterior_drive_asphalt_1024.webp', 2, 4);
+  for (let a = 0; a < 360; a += 20) {
+    const r = 13.5, x = Math.cos(a * Math.PI / 180) * r, z = 32 + Math.sin(a * Math.PI / 180) * r;
+    bush(x, z, 0.9);
+  }
+  for (let x = -14; x <= 14; x += 2) bush(x, 16.5, 0.9);
+  for (let a = 0; a < 360; a += 45) bush(Math.cos(a * Math.PI / 180) * 3.5, 32 + Math.sin(a * Math.PI / 180) * 3.5, 0.6);
+}
+buildEscapeSet();
+// White Lambo (the only real vehicle model in the project), parked
+// curbside east as in the handoff drive.
+gltfLoader.load('assets/vehicles/white_lambo.glb', (gltf) => {
+  const g = fitPropGroup(gltf.scene, 2.0, 1.2, 4.5); if (!g) return;
+  g.traverse((c) => { if (c.isMesh && c.material && c.material.color && c.material.color.getHex() === 0xffffff) { c.material.metalness = 0; c.material.roughness = 0.55; } });
+  g.position.set(11, -0.9, 32); g.rotation.y = 0.4;
+  scene.add(g); lamboGroup = g;
+});
+// Kyle, the second escape agent: the same Mixamo FBX the old ballroom
+// used as its player. No basecolor file exists for him, so the FBX's own
+// materials apply. He idles on the shared mxClips idle clip.
+fbxLoader.load('assets/characters/Kyle_undercover.fbx', (o) => {
+  fitCharacter(o, 1.8);
+  o.rotation.y = Math.PI;
+  const grp = new THREE.Group();
+  grp.add(o);
+  grp.visible = false; grp.position.set(0, -1.5, 60);
+  scene.add(grp);
+  kyleAgent = { group: grp, model: o, mixer: new THREE.AnimationMixer(o) };
+});
+const ESC_ROOF = { Moxie: [0.35, 1.3], Mabel: [-0.35, 0.1], Margo: [0, -1.2] };
+const ESC_GROUND = { Moxie: [8.8, 34.5], Mabel: [13.2, 34.5], Margo: [11, 36.5] };
+function startEscapeCinematic() {
+  if (escapeCine) return;
+  if (!lamboGroup) { escapePending = true; missionStage = 'escape'; return; }
+  if (talking) endTalk();
+  playFight.active = false;
+  windowOpen = false; windowTimer = 0;
+  missionStage = 'escape';
+  const camPos = camera.position.clone();
+  const camLook = new THREE.Vector3(player.position.x - Math.sin(yaw) * 3, 1.6, player.position.z - Math.cos(yaw) * 3);
+  // Gather everyone on the drive, beside the white Lambo.
+  for (const cat of CATS) {
+    cat.fleeing = false; cat.fed = false; cat.moving = false; cat.hiding = false; setTreat(cat, false);
+    const s = ESC_GROUND[cat.name] || [11, 34];
+    cat.group.position.set(s[0], -1.43, s[1]);
+    cat.group.rotation.y = 0; // face south, the direction of travel
+    cat._escFrom = cat.group.position.clone();
+    const r = ESC_ROOF[cat.name] || [0, 0];
+    cat._escTo = new THREE.Vector3(11 + r[0], -0.25, 32 + r[1]);
+    cat._escAttached = false;
+    if (cat.clips && cat.clips.sit) playCatClip(cat, 'sit');
+  }
+  if (kyleAgent) {
+    kyleAgent.group.visible = true;
+    kyleAgent.group.position.set(9.2, -1.43, 30.5);
+    kyleAgent.group.rotation.y = Math.PI / 2; // face the car (east)
+    kyleAgent._escFrom = kyleAgent.group.position.clone();
+    kyleAgent._escDoor = new THREE.Vector3(9.7, -1.43, 32.6);
+    kyleAgent._escSeat = new THREE.Vector3(10.55, -1.43, 32.6);
+    kyleAgent._escAttached = false;
+  }
+  player.position.set(12.8, -1.43, 30.5);
+  player.rotation.y = -Math.PI / 2; // face the car (west)
+  escapeCine = {
+    t: 0, dur: 12,
+    fromPos: camPos, fromLook: camLook,
+    drivePos: new THREE.Vector3(5, 1.6, 43), driveLook: new THREE.Vector3(11, -0.6, 32),
+    camPos: camPos.clone(), camLook: camLook.clone(),
+    carPos: new THREE.Vector3(11, -0.9, 32),
+    rochFrom: new THREE.Vector3(12.8, -1.43, 30.5),
+    rochDoor: new THREE.Vector3(12.3, -1.43, 32.6),
+    rochSeat: new THREE.Vector3(11.45, -1.43, 32.6),
+    rochAttached: false,
+  };
+  document.getElementById('barTop').style.height = '8vh';
+  document.getElementById('barBottom').style.height = '8vh';
+  updateMissionHUD();
+}
+function updateEscapeCine(dt) {
+  const e = escapeCine; if (!e) return;
+  const ease = (x) => x * x * (3 - 2 * x);
+  const lerp3 = (a, b, k) => new THREE.Vector3(a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k);
+  // Keep everyone alive while the main loop is paused for the cinematic.
+  if (mixer) { mixer.update(dt); playClip('idle'); }
+  if (kyleAgent && kyleAgent.mixer) { kyleAgent.mixer.update(dt); playMxCharClip(kyleAgent, 'idle'); }
+  for (const cat of CATS) { if (cat.mixer) cat.mixer.update(dt); }
+  // Camera: pan to the drive, hold on the gather, then track the car.
+  if (e.t < 2) {
+    const k = ease(e.t / 2);
+    e.camPos.copy(lerp3(e.fromPos, e.drivePos, k));
+    e.camLook.copy(lerp3(e.fromLook, e.driveLook, k));
+    lamboGroup.rotation.y = 0.4 + (0 - 0.4) * k; // parked angle eases to facing south
+  } else if (e.t < 6) {
+    e.camPos.copy(e.drivePos); e.camLook.copy(e.driveLook);
+  }
+  // Phase B (2-4.5s): cats hop onto the roof; Kyle and Rochelle walk to the doors.
+  if (e.t >= 2 && e.t < 4.5) {
+    const k = ease((e.t - 2) / 2.5);
+    for (const cat of CATS) {
+      if (cat._escAttached) continue;
+      const p = lerp3(cat._escFrom, cat._escTo, k);
+      p.y += Math.sin(k * Math.PI) * 0.6; // hop arc
+      cat.group.position.copy(p);
+    }
+    if (kyleAgent) kyleAgent.group.position.copy(lerp3(kyleAgent._escFrom, kyleAgent._escDoor, k));
+    player.position.copy(lerp3(e.rochFrom, e.rochDoor, k));
+  }
+  if (e.t >= 4.5) {
+    for (const cat of CATS) {
+      if (!cat._escAttached) { cat.group.position.copy(cat._escTo); lamboGroup.attach(cat.group); cat._escAttached = true; }
+    }
+  }
+  // Phase C (4.5-6s): Kyle and Rochelle get in.
+  if (e.t >= 4.5 && e.t < 6) {
+    const k = ease((e.t - 4.5) / 1.5);
+    if (kyleAgent && !kyleAgent._escAttached) kyleAgent.group.position.copy(lerp3(kyleAgent._escDoor, kyleAgent._escSeat, k));
+    if (!e.rochAttached) player.position.copy(lerp3(e.rochDoor, e.rochSeat, k));
+  }
+  if (e.t >= 6) {
+    if (kyleAgent && !kyleAgent._escAttached) { kyleAgent.group.position.copy(kyleAgent._escSeat); lamboGroup.attach(kyleAgent.group); kyleAgent._escAttached = true; }
+    if (!e.rochAttached) { player.position.copy(e.rochSeat); lamboGroup.attach(player); e.rochAttached = true; }
+  }
+  // Phase D (6-11s): the Lambo pulls out of its spot onto the road and drives south.
+  if (e.t >= 6 && e.t < 11) {
+    const dk = ease((e.t - 6) / 5);
+    let cx, cz;
+    if (dk < 0.4) { const s = ease(dk / 0.4); cx = 11 + (0 - 11) * s; cz = 32 + (44 - 32) * s; }
+    else { const s = ease((dk - 0.4) / 0.6); cx = 0; cz = 44 + (68 - 44) * s; }
+    lamboGroup.position.set(cx, -0.9, cz);
+    e.carPos.set(cx, -0.9, cz);
+    const trackPos = new THREE.Vector3(cx - 9, 2.8, cz - 7), trackLook = new THREE.Vector3(cx, -0.5, cz);
+    if (e.t < 7) {
+      const k = ease((e.t - 6) / 1);
+      e.camPos.copy(lerp3(e.drivePos, trackPos, k));
+      e.camLook.copy(lerp3(e.driveLook, trackLook, k));
+    } else {
+      e.camPos.copy(trackPos); e.camLook.copy(trackLook);
+    }
+  }
+}
+function endEscapeCinematic() {
+  escapeCine = null;
+  document.getElementById('barTop').style.height = '0';
+  document.getElementById('barBottom').style.height = '0';
+  won = true;
+  document.getElementById('winText').textContent = 'Moon, note, rose. The cats rode out on the white Lambo — Kyle driving, Rochelle riding shotgun, all three cats on the roof.';
+  document.getElementById('win').style.display = 'flex';
+  updateMissionHUD();
+}
+if (new URLSearchParams(location.search).has('test')) {
+  window.__mission = { player, NPCS, CATS, PHOTOS, get photos() { return [...photos]; }, get photoIdx() { return photoIdx; }, get windowOpen() { return windowOpen; }, get missionStage() { return missionStage; }, get cinematic() { return cinematic; }, missionTarget, nearestTalk, startCinematic, updateMissionHUD, get won() { return won; }, get escapeCine() { return escapeCine; }, startEscapeCinematic, get escapeReady() { return !!lamboGroup; }, get kyleAgent() { return kyleAgent; }, get lamboGroup() { return lamboGroup; } };
+}
+
 animate();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 addEventListener('contextmenu', e=>e.preventDefault());
