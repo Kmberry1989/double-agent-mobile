@@ -17,6 +17,7 @@
   #mission{position:fixed;top:10px;left:10px;z-index:20;color:#fff;font:16px/1.4 system-ui,sans-serif;text-shadow:0 1px 4px #000}
   #barTop,#barBottom{position:fixed;left:0;right:0;height:0;background:#000;z-index:25;transition:height .6s}
   #barTop{top:0} #barBottom{bottom:0}
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:30}
   #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
   #win{display:none}
   button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
@@ -36,7 +37,7 @@
 <nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html" class="cur" aria-current="page">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a></nav>
 <div id="overlay"><h1>Rochelle's Photo Mission</h1><p>Photographer first, agent second. Kyle is on your earpiece.</p><button id="startBtn">Enter as Rochelle</button></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
-<div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span></div><div id="barTop"></div><div id="barBottom"></div>
+<div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span></div><div id="barTop"></div><div id="barBottom"></div><div id="flash"></div>
 <div id="joy"><div id="knob"></div></div>
 <button id="useBtn">USE</button>
 <script type="module">
@@ -138,6 +139,179 @@ flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroo
   const c = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 3.5), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
   c.position.set(x, 2.75, -13.65); scene.add(c); applyTex(c, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
 });
+
+// ---- Interior windows + curtain rods (night ball, 2026-11-07) ----
+// Tall white-framed windows on the interior walls, night sky behind the
+// glass (it is a nighttime ball and the walls are solid). Rods only above
+// them — no curtains. Placed on real wall faces (interior faces at
+// z +/-14, x +/-20), clear of the doors, the north-wall velvet drapes,
+// the bar, and the tables.
+function nightSkyTexture() {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 384;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 384);
+  grad.addColorStop(0, '#05081f'); grad.addColorStop(0.55, '#0d1740'); grad.addColorStop(1, '#1c2547');
+  g.fillStyle = grad; g.fillRect(0, 0, 256, 384);
+  for (let i = 0; i < 80; i++) {
+    g.fillStyle = 'rgba(255,255,255,' + (0.25 + Math.random() * 0.75).toFixed(2) + ')';
+    const s = Math.random() * 1.6 + 0.6;
+    g.fillRect(Math.random() * 256, Math.random() * 250, s, s);
+  }
+  const glow = g.createRadialGradient(192, 72, 4, 192, 72, 78);
+  glow.addColorStop(0, 'rgba(255,244,200,0.9)');
+  glow.addColorStop(0.35, 'rgba(255,244,200,0.22)');
+  glow.addColorStop(1, 'rgba(255,244,200,0)');
+  g.fillStyle = glow; g.fillRect(104, 0, 152, 160);
+  g.fillStyle = '#fdf6d8'; g.beginPath(); g.arc(192, 72, 20, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(190,180,140,0.55)';
+  g.beginPath(); g.arc(186, 66, 4, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(198, 78, 3, 0, Math.PI * 2); g.fill();
+  // Distant rooftops along the bottom, a few lit windows.
+  g.fillStyle = '#04060e';
+  g.beginPath(); g.moveTo(0, 384); g.lineTo(0, 320); g.lineTo(40, 296); g.lineTo(80, 320); g.lineTo(120, 300); g.lineTo(170, 324); g.lineTo(210, 302); g.lineTo(256, 322); g.lineTo(256, 384); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(255,214,120,0.9)';
+  g.fillRect(52, 312, 5, 7); g.fillRect(140, 316, 5, 7); g.fillRect(200, 312, 5, 7);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; return tex;
+}
+const NIGHT_SKY = nightSkyTexture();
+function addWindow(x, z, rotY) {
+  // Group local +Z faces into the room. 1.7 m wide x 3.4 m tall, centre
+  // y 3.1 (above the 1.2 m wainscoting, below the 6 m ceiling).
+  const g = new THREE.Group();
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0xf5efe0, roughness: 0.6 });
+  const W = 1.7, H = 3.4;
+  const rail = (w, h, px, py) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.08), frameMat); m.position.set(px, py, 0); m.castShadow = true; g.add(m); return m; };
+  rail(W, 0.09, 0, H / 2 - 0.045); rail(W, 0.09, 0, -H / 2 + 0.045);
+  rail(0.09, H, -W / 2 + 0.045, 0); rail(0.09, H, W / 2 - 0.045, 0);
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(W + 0.16, 0.07, 0.14), frameMat);
+  sill.position.set(0, -H / 2 - 0.035, 0.03); g.add(sill);
+  // Night-sky glass, faintly glowing so it reads at night.
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.18, H - 0.18), new THREE.MeshStandardMaterial({ map: NIGHT_SKY, emissive: 0x8a9ac0, emissiveMap: NIGHT_SKY, emissiveIntensity: 0.35, roughness: 0.15, metalness: 0.2 }));
+  glass.position.set(0, 0, -0.01); g.add(glass);
+  // Mullions: one vertical, two horizontal.
+  const mv = new THREE.Mesh(new THREE.BoxGeometry(0.05, H - 0.18, 0.03), frameMat); mv.position.set(0, 0, 0.01); g.add(mv);
+  [-H / 6, H / 6].forEach((py) => { const mh = new THREE.Mesh(new THREE.BoxGeometry(W - 0.18, 0.05, 0.03), frameMat); mh.position.set(0, py, 0.01); g.add(mh); });
+  // Curtain rod above: dark brass, finials, two brackets. Rod only, no curtain.
+  const brass = new THREE.MeshStandardMaterial({ color: 0x8a6b2f, metalness: 0.85, roughness: 0.35 });
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, W + 0.5, 12), brass);
+  rod.rotation.z = Math.PI / 2; rod.position.set(0, H / 2 + 0.32, 0.12); g.add(rod);
+  [-1, 1].forEach((s) => {
+    const fin = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), brass);
+    fin.position.set(s * (W / 2 + 0.25), H / 2 + 0.32, 0.12); g.add(fin);
+    const br = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, 0.12), brass);
+    br.position.set(s * (W / 2 - 0.1), H / 2 + 0.32, 0.06); g.add(br);
+  });
+  g.position.set(x, 3.1, z); g.rotation.y = rotY; scene.add(g);
+  return g;
+}
+// North (velvet drapes at x -12/-4/4/12, exit door at 0) / south (entrance door at 0).
+addWindow(-8, -13.96, 0); addWindow(8, -13.96, 0);
+addWindow(-9, 13.96, Math.PI); addWindow(9, 13.96, Math.PI);
+// West / east (bar sits at x 17.5, z 4..8 — no window there).
+addWindow(-19.96, -7, Math.PI / 2); addWindow(-19.96, 0, Math.PI / 2); addWindow(-19.96, 7, Math.PI / 2);
+addWindow(19.96, -7, -Math.PI / 2); addWindow(19.96, 0, -Math.PI / 2); addWindow(19.96, 11, -Math.PI / 2);
+
+// ---- Gilded paintings (2026-11-07) ----
+// No portrait/painting image exists under assets/ — these canvases are
+// painted procedurally (classical portraits, a moonlit garden, roses, a
+// ball scene) in a muted burgundy/gold/cream palette. If the user sends
+// real paintings, swap the canvas textures for them.
+function paintCanvas(draw) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 320;
+  const g = c.getContext('2d'); draw(g);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; return tex;
+}
+const PAINTING_TEXTURES = [
+  paintCanvas((g) => { // Lady in gold — portrait
+    g.fillStyle = '#2a1a12'; g.fillRect(0, 0, 256, 320);
+    g.fillStyle = '#6a4a1a'; g.beginPath(); g.ellipse(128, 150, 90, 120, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#3a2418'; g.beginPath(); g.ellipse(128, 150, 80, 110, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#7a1a2a'; g.beginPath(); g.moveTo(128, 190); g.lineTo(60, 320); g.lineTo(196, 320); g.closePath(); g.fill();
+    g.fillStyle = '#c9a227'; g.fillRect(118, 200, 20, 6);
+    g.fillStyle = '#d9a06b'; g.fillRect(120, 150, 16, 40);
+    g.beginPath(); g.ellipse(128, 120, 30, 38, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#1a1210'; g.beginPath(); g.ellipse(128, 92, 32, 22, 0, Math.PI, 0); g.fill();
+    g.beginPath(); g.arc(128, 82, 12, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#1a1210'; g.fillRect(112, 116, 8, 3); g.fillRect(136, 116, 8, 3);
+    g.fillStyle = '#8a3a3a'; g.fillRect(120, 142, 16, 3);
+  }),
+  paintCanvas((g) => { // Gentleman with moustache — portrait
+    g.fillStyle = '#14202a'; g.fillRect(0, 0, 256, 320);
+    g.fillStyle = '#3a4a5a'; g.beginPath(); g.ellipse(128, 150, 88, 118, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#1a1a1a'; g.beginPath(); g.moveTo(128, 185); g.lineTo(58, 320); g.lineTo(198, 320); g.closePath(); g.fill();
+    g.fillStyle = '#f0ead8'; g.beginPath(); g.moveTo(128, 185); g.lineTo(112, 205); g.lineTo(128, 225); g.lineTo(144, 205); g.closePath(); g.fill();
+    g.fillStyle = '#c98a5a'; g.fillRect(120, 150, 16, 38);
+    g.beginPath(); g.ellipse(128, 120, 30, 38, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#8a8a8a'; g.beginPath(); g.ellipse(128, 90, 31, 18, 0, Math.PI, 0); g.fill();
+    g.fillStyle = '#2a2a2a'; g.fillRect(112, 116, 8, 3); g.fillRect(136, 116, 8, 3);
+    g.fillRect(118, 136, 20, 4);
+    g.fillStyle = '#8a3a3a'; g.fillRect(121, 144, 14, 3);
+  }),
+  paintCanvas((g) => { // Moonlit garden — landscape
+    const grad = g.createLinearGradient(0, 0, 0, 320);
+    grad.addColorStop(0, '#060a24'); grad.addColorStop(1, '#0e2a22');
+    g.fillStyle = grad; g.fillRect(0, 0, 256, 320);
+    g.fillStyle = '#fdf6d8'; g.beginPath(); g.arc(196, 62, 18, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#0a2018';
+    g.beginPath(); g.moveTo(30, 320); g.lineTo(30, 180); g.lineTo(70, 130); g.lineTo(110, 180); g.lineTo(110, 320); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(150, 320); g.lineTo(150, 200); g.lineTo(185, 150); g.lineTo(220, 200); g.lineTo(220, 320); g.closePath(); g.fill();
+    g.fillStyle = '#1a3a2a'; g.fillRect(0, 280, 256, 40);
+    g.fillStyle = '#c9b078'; g.beginPath(); g.moveTo(108, 320); g.lineTo(128, 240); g.lineTo(148, 320); g.closePath(); g.fill();
+  }),
+  paintCanvas((g) => { // Roses still life
+    g.fillStyle = '#241a1a'; g.fillRect(0, 0, 256, 320);
+    g.fillStyle = '#3a2a1a'; g.fillRect(0, 240, 256, 80);
+    g.fillStyle = '#2a4a6a'; g.beginPath(); g.moveTo(108, 240); g.lineTo(148, 240); g.lineTo(140, 300); g.lineTo(116, 300); g.closePath(); g.fill();
+    g.strokeStyle = '#1a3a1a'; g.lineWidth = 4;
+    [[128, 150], [100, 170], [156, 170], [114, 130], [142, 130]].forEach(([x, y]) => {
+      g.beginPath(); g.moveTo(128, 240); g.lineTo(x, y + 20); g.stroke();
+    });
+    [[128, 150, '#a01830'], [100, 170, '#c03040'], [156, 170, '#801826'], [114, 130, '#d04050'], [142, 130, '#a01830']].forEach(([x, y, col]) => {
+      g.fillStyle = col; g.beginPath(); g.arc(x, y, 20, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,120,140,0.5)'; g.beginPath(); g.arc(x - 5, y - 5, 8, 0, Math.PI * 2); g.fill();
+    });
+  }),
+  paintCanvas((g) => { // Dancers at a ball
+    g.fillStyle = '#3a2410'; g.fillRect(0, 0, 256, 320);
+    g.fillStyle = '#ffd97a';
+    for (let i = 0; i < 24; i++) { g.fillRect(40 + Math.random() * 176, 20 + Math.random() * 40, 3, 3); }
+    g.fillStyle = '#7a1a2a'; g.beginPath(); g.moveTo(100, 150); g.lineTo(60, 300); g.lineTo(140, 300); g.closePath(); g.fill();
+    g.fillStyle = '#1a2a4a'; g.beginPath(); g.moveTo(170, 150); g.lineTo(140, 300); g.lineTo(205, 300); g.closePath(); g.fill();
+    g.fillStyle = '#d9a06b';
+    g.beginPath(); g.arc(100, 125, 14, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.arc(172, 125, 14, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#c9a227'; g.fillRect(30, 290, 196, 6);
+  }),
+];
+function addPainting(x, z, rotY, w, h, tex) {
+  // Gilded frame: gold rim, darker inner bevel, canvas slightly proud.
+  const g = new THREE.Group();
+  const gold = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.7, roughness: 0.35 });
+  const darkGold = new THREE.MeshStandardMaterial({ color: 0x8a6b2f, metalness: 0.7, roughness: 0.4 });
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, h + 0.12, 0.05), gold);
+  frame.castShadow = true; g.add(frame);
+  const inner = new THREE.Mesh(new THREE.BoxGeometry(w + 0.02, h + 0.02, 0.055), darkGold);
+  inner.position.z = 0.004; g.add(inner);
+  const canvas = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
+  canvas.position.z = 0.032; g.add(canvas);
+  g.position.set(x, 1.6, z); g.rotation.y = rotY; scene.add(g);
+  return g;
+}
+// North (between the velvet drapes) / south (between door and windows).
+addPainting(-16.5, -13.96, 0, 1.5, 1.9, PAINTING_TEXTURES[0]);
+addPainting(16.5, -13.96, 0, 1.5, 1.9, PAINTING_TEXTURES[1]);
+addPainting(-15, 13.96, Math.PI, 1.4, 1.8, PAINTING_TEXTURES[2]);
+addPainting(-4.5, 13.96, Math.PI, 1.3, 1.7, PAINTING_TEXTURES[3]);
+addPainting(4.5, 13.96, Math.PI, 1.3, 1.7, PAINTING_TEXTURES[4]);
+addPainting(15, 13.96, Math.PI, 1.4, 1.8, PAINTING_TEXTURES[0]);
+// West / east (bar zone on the east wall left clear).
+addPainting(-19.96, -11, Math.PI / 2, 1.4, 1.8, PAINTING_TEXTURES[1]);
+addPainting(-19.96, -3.5, Math.PI / 2, 1.2, 1.6, PAINTING_TEXTURES[3]);
+addPainting(-19.96, 3.5, Math.PI / 2, 1.2, 1.6, PAINTING_TEXTURES[4]);
+addPainting(-19.96, 11, Math.PI / 2, 1.4, 1.8, PAINTING_TEXTURES[2]);
+addPainting(19.96, -11, -Math.PI / 2, 1.4, 1.8, PAINTING_TEXTURES[0]);
+addPainting(19.96, -3.5, -Math.PI / 2, 1.2, 1.6, PAINTING_TEXTURES[2]);
+
 // Carpet runner (entrance to dance floor) and a rug in front of the bar.
 flatPlane(0, 0.03, 7.5, 2.5, 11, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4);
 flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom/ballroom_rug_medallion_large_1024.webp', 1, 1);
@@ -331,6 +505,91 @@ fbxLoader.load('assets/characters/Rochelle_undercover.fbx', (obj) => {
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
   head.position.y = 1.95; player.add(head); playerModel = body;
 });
+
+// ---- Procedural SLR camera in Rochelle's right hand (replaces the scanner, 2026-11-07) ----
+// The scanner GLB (a clunky box at her side) is gone — Rochelle is a
+// photographer, so she carries a proper SLR: dark body, lens barrel with
+// a glass front, viewfinder prism, hot-shoe flash. Built from Three.js
+// geometry only; attached to her Mixamo RightHand bone the same way the
+// courtyard attaches weapons (world transform set first, then
+// hand.attach preserves it as a bone-local offset, so it rides the hand
+// through every clip). No dialogue, UI, or audio changes.
+let slrGroup = null, slrFlashLight = null, slrFlashFaceMat = null, cameraAttached = false, flashCount = 0, flashT = -1;
+function buildSLRCamera() {
+  const g = new THREE.Group();
+  const dark = new THREE.MeshStandardMaterial({ color: 0x17181a, metalness: 0.6, roughness: 0.45 });
+  const silver = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, metalness: 0.9, roughness: 0.3 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.09, 0.055), dark);
+  body.castShadow = true; g.add(body);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.085, 0.05), dark);
+  grip.position.set(0.056, -0.002, 0.008); g.add(grip);
+  // Lens barrel, forward (+Z), glass front element.
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.038, 0.07, 24), dark);
+  barrel.rotation.x = Math.PI / 2; barrel.position.set(-0.012, 0, 0.058); barrel.castShadow = true; g.add(barrel);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.004, 8, 24), silver);
+  ring.position.set(-0.012, 0, 0.093); g.add(ring);
+  const glass = new THREE.Mesh(new THREE.CircleGeometry(0.03, 24), new THREE.MeshStandardMaterial({ color: 0x0a1a2e, metalness: 1, roughness: 0.08, emissive: 0x0a2038, emissiveIntensity: 0.6 }));
+  glass.position.set(-0.012, 0, 0.094); g.add(glass);
+  // Viewfinder prism hump on top.
+  const prism = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.035, 0.045), dark);
+  prism.position.set(-0.005, 0.06, -0.005); g.add(prism);
+  // Hot-shoe flash unit on top of the prism.
+  const flashBase = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.016, 0.03), dark);
+  flashBase.position.set(-0.005, 0.085, -0.005); g.add(flashBase);
+  slrFlashFaceMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.25 });
+  const flashFace = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, 0.005), slrFlashFaceMat);
+  flashFace.position.set(-0.005, 0.085, 0.012); g.add(flashFace);
+  // Shutter button on top right.
+  const shutter = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.008, 12), silver);
+  shutter.position.set(0.05, 0.049, 0.01); g.add(shutter);
+  // Flash burst light, rides with the camera.
+  slrFlashLight = new THREE.PointLight(0xffffff, 0, 9, 2);
+  slrFlashLight.position.set(0, 0.1, 0.08); g.add(slrFlashLight);
+  return g;
+}
+function findRightHandBone(model) {
+  let found = null;
+  const key = (n) => n.toLowerCase().replace(/[^a-z]/g, '');
+  model.traverse((o) => { if (!o.isBone || found) return; if (key(o.name) === 'mixamorigRighthand') found = o; });
+  if (!found) model.traverse((o) => { if (!o.isBone || found) return; if (key(o.name).indexOf('righthand') >= 0) found = o; });
+  return found;
+}
+function tryAttachCamera() {
+  if (cameraAttached) return;
+  if (!playerModel) return;
+  if (!slrGroup) slrGroup = buildSLRCamera();
+  player.updateMatrixWorld(true);
+  const hand = findRightHandBone(playerModel);
+  if (hand) {
+    try {
+      const hp = new THREE.Vector3(); hand.getWorldPosition(hp);
+      // Player forward in world is yaw + PI (model has a PI turn inside the group).
+      const worldYaw = yaw + Math.PI;
+      const fwd = new THREE.Vector3(Math.sin(worldYaw), 0, Math.cos(worldYaw));
+      scene.attach(slrGroup);
+      slrGroup.position.copy(hp).addScaledVector(fwd, 0.04);
+      slrGroup.quaternion.setFromEuler(new THREE.Euler(0, worldYaw, 0));
+      slrGroup.scale.setScalar(1);
+      hand.attach(slrGroup);
+      cameraAttached = true;
+    } catch (e) { /* retry next frame */ }
+  } else {
+    // No hand bone (capsule fallback): carry at her right side.
+    player.add(slrGroup);
+    slrGroup.position.set(0.42, 1.25, 0.15);
+    slrGroup.rotation.set(0, Math.PI, 0);
+    cameraAttached = true;
+  }
+}
+function fireCameraFlash() {
+  flashCount++;
+  flashT = 0;
+  if (slrFlashLight) slrFlashLight.intensity = 60;
+  const fl = document.getElementById('flash');
+  if (fl) fl.style.opacity = '0.85';
+  if (slrFlashFaceMat) slrFlashFaceMat.emissiveIntensity = 6;
+}
+
 function playClip(key) {
   // Player uses the original Mixamo clips; the guard in playMxClip stops a
   // running clip being reset every frame (that would freeze walk/idle).
@@ -447,7 +706,7 @@ function makeCat(cat) {
   const collar = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 8, 20), new THREE.MeshStandardMaterial({ color: 0x111111 }));
   collar.position.set(0, 0.34, 0.32); collar.rotation.x = 0.5; g.add(collar); cat.collarMesh = collar;
   const tag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.02), new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x00ffcc, emissiveIntensity: 1.4 }));
-  tag.position.set(0, 0.22, 0.48); g.add(tag);
+  tag.position.set(0, 0.15, 0.33); g.add(tag);
   g.position.set(cat.x, 0, cat.z); scene.add(g);
   cat.group = g; cat.phase = Math.random() * 6.28; cat.wp = 0; cat.pause = 0;
   // Margo starts hidden (see below) — she only appears once Moxie and
@@ -499,22 +758,17 @@ document.getElementById('dialog').addEventListener('pointerdown', (e) => {
 });
 
 // Real cat collars replace the torus collars when loaded (the glowing tag
-// stays — it is the scannable part). Real scanner: the player carries it
-// at their right side, since it is the tool used to scan the tags.
+// stays — it is the scannable part).
 gltfLoader.load('assets/props/cat_collar.glb', (gltf)=>{
   CATS.forEach((cat)=>{
-    const g = fitPropGroup(gltf.scene.clone(), 0.24, 0.06, 0.24); if (!g) return;
-    g.position.set(0, 0.34, 0.32); g.rotation.x = 0.5; cat.group.add(g);
+    const g = fitPropGroup(gltf.scene.clone(), 0.16, 0.04, 0.16); if (!g) return;
+    g.position.set(0, 0.23, 0.22); g.rotation.x = 0.5; cat.group.add(g);
     if (cat.collarMesh) cat.collarMesh.visible = false;
   });
 }, undefined, ()=>{});
-gltfLoader.load('assets/props/cat_scanner.glb', (gltf)=>{
-  const g = fitPropGroup(gltf.scene, 0.14, 0.3, 0.05); if (!g) return;
-  g.position.set(0.45, 1.3, 0.2); player.add(g);
-}, undefined, ()=>{});
 
 // ---- Real GLB cats + pooled animations (2026-11-04) ----
-// Cats load as GLBs (Mabel/Margo/Moxie, 0.22 m tall, faces +Z, no turn),
+// Cats load as GLBs (Mabel/Margo/Moxie, 0.15 m tall, faces +Z, no turn),
 // with all animations pooled across cats + the More batch, by canonical
 // label. Each cat uses its own clip for an action when it has one,
 // otherwise another cat's clip (same 33-bone rig, so it plays cleanly).
@@ -598,16 +852,16 @@ function buildCatClipLibraries() {
 function loadCatGLB(cat) {
   gltfLoader.load('assets/cats/' + cat.name + '.glb', (gltf) => {
     const obj = gltf.scene;
-    fitCharacter(obj, 0.22);
+    fitCharacter(obj, 0.15);
     cat.group.add(obj); cat.model = obj;
     cat.mixer = new THREE.AnimationMixer(obj); cat._curCatClip = null;
     cat.group.children.forEach((child) => {
       if (child.isMesh && child.geometry.type !== 'TorusGeometry' && !(child.material && child.material.emissiveIntensity === 1.4)) child.visible = false;
     });
-    // Shrink the procedural collar/tag to match the 0.22 m GLB cat (they were sized for the 0.5 m procedural cat).
+    // Shrink the procedural collar/tag to match the 0.15 m GLB cat (they were sized for the 0.5 m procedural cat).
     cat.group.children.forEach((child) => {
-      if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.44); child.position.set(0, 0.15, 0.14); }
-      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.44); child.position.set(0, 0.10, 0.21); }
+      if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.30); child.position.set(0, 0.10, 0.10); }
+      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.30); child.position.set(0, 0.07, 0.14); }
     });
     const src = {};
     (gltf.animations || []).forEach((clip) => {
@@ -864,6 +1118,7 @@ function talkTo(npc) {
     // Fed, window open, right cat, right order: the photo.
     npc.fed = false; npc.fedTimer = 0; setTreat(npc, false);
     photos.push(p.symbol); photoIdx++;
+    fireCameraFlash();
     windowOpen = false; windowTimer = 0;
     if (photos.length === 3) {
       startEscapeCinematic();
@@ -1090,6 +1345,17 @@ function animate() {
     camera.position.copy(escapeCine.camPos);
     camera.lookAt(escapeCine.camLook);
   }
+  // Camera flash decay (~200 ms): light burst + white overlay + flash face.
+  if (flashT >= 0) {
+    flashT += dt;
+    const k = Math.min(flashT / 0.2, 1);
+    if (slrFlashLight) slrFlashLight.intensity = 60 * (1 - k);
+    const fl = document.getElementById('flash');
+    if (fl) fl.style.opacity = String(0.85 * (1 - k));
+    if (slrFlashFaceMat) slrFlashFaceMat.emissiveIntensity = 0.25 + 6 * (1 - k);
+    if (k >= 1) { flashT = -1; if (fl) fl.style.opacity = '0'; }
+  }
+  tryAttachCamera();
   renderer.render(scene, camera);
 }
 
@@ -1273,7 +1539,12 @@ function endEscapeCinematic() {
   updateMissionHUD();
 }
 if (new URLSearchParams(location.search).has('test')) {
-  window.__mission = { player, NPCS, CATS, PHOTOS, get photos() { return [...photos]; }, get photoIdx() { return photoIdx; }, get windowOpen() { return windowOpen; }, get missionStage() { return missionStage; }, get cinematic() { return cinematic; }, missionTarget, nearestTalk, startCinematic, updateMissionHUD, get won() { return won; }, get escapeCine() { return escapeCine; }, startEscapeCinematic, get escapeReady() { return !!lamboGroup; }, get kyleAgent() { return kyleAgent; }, get lamboGroup() { return lamboGroup; } };
+  window.__mission = { player, NPCS, CATS, PHOTOS, get photos() { return [...photos]; }, get photoIdx() { return photoIdx; }, get windowOpen() { return windowOpen; }, get missionStage() { return missionStage; }, get cinematic() { return cinematic; }, missionTarget, nearestTalk, startCinematic, updateMissionHUD, get won() { return won; }, get escapeCine() { return escapeCine; }, startEscapeCinematic, get escapeReady() { return !!lamboGroup; }, get kyleAgent() { return kyleAgent; }, get lamboGroup() { return lamboGroup; },
+    get cameraAttached() { return cameraAttached; }, fireCameraFlash, get flashCount() { return flashCount; },
+    get flashLightIntensity() { return slrFlashLight ? slrFlashLight.intensity : -1; },
+    get cameraGroup() { return slrGroup; },
+    teleport: (x, z, y) => { player.position.set(x, 0, z); yaw = y; },
+    slrScreenPos: () => { if (!slrGroup) return null; const v = new THREE.Vector3(); slrGroup.getWorldPosition(v); v.project(camera); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; } };
 }
 
 animate();
