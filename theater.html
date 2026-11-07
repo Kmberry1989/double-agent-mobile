@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
+<title>Double Agent — The Theater</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#120a08;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  canvas{display:block}
+  #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
+  #win{display:none}
+  button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
+  #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5}
+  #knob{position:absolute;left:37px;top:37px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.45)}
+  #slashBtn{position:fixed;right:18px;bottom:90px;width:84px;height:84px;border-radius:50%;background:#c9a227;color:#111;font-weight:800;font-size:15px;display:none;z-index:5;border:0}
+  body.touch #joy{display:block}
+  body.touch #slashBtn{display:block}
+  a{color:#ffd97a}
+  .levels{position:fixed;top:10px;right:10px;z-index:11;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:46vw}
+  .levels a{background:rgba(0,0,0,.55);border:1px solid #8a6b3a;color:#ffd97a;border-radius:8px;padding:6px 10px;font-size:13px;text-decoration:none}
+  .levels a.cur{opacity:.45;pointer-events:none}
+  #mission{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5;max-width:min(480px,92vw)}
+  #mission b{color:#ffd97a}
+  #barTop,#barBottom{position:fixed;left:0;right:0;height:0;background:#000;z-index:9;transition:height .6s}
+  #barTop{top:0} #barBottom{bottom:0}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html" class="cur" aria-current="page">Theater</a></nav>
+<div id="mission"><b>Enemies:</b> <span id="enemyCount">0 / 8</span></div>
+<div id="barTop"></div><div id="barBottom"></div>
+<div id="overlay"><h1>The Theater</h1><button id="startBtn">Enter the theater</button></div>
+<div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
+<div id="joy"><div id="knob"></div></div>
+<button id="slashBtn">SLASH</button>
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+const gltfLoader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+gltfLoader.setDRACOLoader(dracoLoader);
+const fbxLoader = new FBXLoader();
+const texLoader = new THREE.TextureLoader();
+
+// ---- Layout ----
+// Stage: x -12..12, z -6..6, top y=0.9. Backstage behind the curtain
+// (z -10..-6) and wings (x +-12..14) are at the same 0.9 level, so
+// Rochelle walks in from backstage and out through the curtains.
+// House floor: y=0, z 6..29.5. The only way between stage and house is
+// the centre steps (x -1.5..1.5, z 6..7.5); the stage front face is a
+// wall everywhere else (enforced by the ground-height step check).
+const STAGE_TOP = 0.9;
+function groundHeight(x, z) {
+  if (z <= 6 && z >= -10 && Math.abs(x) <= 14) return STAGE_TOP;
+  if (z > 6 && z <= 7.5 && Math.abs(x) <= 1.5) {
+    if (z <= 6.5) return 0.6;
+    if (z <= 7.0) return 0.3;
+    return 0.0;
+  }
+  return 0.0;
+}
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0605);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+const ambient = new THREE.AmbientLight(0xffe6b0, 0.25); // house dark until the cinematic
+scene.add(ambient);
+scene.add(new THREE.HemisphereLight(0xffe6b0, 0x2a1a10, 0.25));
+const houseLight = new THREE.PointLight(0xffc94d, 40, 40); houseLight.position.set(0, 8, 18); scene.add(houseLight);
+
+function applyTex(mesh, path, rx, ry) {
+  texLoader.load(path, (tex) => {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(rx, ry); tex.colorSpace = THREE.SRGBColorSpace;
+    mesh.material.map = tex; mesh.material.color.setHex(0xffffff); mesh.material.needsUpdate = true;
+  }, undefined, () => {});
+}
+function flatPlane(x, y, z, w, d, color, path, rx, ry, rotX) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color }));
+  m.rotation.x = rotX === undefined ? -Math.PI / 2 : rotX; m.position.set(x, y, z); m.receiveShadow = true; scene.add(m);
+  if (path) applyTex(m, path, rx, ry); return m;
+}
+function box(x, y, z, w, h, d, color) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color }));
+  m.position.set(x, y, z); scene.add(m); return m;
+}
+function cyl(x, y, z, rTop, rBot, h, color, seg) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, seg || 24), new THREE.MeshStandardMaterial({ color }));
+  m.position.set(x, y, z); scene.add(m); return m;
+}
+const TEX = 'assets/textures/theater/';
+
+// ---- Theater environment ----
+// House floor (dark) + centre aisle carpet + side floor.
+flatPlane(0, 0, 18, 28, 24, 0x241812, null, 0, 0); // house floor slab
+flatPlane(0, 0.02, 18, 3, 22, 0x7a1a1a, TEX + 'theater_red_carpet_1024.webp', 1, 8); // centre aisle carpet
+// Stage top (wood) + front apron face (gold trim strip along the top edge).
+flatPlane(0, STAGE_TOP, 0, 24, 12, 0x6b4a26, TEX + 'theater_stage_wood_floor_1024.webp', 6, 3);
+box(0, STAGE_TOP / 2, 6.05, 24, STAGE_TOP, 0.3, 0x3a2410); // stage front face
+const apronTrim = box(0, STAGE_TOP + 0.04, 6.0, 24, 0.08, 0.35, 0xc9a227);
+applyTex(apronTrim, TEX + 'theater_gold_trim_1024.webp', 12, 1);
+box(0, STAGE_TOP / 2, -6.05, 24, STAGE_TOP, 0.3, 0x3a2410); // stage back face
+box(-12.05, STAGE_TOP / 2, 0, 0.3, STAGE_TOP, 12, 0x3a2410);
+box(12.05, STAGE_TOP / 2, 0, 0.3, STAGE_TOP, 12, 0x3a2410);
+// Backstage floor (same level as the stage) + wing floors.
+flatPlane(0, STAGE_TOP + 0.01, -8, 24, 4, 0x4a3421, TEX + 'theater_stage_wood_floor_1024.webp', 6, 1);
+flatPlane(-13, STAGE_TOP + 0.01, 0, 2, 12, 0x4a3421, TEX + 'theater_stage_wood_floor_1024.webp', 1, 3);
+flatPlane(13, STAGE_TOP + 0.01, 0, 2, 12, 0x4a3421, TEX + 'theater_stage_wood_floor_1024.webp', 1, 3);
+// Centre steps (3 x 0.3 m) from the stage down to the house floor.
+box(0, 0.45, 6.25, 3, 0.3, 0.5, 0x5a3a1a);
+box(0, 0.15, 6.75, 3, 0.3, 0.5, 0x5a3a1a);
+// House walls (damask) + ceiling (ornate) + backstage back wall.
+const wallN = box(0, 5, -10.5, 30, 10, 1, 0x3a1a1a); applyTex(wallN, TEX + 'theater_house_wallpaper_1024.webp', 8, 2);
+const wallS = box(0, 5, 30.5, 30, 10, 1, 0x3a1a1a); applyTex(wallS, TEX + 'theater_house_wallpaper_1024.webp', 8, 2);
+const wallW = box(-14.5, 5, 10, 1, 10, 42, 0x3a1a1a); applyTex(wallW, TEX + 'theater_house_wallpaper_1024.webp', 10, 2);
+const wallE = box(14.5, 5, 10, 1, 10, 42, 0x3a1a1a); applyTex(wallE, TEX + 'theater_house_wallpaper_1024.webp', 10, 2);
+flatPlane(0, 10, 10, 28, 40, 0x2a3a3a, TEX + 'theater_ceiling_1024.webp', 6, 8, Math.PI / 2);
+// Sconces (glowing fixtures, no extra lights) on the house side walls.
+[[-13.9, 10], [-13.9, 18], [-13.9, 26], [13.9, 10], [13.9, 18], [13.9, 26]].forEach(([x, z]) => {
+  const s = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.3), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xffc94d, emissiveIntensity: 1.0 }));
+  s.position.set(x, 3, z); scene.add(s);
+});
+// Proscenium arch (gold trim): two pillars + top beam framing the stage at z=6.
+const pilL = box(-12.4, 4, 6, 0.8, 8, 0.8, 0xc9a227); applyTex(pilL, TEX + 'theater_gold_trim_1024.webp', 1, 4);
+const pilR = box(12.4, 4, 6, 0.8, 8, 0.8, 0xc9a227); applyTex(pilR, TEX + 'theater_gold_trim_1024.webp', 1, 4);
+const archTop = box(0, 8.2, 6, 25.6, 0.8, 0.8, 0xc9a227); applyTex(archTop, TEX + 'theater_gold_trim_1024.webp', 12, 1);
+// Footlights: a low brass strip along the stage front edge + a row of
+// small glowing lamps.
+const footStrip = new THREE.Mesh(new THREE.BoxGeometry(22, 0.18, 0.3), new THREE.MeshStandardMaterial({ color: 0x8a6b3a }));
+footStrip.position.set(0, STAGE_TOP + 0.09, 5.85); scene.add(footStrip);
+for (let x = -10; x <= 10; x += 2.5) {
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.6 }));
+  lamp.position.set(x, STAGE_TOP + 0.2, 5.85); scene.add(lamp);
+}
+const footLight = new THREE.PointLight(0xffc94d, 30, 18); footLight.position.set(0, 2, 8); scene.add(footLight);
+
+// Main curtain (opens in the cinematic): two halves, red velvet, hanging
+// at z=-5.5 from y=0.9 to y=8. Closed they meet at x=0; open they slide
+// to the sides (x=+-10.5). Valance across the top.
+const curtainMat = new THREE.MeshStandardMaterial({ color: 0x5a1a2a });
+const curtainL = new THREE.Mesh(new THREE.PlaneGeometry(12, 7.1), curtainMat.clone());
+curtainL.position.set(-6, STAGE_TOP + 3.55, -5.5); scene.add(curtainL);
+applyTex(curtainL, TEX + 'theater_red_velvet_curtain_1024.webp', 3, 2);
+const curtainR = new THREE.Mesh(new THREE.PlaneGeometry(12, 7.1), curtainMat.clone());
+curtainR.position.set(6, STAGE_TOP + 3.55, -5.5); scene.add(curtainR);
+applyTex(curtainR, TEX + 'theater_red_velvet_curtain_1024.webp', 3, 2);
+const valance = new THREE.Mesh(new THREE.PlaneGeometry(24, 1.2), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
+valance.position.set(0, 7.9, -5.4); scene.add(valance);
+applyTex(valance, TEX + 'theater_red_velvet_curtain_1024.webp', 6, 1);
+// Side curtains (legs) at the stage sides.
+[-11, 11].forEach((x) => {
+  const leg = new THREE.Mesh(new THREE.PlaneGeometry(2, 7.1), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
+  leg.position.set(x, STAGE_TOP + 3.55, -4); scene.add(leg);
+  applyTex(leg, TEX + 'theater_red_velvet_curtain_1024.webp', 1, 2);
+});
+
+// Audience seats: 10 rows (z 10..28), two blocks per row flanking the
+// centre aisle. Each block is a seat bench + backrest + armrest dividers,
+// seat velvet. The blocks are colliders (the seating area is not walkable;
+// the player uses the centre aisle and the side aisles).
+const colliders = [];
+function seatBlock(cx, cz, noCollider) {
+  const g = new THREE.Group();
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(9, 0.5, 0.6), new THREE.MeshStandardMaterial({ color: 0x7a1a1a }));
+  seat.position.set(0, 0.45, 0); g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(9, 1.0, 0.25), new THREE.MeshStandardMaterial({ color: 0x7a1a1a }));
+  back.position.set(0, 0.95, 0.35); g.add(back);
+  for (let i = 0; i <= 6; i++) {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.35, 0.6), new THREE.MeshStandardMaterial({ color: 0x7a1a1a }));
+    arm.position.set(-4.5 + i * 1.5, 0.85, 0); g.add(arm);
+  }
+  g.traverse((o) => { if (o.isMesh) applyTex(o, TEX + 'theater_seat_velvet_1024.webp', 3, 1); });
+  g.position.set(cx, 0, cz); scene.add(g);
+  if (!noCollider) colliders.push({ x: cx, z: cz, r: 4.5 });
+  return g;
+}
+for (let z = 10; z <= 28; z += 2) { seatBlock(-6.5, z); seatBlock(6.5, z); }
+// Balcony: a raised tier at the back of the house (z 27..30, y=4) with a
+// railing and a row of seats, overlooking the stage. Scenery only — the
+// balcony seats add no colliders (they sit on the tier, above the player).
+box(0, 3.5, 28.5, 26, 1, 3, 0x2a1a12);
+const balRail = box(0, 4.6, 27.1, 26, 0.9, 0.15, 0xc9a227); applyTex(balRail, TEX + 'theater_gold_trim_1024.webp', 12, 1);
+const balSeatL = seatBlock(-6.5, 29, true); balSeatL.position.y = 4;
+const balSeatR = seatBlock(6.5, 29, true); balSeatR.position.y = 4;
+// Fly loft: a beam above the stage the rigging hangs from.
+box(0, 9.2, 0, 24, 0.4, 0.6, 0x2a1a12);
+
+// Spotlights (the cinematic pair): fixtures mounted in the house at y=8,
+// aimed at centre stage. Off until the cinematic turns them on, left first.
+function makeSpotlight(x) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.9, 16), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+  body.rotation.x = Math.PI / 3; g.add(body);
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.32, 16), new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x000000 }));
+  lens.position.set(0, -0.32, 0.32); lens.rotation.x = -Math.PI / 3 + Math.PI / 2; g.add(lens);
+  const yoke = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 8, 20, Math.PI), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+  yoke.position.y = 0.4; g.add(yoke);
+  g.position.set(x, 8, 15); scene.add(g);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(2.2, 9, 20, 1, true), new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+  cone.position.set(x, 4.2, 7.5); cone.rotation.x = Math.PI / 2 + 0.55; scene.add(cone);
+  const spot = new THREE.SpotLight(0xfff2c0, 0, 30, 0.35, 0.4, 1.2);
+  spot.position.set(x, 8, 15); spot.target.position.set(0, STAGE_TOP, 0); scene.add(spot); scene.add(spot.target);
+  return { group: g, cone, spot, lens };
+}
+const spotL = makeSpotlight(-6), spotR = makeSpotlight(6);
+
+// ---- Sandbag ropes (core environmental weapon) ----
+// 4 ropes over the stage, each holding a sandbag just above head height
+// (bag centre y=2.9, stage floor 0.9). Slash near a rope to cut it; the
+// bag drops straight down and defeats whatever enemy is underneath.
+const sandbags = [];
+function makeSandbag(x, z) {
+  const g = new THREE.Group();
+  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 5.8, 8), new THREE.MeshStandardMaterial({ color: 0x8a6b3a }));
+  rope.position.set(0, 6.1, 0); g.add(rope);
+  applyTex(rope, TEX + 'theater_rope_1024.webp', 1, 6);
+  const bag = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.4, 6, 12), new THREE.MeshStandardMaterial({ color: 0xb0a080 }));
+  bag.position.set(0, 2.9, 0); g.add(bag);
+  applyTex(bag, TEX + 'theater_sandbag_canvas_1024.webp', 1, 1);
+  g.position.set(x, 0, z); scene.add(g);
+  const sb = { x, z, group: g, rope, bag, cut: false, falling: false, vy: 0, used: false };
+  sandbags.push(sb); return sb;
+}
+makeSandbag(-6, -2); makeSandbag(6, -2); makeSandbag(-6, 3); makeSandbag(6, 3);
+
+// ---- Chandelier (droppable) ----
+// Hangs over the stage at (0, 7, -2). A rope runs from it down to a cleat
+// on the stage floor (3, 0.9, -5) — slash near the cleat to cut the rope
+// and drop the chandelier on whoever is underneath.
+const chandelier = { x: 0, z: -2, y: 7, dropped: false, falling: false, vy: 0, used: false, group: new THREE.Group() };
+{
+  const g = chandelier.group;
+  const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3, 8), new THREE.MeshStandardMaterial({ color: 0x8a6b3a }));
+  chain.position.set(0, 1.5, 0); g.add(chain);
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.2, 12), new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 }));
+  col.position.set(0, 0, 0); g.add(col);
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    const arm = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.04, 8, 16, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 }));
+    arm.position.set(Math.cos(a) * 0.35, -0.2, Math.sin(a) * 0.35); arm.rotation.z = a; arm.rotation.y = -a; g.add(arm);
+    const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.25, 8), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.2 }));
+    candle.position.set(Math.cos(a) * 0.7, 0.1, Math.sin(a) * 0.7); g.add(candle);
+    const drop = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
+    drop.position.set(Math.cos(a) * 0.7, -0.35, Math.sin(a) * 0.7); g.add(drop);
+  }
+  const finial = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 }));
+  finial.position.set(0, -0.7, 0); g.add(finial);
+  g.position.set(chandelier.x, chandelier.y, chandelier.z); scene.add(g);
+  const chLight = new THREE.PointLight(0xffc94d, 25, 15); chLight.position.set(0, -0.3, 0); g.add(chLight);
+  // The drop rope: from the chandelier down to a cleat at the stage edge.
+  const ropeLen = Math.hypot(3 - 0, 5 - 2, 7 - STAGE_TOP);
+  const dropRope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, ropeLen, 8), new THREE.MeshStandardMaterial({ color: 0x8a6b3a }));
+  dropRope.position.set(1.5, (7 + STAGE_TOP) / 2, -3.5);
+  dropRope.rotation.z = Math.atan2(3 - 0, 7 - STAGE_TOP); dropRope.rotation.x = -Math.atan2(-5 - -2, 7 - STAGE_TOP);
+  scene.add(dropRope); chandelier.rope = dropRope;
+  chandelier.cleat = { x: 3, z: -5 };
+  colliders.push({ x: 3, z: -5, r: 0.5 });
+}
+
+// ---- Set flats (topple-able painted backdrops) ----
+// set_flat.png on planes, leaning at the back of the stage. Slash near the
+// base to topple one onto an enemy in front of it.
+const setFlats = [];
+function makeSetFlat(x, z, rotY) {
+  const tex = texLoader.load('assets/theater/objects/set_flat.png');
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), new THREE.MeshStandardMaterial({ map: tex, transparent: true, side: THREE.DoubleSide }));
+  m.position.set(x, STAGE_TOP + 2, z); m.rotation.y = rotY; m.rotation.x = -0.08; scene.add(m);
+  const flat = { x, z, mesh: m, toppled: false, fallT: 0, used: false };
+  setFlats.push(flat); colliders.push({ x, z, r: 1.0 }); return flat;
+}
+makeSetFlat(-8, -5, 0.3); makeSetFlat(8, -5, -0.3);
+
+// ---- Heavy main curtain (droppable upstage drape) ----
+// main_curtain.png on a tall plane at the back of the stage. Slash near it
+// to drop it on an enemy underneath.
+const drapeTex = texLoader.load('assets/theater/objects/main_curtain.png');
+drapeTex.colorSpace = THREE.SRGBColorSpace;
+const drape = new THREE.Mesh(new THREE.PlaneGeometry(5, 7), new THREE.MeshStandardMaterial({ map: drapeTex, transparent: true, side: THREE.DoubleSide }));
+drape.position.set(0, STAGE_TOP + 3.5, -5.8); scene.add(drape);
+const drapeState = { x: 0, z: -5.8, dropped: false, fallT: 0, used: false };
+colliders.push({ x: 0, z: -5.8, r: 1.0 });
+
+// ---- Prop crates + barrel (smashable) ----
+// A stack of crates + a barrel on stage right. Slash near them to smash
+// the stack (crates scatter, barrel rolls) onto an enemy beside them.
+const crates = { x: 9, z: -3, smashed: false, used: false, group: new THREE.Group(), parts: [] };
+{
+  const g = crates.group;
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a26 });
+  const c1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), wood); c1.position.set(0, 0.6, 0); g.add(c1);
+  const c2 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.0, 1.0), wood); c2.position.set(0.1, 1.7, 0); g.add(c2);
+  const c3 = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), wood); c3.position.set(-1.1, 0.4, 0.4); g.add(c3);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 1.1, 16), new THREE.MeshStandardMaterial({ color: 0x5a3a1a }));
+  barrel.position.set(1.4, 0.55, 0.3); g.add(barrel);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.03, 8, 20), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  band.position.set(1.4, 0.55, 0.3); band.rotation.x = Math.PI / 2; g.add(band);
+  crates.parts = [c1, c2, c3, barrel];
+  g.position.set(crates.x, STAGE_TOP, crates.z); scene.add(g);
+  colliders.push({ x: crates.x, z: crates.z, r: 1.6 });
+}
+colliders.push({ x: -12.4, z: 6, r: 0.8 }); colliders.push({ x: 12.4, z: 6, r: 0.8 });
+
+// ---- Character helpers (same patterns as ballroom-rochelle.html) ----
+function fitCharacter(obj, height) {
+  obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  let bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
+  if (!size.y) return;
+  obj.scale.setScalar(height / size.y);
+  bb = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); bb.getCenter(c);
+  obj.position.set(-c.x, -bb.min.y, -c.z);
+}
+function applyBasecolor(obj, texPath) {
+  if (!texPath) return;
+  const tex = texLoader.load(texPath); tex.colorSpace = THREE.SRGBColorSpace;
+  obj.traverse((o) => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach((m) => { m.map = tex; m.color.set(0xffffff); m.needsUpdate = true; }); } });
+}
+function stripRootTravel(clip) {
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') >= 0 && t.name.endsWith('.position') && nt.values && nt.values.length >= 3) {
+      const x0 = nt.values[0], z0 = nt.values[2];
+      for (let i = 0; i + 2 < nt.values.length; i += 3) { nt.values[i] = x0; nt.values[i + 2] = z0; }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
+function fixDriveClip(clip) {
+  // Drive clips declare FBX UnitScaleFactor 1.0 (centimetres); the repo
+  // clips declare 100, so the loader leaves Drive Hips positions ~100x too
+  // big and (for the actionforge batch) metres off-origin in the source
+  // scene. Divide Hips position by 100 and re-base XZ to the first frame,
+  // so the character stays in place and only the relative motion (crouch,
+  // lunge) survives. Y is divided but NOT re-based: it is the hips height.
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') >= 0 && t.name.endsWith('.position') && nt.values && nt.values.length >= 3) {
+      const x0 = nt.values[0] / 100, z0 = nt.values[2] / 100;
+      for (let i = 0; i + 2 < nt.values.length; i += 3) {
+        nt.values[i] = nt.values[i] / 100 - x0;
+        nt.values[i + 1] = nt.values[i + 1] / 100;
+        nt.values[i + 2] = nt.values[i + 2] / 100 - z0;
+      }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
+
+// ---- Player (Rochelle_undercover, Mixamo, dual katanas) ----
+const player = new THREE.Group(); player.position.set(0, STAGE_TOP, -8); scene.add(player);
+let playerModel = null, mixer = null;
+const mxClips = {};
+function playMxCharClip(char, key) {
+  if (!char.mixer || !mxClips[key]) return;
+  const act = char.mixer.clipAction(mxClips[key]);
+  if (char._cur === act && act.isRunning()) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset().fadeIn(0.15).play(); char._cur = act;
+}
+function playMxCharClipOnce(char, key) {
+  if (!char.mixer || !mxClips[key]) return;
+  const act = char.mixer.clipAction(mxClips[key]);
+  if (char._cur === act) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); char._cur = act;
+}
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx']].forEach(([key, file]) => {
+  fbxLoader.load('assets/animations/' + file, (obj) => {
+    const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+    if (raw) mxClips[key] = stripRootTravel(raw);
+  }, undefined, () => {});
+});
+// Sword clips (Drive, fixed at load) + the formal bow clip (Drive, fixed).
+[['swordAttack', 'sword_attack.fbx'], ['swordCombo', 'sword_regular_combo.fbx'], ['bow', 'bow_1046932.fbx']].forEach(([key, file]) => {
+  fbxLoader.load('assets/animations/' + file, (obj) => {
+    const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+    if (raw) mxClips[key] = fixDriveClip(raw);
+  }, undefined, () => {});
+});
+function playClip(key) { if (!player.mixer) return; playMxCharClip(player, key); mixer = player.mixer; }
+
+// Katana attach — the viewer.html grip logic (per-hand baked offsets).
+// The katana's geometry sits +0.744 m in mesh-local X from the node origin,
+// so the pivot is placed so the handle centre lands on the palm; the hands
+// are mirrors, so the left hand needs its own entry (X flips sign).
+const KATANA_OFFSETS = {
+  'katana': { x: 0.414, y: 0.060, z: -0.003, rx: 0, ry: 0, rz: 0, s: 1 },
+  'katana|L': { x: -0.412, y: 0.061, z: -0.031, rx: 0, ry: 0, rz: 0, s: 1 },
+};
+const FINGER_DIR = new THREE.Vector3(-0.012, 1.000, 0.027).normalize();
+const DORSAL_DIR = new THREE.Vector3(0.569, 0.029, -0.822).normalize();
+const LEFT_FINGER_DIR = new THREE.Vector3(0.012, 1.000, 0.027).normalize();
+const LEFT_DORSAL_DIR = new THREE.Vector3(0.569, -0.029, 0.822).normalize();
+function boneKey(name) {
+  if (!name) return '';
+  let base = name.split('.')[0].split('|')[0];
+  if (base.indexOf(':') >= 0) base = base.slice(base.indexOf(':') + 1);
+  return base.toLowerCase();
+}
+function findHandBone(model, side) {
+  const key = side === 'L' ? 'lefthand' : 'righthand';
+  let found = null;
+  model.traverse((o) => { if (!o.isBone || found) return; if (boneKey(o.name) === key) found = o; });
+  if (!found) model.traverse((o) => { if (!o.isBone || found) return; if (boneKey(o.name).indexOf(key) >= 0) found = o; });
+  return found;
+}
+function measureHandAxes(model, side) {
+  const handKey = side === 'R' ? 'righthand' : 'lefthand';
+  let hand = null;
+  model.traverse((o) => { if (!o.isBone || hand) return; if (boneKey(o.name) === handKey) hand = o; });
+  if (!hand) model.traverse((o) => { if (!o.isBone || hand) return; if (boneKey(o.name).indexOf(handKey) >= 0) hand = o; });
+  if (!hand) return null;
+  const fingers = {};
+  for (const f of ['index', 'middle', 'ring', 'pinky', 'thumb']) {
+    const fk = handKey + f + '1';
+    model.traverse((o) => { if (!o.isBone || fingers[f]) return; if (boneKey(o.name).indexOf(fk) >= 0) fingers[f] = o; });
+  }
+  model.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(hand.matrixWorld).invert();
+  const dirs = {};
+  for (const [f, bone] of Object.entries(fingers)) {
+    const p = new THREE.Vector3();
+    bone.getWorldPosition(p).applyMatrix4(inv);
+    if (p.lengthSq() > 1e-12) dirs[f] = p.normalize();
+  }
+  const four = ['index', 'middle', 'ring', 'pinky'].map((f) => dirs[f]).filter(Boolean);
+  if (!four.length || !dirs.thumb) return null;
+  const finger = four.reduce((a, d) => a.add(d), new THREE.Vector3()).normalize();
+  const dorsal = new THREE.Vector3().crossVectors(finger, dirs.thumb).normalize();
+  if (!isFinite(dorsal.x) || !isFinite(dorsal.y) || !isFinite(dorsal.z)) return null;
+  return { finger, dorsal };
+}
+let handAxes = { R: null, L: null };
+function fitWeapon(obj) {
+  let box3 = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); box3.getSize(size);
+  if (size.x > size.z && size.x >= size.y) obj.rotation.y = Math.PI / 2;
+  box3 = new THREE.Box3().setFromObject(obj); box3.getSize(size);
+  const longest = Math.max(size.x, size.y, size.z);
+  if (!longest || longest <= 0) return false;
+  return true;
+}
+function attachKatana(side) {
+  if (!playerModel) return;
+  const forLeft = side === 'L';
+  gltfLoader.load('assets/weapons/katana.glb', (gltf) => {
+    const pivot = new THREE.Group(); pivot.add(gltf.scene);
+    if (!fitWeapon(gltf.scene)) return;
+    scene.add(pivot);
+    const hand = findHandBone(playerModel, side);
+    if (!hand) { pivot.removeFromParent(); return; }
+    try {
+      playerModel.updateMatrixWorld(true); pivot.updateMatrixWorld(true);
+      const box3 = new THREE.Box3().setFromObject(gltf.scene);
+      const size = new THREE.Vector3(); box3.getSize(size);
+      let meshNode = null;
+      gltf.scene.traverse((o) => { if (!meshNode && o.isMesh) meshNode = o; });
+      const gripLocal = pivot.worldToLocal(meshNode.getWorldPosition(new THREE.Vector3()));
+      const axes = ['x', 'y', 'z'];
+      const longAxis = axes.reduce((a, b) => (size[a] >= size[b] ? a : b));
+      const muzzleSign = (box3.max[longAxis] - gripLocal[longAxis]) >= (gripLocal[longAxis] - box3.min[longAxis]) ? 1 : -1;
+      const muzzleDir = new THREE.Vector3(0, 0, 0); muzzleDir[longAxis] = muzzleSign;
+      const slideTop = new THREE.Vector3(0, 1, 0);
+      const e1 = muzzleDir.clone(), e2 = slideTop.clone();
+      const e3 = new THREE.Vector3().crossVectors(e1, e2).normalize();
+      const axesH = forLeft ? (handAxes.L || { finger: LEFT_FINGER_DIR, dorsal: LEFT_DORSAL_DIR }) : (handAxes.R || { finger: FINGER_DIR, dorsal: DORSAL_DIR });
+      const f1 = axesH.finger.clone(), f2 = axesH.dorsal.clone();
+      const f3 = new THREE.Vector3().crossVectors(f1, f2).normalize();
+      const R = new THREE.Matrix4().multiplyMatrices(
+        new THREE.Matrix4().makeBasis(f1, f2, f3),
+        new THREE.Matrix4().makeBasis(e1, e2, e3).transpose()
+      );
+      const q = new THREE.Quaternion().setFromRotationMatrix(R);
+      hand.attach(pivot);
+      pivot.quaternion.copy(q);
+      pivot.position.copy(gripLocal.clone().applyQuaternion(q).negate());
+      pivot.userData.basePos = pivot.position.clone();
+      pivot.userData.baseQuat = pivot.quaternion.clone();
+      pivot.userData.baseScale = pivot.scale.clone();
+      const o = KATANA_OFFSETS[forLeft ? 'katana|L' : 'katana'];
+      const b = pivot.userData.basePos;
+      pivot.position.set(b.x + o.x, b.y + o.y, b.z + o.z);
+      const off = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+        THREE.MathUtils.degToRad(o.rx), THREE.MathUtils.degToRad(o.ry), THREE.MathUtils.degToRad(o.rz)));
+      pivot.quaternion.copy(pivot.userData.baseQuat).multiply(off);
+      pivot.scale.set(pivot.userData.baseScale.x * o.s, pivot.userData.baseScale.y * o.s, pivot.userData.baseScale.z * o.s);
+    } catch (e) { pivot.removeFromParent(); }
+  }, undefined, () => {});
+}
+
+fbxLoader.load('assets/characters/Rochelle_undercover.fbx', (obj) => {
+  fitCharacter(obj, 1.8);
+  obj.rotation.y = Math.PI;
+  applyBasecolor(obj, 'assets/characters/textures/Rochelle_basecolor.jpg');
+  player.add(obj); playerModel = obj;
+  mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
+  handAxes = { R: measureHandAxes(obj, 'R'), L: measureHandAxes(obj, 'L') };
+  attachKatana('R'); attachKatana('L');
+}, undefined, () => {
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+  body.position.y = 1.0; player.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
+  head.position.y = 1.95; player.add(head); playerModel = body;
+});
+
+// ---- Enemies (billboard sprites, data-driven roster) ----
+// 8 slots. Only 3 images exist in the repo so far (woman1, woman4,
+// woman6); the other 5 are Kyle's fixes, pending. A pending slot tries
+// its intended filename first and falls back to cycling the 3 available
+// images if the file is not there yet — so the fixed images drop in by
+// filename with no code change.
+const ENEMY_ROSTER = [
+  { img: 'assets/theater/enemies/enemy_woman1.png', pending: false },
+  { img: 'assets/theater/enemies/enemy_woman4.png', pending: false },
+  { img: 'assets/theater/enemies/enemy_woman6.png', pending: false },
+  { img: 'assets/theater/enemies/enemy_woman2.png', pending: true },
+  { img: 'assets/theater/enemies/enemy_woman3.png', pending: true },
+  { img: 'assets/theater/enemies/enemy_woman5.png', pending: true },
+  { img: 'assets/theater/enemies/enemy_man1.png', pending: true },
+  { img: 'assets/theater/enemies/enemy_man2.png', pending: true },
+];
+const FALLBACK_IMGS = [
+  'assets/theater/enemies/enemy_woman1.png',
+  'assets/theater/enemies/enemy_woman4.png',
+  'assets/theater/enemies/enemy_woman6.png',
+];
+const ENEMY_SPAWNS = [
+  [-4, 10], [4, 10], [-7, 14], [7, 14], [-4, 18], [4, 18], [-7, 22], [7, 22],
+];
+const enemies = [];
+function makeEnemy(i) {
+  const slot = ENEMY_ROSTER[i];
+  // A pending slot uses a cycling fallback image; it also tries its
+  // intended filename, so the fixed image drops in by filename later.
+  let useTex;
+  if (slot.pending) {
+    const fb = FALLBACK_IMGS[i % FALLBACK_IMGS.length];
+    useTex = texLoader.load(fb); useTex.colorSpace = THREE.SRGBColorSpace;
+  } else {
+    useTex = texLoader.load(slot.img); useTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  const aspect = slot.img.includes('woman4') ? 1280 / 1920 : 1120 / 2240;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8 * aspect, 1.8),
+    new THREE.MeshBasicMaterial({ map: useTex, transparent: true, side: THREE.DoubleSide })
+  );
+  mesh.position.set(ENEMY_SPAWNS[i][0], -0.6, ENEMY_SPAWNS[i][1]);
+  mesh.visible = false; scene.add(mesh);
+  const enemy = {
+    i, mesh, state: 'waiting', // waiting -> rising -> walking -> chasing -> menacing -> falling -> gone
+    x: ENEMY_SPAWNS[i][0], z: ENEMY_SPAWNS[i][1], y: -0.6,
+    riseT: 0, fallT: 0, sway: Math.random() * 6.28,
+  };
+  if (slot.pending) {
+    // If the intended file exists by the time the page loads, it replaces
+    // the fallback. (If it 404s, the error callback is a no-op.)
+    texLoader.load(slot.img, (t) => { t.colorSpace = THREE.SRGBColorSpace; enemy.mesh.material.map = t; enemy.mesh.material.needsUpdate = true; }, undefined, () => {});
+  }
+  enemies.push(enemy); return enemy;
+}
+for (let i = 0; i < 8; i++) makeEnemy(i);
+let defeated = 0;
+function updateEnemyCount() {
+  const el = document.getElementById('enemyCount');
+  if (el) el.textContent = defeated + ' / 8';
+}
+function defeatEnemy(enemy, silent) {
+  if (!enemy || enemy.state === 'falling' || enemy.state === 'gone') return;
+  enemy.state = 'falling'; enemy.fallT = 0;
+  defeated++; updateEnemyCount();
+  if (!silent) spawnNextEnemy();
+}
+function spawnNextEnemy() {
+  const next = enemies.find((e) => e.state === 'waiting');
+  if (!next) return;
+  next.state = 'rising'; next.riseT = 0; next.mesh.visible = true;
+}
+function updateEnemies(dt, t) {
+  for (const e of enemies) {
+    if (e.state === 'waiting' || e.state === 'gone') continue;
+    if (e.state === 'rising') {
+      e.riseT += dt;
+      const k = Math.min(e.riseT / 1.0, 1);
+      e.y = -0.6 + 0.6 * k;
+      e.mesh.position.set(e.x, e.y + 0.9, e.z);
+      e.mesh.rotation.y = Math.atan2(camera.position.x - e.x, camera.position.z - e.z);
+      if (k >= 1) { e.state = 'walking'; }
+      continue;
+    }
+    if (e.state === 'falling') {
+      e.fallT += dt;
+      const k = Math.min(e.fallT / 0.6, 1);
+      e.mesh.rotation.x = -Math.PI / 2 * k;
+      e.mesh.material.opacity = 1 - k;
+      if (k >= 1) { e.state = 'gone'; e.mesh.visible = false; }
+      continue;
+    }
+    // walking / chasing / menacing: billboard to face the camera, stay upright.
+    e.mesh.rotation.y = Math.atan2(camera.position.x - e.x, camera.position.z - e.z);
+    e.mesh.rotation.x = 0;
+    const dx = player.position.x - e.x, dz = player.position.z - e.z;
+    const d = Math.hypot(dx, dz);
+    if (e.state === 'walking') {
+      // Walk to the centre aisle, down it, up the steps, onto the stage.
+      let tx = e.x, tz = e.z;
+      if (Math.abs(e.x) > 0.4) { tx = 0; tz = e.z; }
+      else if (e.z > 7.5) { tx = 0; tz = 7.5; }
+      else if (e.z > 5) { tx = 0; tz = 5; }
+      else { e.state = 'chasing'; continue; }
+      const ddx = tx - e.x, ddz = tz - e.z, dd = Math.hypot(ddx, ddz);
+      if (dd > 0.1) {
+        const sp = 1.2 * dt;
+        e.x += ddx / dd * sp; e.z += ddz / dd * sp;
+      }
+    } else if (e.state === 'chasing') {
+      if (d > 1.3) {
+        const sp = 1.2 * dt;
+        e.x += dx / d * sp; e.z += dz / d * sp;
+      } else { e.state = 'menacing'; }
+    } else if (e.state === 'menacing') {
+      // Crowd Rochelle and sway — no health/damage system exists in this
+      // level (none was specified), so they menace without hurting her.
+      e.mesh.position.x = e.x + Math.sin(t * 2 + e.sway) * 0.05;
+      if (d > 1.6) e.state = 'chasing';
+    }
+    e.y = groundHeight(e.x, e.z);
+    e.mesh.position.set(e.x, e.y + 0.9, e.z);
+  }
+}
+
+// ---- Destructible triggers (all one-shot, all by slashing near them) ----
+function enemiesNear(x, z, r) {
+  return enemies.filter((e) => (e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing') && Math.hypot(e.x - x, e.z - z) < r);
+}
+function triggerSandbag(sb) {
+  if (sb.used) return; sb.used = true; sb.cut = true; sb.falling = true; sb.vy = 0;
+}
+function triggerChandelier() {
+  if (chandelier.used) return; chandelier.used = true; chandelier.falling = true; chandelier.vy = 0;
+  if (chandelier.rope) chandelier.rope.visible = false;
+}
+function triggerSetFlat(flat) {
+  if (flat.used) return; flat.used = true; flat.toppled = true; flat.fallT = 0;
+}
+function triggerDrape() {
+  if (drapeState.used) return; drapeState.used = true; drapeState.dropped = true; drapeState.fallT = 0;
+}
+function triggerCrates() {
+  if (crates.used) return; crates.used = true; crates.smashed = true;
+}
+function updateDestructibles(dt) {
+  for (const sb of sandbags) {
+    if (sb.falling) {
+      sb.vy += 22 * dt;
+      const bagY = sb.bag.position.y - sb.vy * dt;
+      if (bagY <= 1.2) {
+        sb.bag.position.y = 1.2; sb.falling = false;
+        sb.rope.visible = false;
+        enemiesNear(sb.x, sb.z, 1.2).forEach((e) => defeatEnemy(e));
+      } else sb.bag.position.y = bagY;
+    }
+  }
+  if (chandelier.falling) {
+    chandelier.vy += 22 * dt;
+    const y = chandelier.group.position.y - chandelier.vy * dt;
+    if (y <= STAGE_TOP + 0.7) {
+      chandelier.group.position.y = STAGE_TOP + 0.7; chandelier.falling = false;
+      enemiesNear(chandelier.x, chandelier.z, 1.8).forEach((e) => defeatEnemy(e));
+    } else chandelier.group.position.y = y;
+  }
+  for (const flat of setFlats) {
+    if (flat.toppled && flat.fallT < 1) {
+      flat.fallT += dt / 0.6;
+      const k = Math.min(flat.fallT, 1);
+      flat.mesh.rotation.x = -0.08 - 1.35 * k;
+      if (k >= 1) enemiesNear(flat.x, flat.z + 1, 1.6).forEach((e) => defeatEnemy(e));
+    }
+  }
+  if (drapeState.dropped && drapeState.fallT < 1) {
+    drapeState.fallT += dt / 0.8;
+    const k = Math.min(drapeState.fallT, 1);
+    drape.position.y = STAGE_TOP + 3.5 - 3.2 * k;
+    drape.material.opacity = 1 - 0.4 * k;
+    if (k >= 1) enemiesNear(drapeState.x, drapeState.z + 1, 1.8).forEach((e) => defeatEnemy(e));
+  }
+  if (crates.smashed && crates.group.userData.smashed !== true) {
+    crates.group.userData.smashed = true;
+    crates.parts.forEach((p, i) => {
+      p.rotation.set((i % 2 ? 1 : -1) * 0.9, i * 0.7, (i % 3 - 1) * 0.8);
+      p.position.x += (i - 1.5) * 0.5; p.position.z += (i % 2 ? 0.6 : -0.4);
+    });
+    enemiesNear(crates.x, crates.z, 1.4).forEach((e) => defeatEnemy(e));
+  }
+}
+
+// ---- Slash (sword melee) ----
+let slashCooldown = 0, slashTimer = 0, slashAlt = false;
+function trySlash() {
+  if (!started || won || cine || bowPhase) return;
+  if (slashCooldown > 0) return;
+  slashCooldown = 0.55;
+  slashAlt = !slashAlt;
+  const key = slashAlt ? 'swordCombo' : 'swordAttack';
+  if (mxClips[key]) { playMxCharClipOnce(player, key); slashTimer = mxClips[key].duration; }
+  // Hit check: enemies and destructibles in front of Rochelle, within 2.4 m.
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const inFront = (x, z, range) => {
+    const dx = x - player.position.x, dz = z - player.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d > range) return false;
+    return (dx * fx + dz * fz) / (d || 1) > 0.6;
+  };
+  for (const e of enemies) {
+    if ((e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing') && inFront(e.x, e.z, 2.4)) defeatEnemy(e);
+  }
+  for (const sb of sandbags) if (!sb.used && inFront(sb.x, sb.z, 2.4)) triggerSandbag(sb);
+  if (!chandelier.used && inFront(chandelier.cleat.x, chandelier.cleat.z, 2.4)) triggerChandelier();
+  for (const flat of setFlats) if (!flat.used && inFront(flat.x, flat.z, 2.4)) triggerSetFlat(flat);
+  if (!drapeState.used && inFront(drapeState.x, drapeState.z, 2.4)) triggerDrape();
+  if (!crates.used && inFront(crates.x, crates.z, 2.4)) triggerCrates();
+}
+
+// ---- Game state / cinematic ----
+let won = false, started = false, cine = null, bowPhase = null, winShown = false;
+let yaw = Math.PI, pitch = 0.15;
+const keys = {};
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+if (isTouch) document.body.classList.add('touch');
+const clock = new THREE.Clock();
+
+function startCinematic() {
+  cine = { t: 0, phase: 'curtains', spotLOn: false, spotROn: false, enemySent: false };
+  document.getElementById('barTop').style.height = '8vh';
+  document.getElementById('barBottom').style.height = '8vh';
+  camera.position.set(0, 2.5, 16);
+  camera.lookAt(0, 2, 0);
+  player.position.set(0, STAGE_TOP, -8);
+  player.rotation.y = Math.PI;
+}
+function endCinematic() {
+  cine = null;
+  document.getElementById('barTop').style.height = '0';
+  document.getElementById('barBottom').style.height = '0';
+  yaw = Math.PI; // face the audience (and the incoming enemy)
+  player.rotation.y = yaw;
+}
+function updateCinematic(dt) {
+  if (!cine) return;
+  cine.t += dt;
+  const t = cine.t;
+  // Curtains open over the first 2.5 s: the halves slide apart and gather
+  // (scale.x shrinks) so they bunch at the sides instead of clipping the
+  // side walls.
+  if (t < 2.5) {
+    const k = t / 2.5;
+    curtainL.position.x = -6 - 4.5 * k;
+    curtainR.position.x = 6 + 4.5 * k;
+    curtainL.scale.x = 1 - 0.5 * k;
+    curtainR.scale.x = 1 - 0.5 * k;
+  } else {
+    curtainL.position.x = -10.5; curtainR.position.x = 10.5;
+    curtainL.scale.x = 0.5; curtainR.scale.x = 0.5;
+  }
+  // Rochelle walks out from backstage (z=-8) to centre stage (z=0), 2.5..6 s.
+  if (t >= 2.5 && t < 6) {
+    const k = (t - 2.5) / 3.5;
+    player.position.set(0, STAGE_TOP, -8 + 8 * k);
+    player.rotation.y = Math.PI;
+    playClip('walk');
+  } else if (t >= 6) {
+    player.position.set(0, STAGE_TOP, 0);
+    playClip('idle');
+  }
+  // Left spotlight at 6 s, right at 7 s.
+  if (t >= 6 && !cine.spotLOn) {
+    cine.spotLOn = true;
+    spotL.spot.intensity = 220; spotL.cone.material.opacity = 0.14;
+    spotL.lens.material.emissive.setHex(0xfff2c0); spotL.lens.material.emissiveIntensity = 2;
+  }
+  if (t >= 7 && !cine.spotROn) {
+    cine.spotROn = true;
+    spotR.spot.intensity = 220; spotR.cone.material.opacity = 0.14;
+    spotR.lens.material.emissive.setHex(0xfff2c0); spotR.lens.material.emissiveIntensity = 2;
+  }
+  // Beat alone on stage, then the first enemy rises (10 s) and walks.
+  if (t >= 10 && !cine.enemySent) {
+    cine.enemySent = true;
+    const first = enemies[0];
+    first.state = 'rising'; first.riseT = 0; first.mesh.visible = true;
+  }
+  // House lights come up a little once the curtains are open.
+  if (t >= 2.5) { ambient.intensity = 0.6; houseLight.intensity = 60; }
+  if (t >= 14) endCinematic();
+}
+function startBow() {
+  bowPhase = { t: 0, walked: false };
+  document.getElementById('barTop').style.height = '8vh';
+  document.getElementById('barBottom').style.height = '8vh';
+  if (mxClips.bow) playMxCharClipOnce(player, 'bow');
+  else {
+    // Procedural fallback: pitch the player group forward smoothly.
+    bowPhase.procedural = true;
+  }
+}
+function updateBow(dt) {
+  if (!bowPhase) return;
+  bowPhase.t += dt;
+  const bowDur = mxClips.bow ? mxClips.bow.duration : 2.0;
+  if (bowPhase.procedural) {
+    const k = Math.min(bowPhase.t / 2.0, 1);
+    player.rotation.x = Math.sin(k * Math.PI) * 0.5;
+  }
+  if (bowPhase.t >= bowDur && !bowPhase.walked) {
+    bowPhase.walked = true;
+    player.rotation.x = 0;
+  }
+  if (bowPhase.walked) {
+    // Walk out through the curtains to backstage.
+    player.position.z -= 1.6 * dt;
+    player.rotation.y = 0; // face upstage (away from the audience)
+    playClip('walk');
+    if (player.position.z <= -8.5) showWin();
+  }
+}
+function showWin() {
+  if (winShown) return;
+  winShown = true; won = true;
+  document.getElementById('barTop').style.height = '0';
+  document.getElementById('barBottom').style.height = '0';
+  document.getElementById('winText').textContent = 'All eight masked enemies are down. Rochelle takes her bow and slips out through the curtains.';
+  document.getElementById('win').style.display = 'flex';
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+
+// ---- Input ----
+document.getElementById('startBtn').onclick = () => {
+  document.getElementById('overlay').style.display = 'none'; started = true;
+  startCinematic();
+  if (!isTouch) renderer.domElement.requestPointerLock();
+};
+addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if ((e.key === ' ' || e.key.toLowerCase() === 'f') && started) { e.preventDefault(); trySlash(); }
+});
+addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+addEventListener('mousemove', (e) => {
+  if (document.pointerLockElement && started && !cine) { yaw -= e.movementX * 0.003; pitch = Math.max(-0.4, Math.min(0.5, pitch - e.movementY * 0.003)); }
+});
+renderer.domElement.addEventListener('mousedown', (e) => {
+  if (document.pointerLockElement && started && !cine && !won) trySlash();
+});
+let joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
+const joy = document.getElementById('joy'), knob = document.getElementById('knob');
+joy.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; joyId = t.identifier; moveJoy(t); e.preventDefault(); }, { passive: false });
+joy.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (t.identifier === joyId) moveJoy(t); e.preventDefault(); }, { passive: false });
+function endJoy(e) { for (const t of e.changedTouches) if (t.identifier === joyId) { joyId = null; joyX = joyY = 0; knob.style.left = '37px'; knob.style.top = '37px'; } }
+joy.addEventListener('touchend', endJoy); joy.addEventListener('touchcancel', endJoy);
+function moveJoy(t) {
+  const r = joy.getBoundingClientRect(); const dx = (t.clientX - (r.left + 65)) / 50, dy = (t.clientY - (r.top + 65)) / 50;
+  const m = Math.min(1, Math.hypot(dx, dy)) || 1; joyX = dx / Math.max(1, Math.hypot(dx, dy)) * m; joyY = dy / Math.max(1, Math.hypot(dx, dy)) * m;
+  knob.style.left = (37 + joyX * 35) + 'px'; knob.style.top = (37 + joyY * 35) + 'px';
+}
+renderer.domElement.addEventListener('touchstart', (e) => {
+  if (!started) return;
+  for (const t of e.changedTouches) { if (t.identifier !== joyId) { lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY; } }
+}, { passive: true });
+renderer.domElement.addEventListener('touchmove', (e) => {
+  for (const t of e.changedTouches) if (t.identifier === lookId) {
+    yaw -= (t.clientX - lastLX) * 0.005; pitch = Math.max(-0.4, Math.min(0.5, pitch - (t.clientY - lastLY) * 0.005));
+    lastLX = t.clientX; lastLY = t.clientY;
+  }
+}, { passive: true });
+renderer.domElement.addEventListener('touchend', (e) => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; });
+document.getElementById('slashBtn').addEventListener('touchstart', (e) => { e.preventDefault(); trySlash(); }, { passive: false });
+
+// ---- Loop ----
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
+  if (slashCooldown > 0) slashCooldown -= dt;
+  if (slashTimer > 0) slashTimer -= dt;
+  updateCinematic(dt);
+  if (bowPhase) updateBow(dt);
+  updateEnemies(dt, t);
+  updateDestructibles(dt);
+  if (started && !won && !cine && !bowPhase) {
+    let fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
+    let fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
+    if (joyId !== null) { fx += joyX; fz += -joyY; }
+    const ml = Math.hypot(fx, fz);
+    if (ml > 1) { fx /= ml; fz /= ml; }
+    const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);
+    const dz = -fx * Math.sin(yaw) - fz * Math.cos(yaw);
+    const speed = (keys['shift'] ? 5.5 : 4) * dt;
+    const nx = player.position.x + dx * speed, nz = player.position.z + dz * speed;
+    // The stage front face is a wall except at the centre steps: a move
+    // that changes ground height by more than 0.45 m is blocked.
+    const curG = groundHeight(player.position.x, player.position.z);
+    const newG = groundHeight(nx, nz);
+    if (Math.abs(newG - curG) <= 0.45) {
+      player.position.x = nx; player.position.z = nz;
+      player.position.y = newG;
+    }
+    player.position.x = Math.max(-13.5, Math.min(13.5, player.position.x));
+    player.position.z = Math.max(-9.5, Math.min(29.5, player.position.z));
+    player.position.y = groundHeight(player.position.x, player.position.z);
+    for (const c of colliders) {
+      const ddx = player.position.x - c.x, ddz = player.position.z - c.z, d = Math.hypot(ddx, ddz);
+      if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
+    }
+    player.rotation.y = yaw;
+    if (mixer) {
+      mixer.update(dt);
+      if (slashTimer <= 0) playClip(ml > 0.1 ? 'walk' : 'idle');
+    }
+    if (defeated >= 8 && !bowPhase && !won) startBow();
+  } else if (mixer && (cine || bowPhase)) {
+    mixer.update(dt);
+  }
+  if (!cine) {
+    const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    camera.position.set(player.position.x + back.x * 5, player.position.y + 2.6, player.position.z + back.z * 5);
+    camera.lookAt(player.position.x - back.x * 3, player.position.y + 1.6, player.position.z - back.z * 3);
+  } else {
+    camera.position.set(0, 2.5, 16);
+    camera.lookAt(0, 2, 0);
+  }
+  renderer.render(scene, camera);
+}
+updateEnemyCount();
+if (new URLSearchParams(location.search).has('test')) {
+  window.__theater = {
+    player, enemies, sandbags, chandelier, setFlats, drapeState, crates,
+    get defeated() { return defeated; }, get won() { return won; },
+    get cine() { return cine; }, get bowPhase() { return bowPhase; },
+    startCinematic, trySlash, defeatEnemy, spawnNextEnemy, startBow, groundHeight,
+  };
+}
+animate();
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('contextmenu', e => e.preventDefault());
+</script>
+</body>
+</html>
