@@ -454,6 +454,14 @@ function updateDoors(dt) {
 // White Lamborghini, parked curbside on the east edge of the round drive (was in the middle of the drive).
 gltfLoader.load('assets/vehicles/white_lambo.glb', (gltf) => {
   const g = fitPropGroup(gltf.scene, 2.0, 1.2, 4.5); if (!g) return;
+  // White paint fix: the GLB's single material is metalness 1.0 / roughness
+  // 1.0 with the white paint baked into its texture, and this page has no
+  // scene.environment — a metal with no env map reflects nothing, so the
+  // white car read solid black (ambient/hemisphere light is diffuse-only
+  // and a metal has no diffuse term). Lower the metalness so the white
+  // paint gets diffuse light and reads white. The black Lambo keeps
+  // metalness 1.0 + its near-black tint, so it stays black.
+  g.traverse((o) => { if (o.isMesh) { o.material.metalness = 0; o.material.roughness = 0.55; } });
   g.position.set(11, -0.9, 32); g.rotation.y = 0.4; scene.add(g);
   colliders.push({ x: 11, z: 32, r: 2.8 });
 }, undefined, () => {});
