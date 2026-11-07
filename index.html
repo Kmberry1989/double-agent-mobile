@@ -1129,9 +1129,11 @@ guards.forEach((g, i)=>{
 });
 // ---------- Cameras ----------
 const cameras = [];
+const CAM_POLE_TEX = 'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp';
+const CAM_HEAD_TEX = 'assets/textures/raw/painted-metal-blue.jpg';
 [[-20,-30],[28,0],[-5,32]].forEach(([x,z])=>{
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,4,8), mat(0x333333)); pole.position.set(x,2,z); scene.add(pole);
-  const headM = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.3,0.4), mat(0x222222)); headM.position.set(x,4.1,z); scene.add(headM);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,4,8), texturedMat(0x333333, CAM_POLE_TEX, 1, 2)); pole.position.set(x,2,z); scene.add(pole);
+  const headM = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.3,0.4), texturedMat(0x222222, CAM_HEAD_TEX, 1, 1)); headM.position.set(x,4.1,z); scene.add(headM);
   const cone = new THREE.Mesh(new THREE.ConeGeometry(3.5,12,20,1,true), new THREE.MeshBasicMaterial({color:0xff8800, transparent:true, opacity:0.10, side:THREE.DoubleSide, depthWrite:false}));
   cone.rotation.x = -Math.PI/2; cone.rotation.z = Math.PI/2; cone.position.set(x,3.6,z+6); scene.add(cone);
   cameras.push({x,z,head:headM,cone,yaw:0,dir:1});
