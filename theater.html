@@ -578,29 +578,46 @@ fbxLoader.load('assets/characters/Rochelle_undercover.fbx', (obj) => {
 });
 
 // ---- Enemies (billboard sprites + 3D masked enemies, data-driven roster) ----
-// 8 slots. 3 are real 3D masquerade characters (Mixamo-rigged GLBs):
+// 8 slots. 4 are real 3D masquerade characters (Mixamo-rigged GLBs),
+// each armed with a fencing sword on its right hand:
 // slot 1 = masquerade_woman_blue (blue gown, blue/gold mask — matches
-// woman4, so it REPLACES the woman4 billboard); slot 5 =
-// masquerade_red_black (black/red costume, red/gold mask — matches woman5,
-// fills a pending slot); slot 6 = masquerade_man_black (black tuxedo,
-// black/silver mask — matches man1, fills a pending slot). The other 5
-// slots are billboard sprites; only 3 images exist in the repo so far
-// (woman1, woman6 — the woman4 image is no longer used, its slot is 3D);
-// the remaining pending slots (woman2, woman3, man2) are Kyle's fixes,
+// woman4, so it REPLACES the woman4 billboard) + silver sword;
+// slot 5 = masquerade_red_black (black/red costume, red/gold mask —
+// matches woman5, fills a pending slot) + gold sword;
+// slot 6 = masquerade_man_black (black tuxedo, black/silver mask —
+// matches man1, fills a pending slot) + silver sword;
+// slot 7 = masquerade_man_navy (navy tuxedo, gold mask — matches man2,
+// fills a pending slot) + gold sword.
+// The other 4 slots are billboard sprites, unarmed (a 3D sword on a 2D
+// sprite would not read). Only 2 billboard images exist in the repo so
+// far (woman1, woman6 — the woman4 image is no longer used, its slot is
+// 3D); the remaining pending slots (woman2, woman3) are Kyle's fixes,
 // pending. A pending slot tries its intended filename first and falls
 // back to cycling the 2 available images if the file is not there yet —
 // so the fixed images drop in by filename with no code change. (The
 // fallback cycles woman1/woman6; woman4 is no longer a fallback because
 // its slot is a 3D character now.)
+// Fencing swords, measured in Blender from the GLB (blade along local Y,
+// node origin at the geometry centre — NOT at the grip, unlike the
+// katana's original file). Sword 1 (silver): guard (widest X, 0.265 m)
+// at Y +0.27, pommel at Y +0.49 — blade points -Y (tip at Y -0.50),
+// grip centre Y +0.38. Sword 2 (gold): guard (widest X, 0.338 m) at
+// Y -0.20, pommel at Y -0.50 — blade points +Y (tip at Y +0.50), grip
+// centre Y -0.35. The two files are mirrored in Y, so the blade sign
+// and grip offset are per-file, not shared.
+const ENEMY_SWORDS = {
+  'assets/theater/enemies/fencing_sword_1.glb': { gripY: 0.38, bladeSign: -1 },
+  'assets/theater/enemies/fencing_sword_2.glb': { gripY: -0.35, bladeSign: 1 },
+};
 const ENEMY_ROSTER = [
   { img: 'assets/theater/enemies/enemy_woman1.png', pending: false },
-  { model: 'assets/theater/enemies/masquerade_woman_blue.glb', is3D: true },
+  { model: 'assets/theater/enemies/masquerade_woman_blue.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_1.glb' },
   { img: 'assets/theater/enemies/enemy_woman6.png', pending: false },
   { img: 'assets/theater/enemies/enemy_woman2.png', pending: true },
   { img: 'assets/theater/enemies/enemy_woman3.png', pending: true },
-  { model: 'assets/theater/enemies/masquerade_red_black.glb', is3D: true },
-  { model: 'assets/theater/enemies/masquerade_man_black.glb', is3D: true },
-  { img: 'assets/theater/enemies/enemy_man2.png', pending: true },
+  { model: 'assets/theater/enemies/masquerade_red_black.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_2.glb' },
+  { model: 'assets/theater/enemies/masquerade_man_black.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_1.glb' },
+  { model: 'assets/theater/enemies/masquerade_man_navy.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_2.glb' },
 ];
 const FALLBACK_IMGS = [
   'assets/theater/enemies/enemy_woman1.png',
@@ -610,13 +627,69 @@ const ENEMY_SPAWNS = [
   [-4, 10], [4, 10], [-7, 14], [7, 14], [-4, 18], [4, 18], [-7, 22], [7, 22],
 ];
 const enemies = [];
+// ---- Fencing sword on a 3D enemy's right hand ----
+// Same hand-attach pattern as the katana on Rochelle: align the weapon's
+// axes to the hand's measured finger/dorsal axes, then position the pivot
+// so the grip centre lands on the palm. Differences from the katana:
+// the sword's blade runs along local Y (not Z) and its guard is the
+// wide-X part, so the weapon basis is e1 = blade direction (toward the
+// tip, per-file sign), e2 = guard wide axis (X), e3 = cross(e1, e2);
+// and the grip offset is measured in world space (not a hand-local baked
+// offset) so the enemy model's fit scale (~1.8x) cannot skew it.
+// The sword is a child of the hand bone inside the enemy model, so it
+// rides with the hand through walk/idle, and tips/fades with the enemy
+// on defeat (the model's tip rotation and fade traverse include it).
+// One model lacks a thumb (man_black, 33 bones — index fingers only),
+// so measureHandAxes returns null for it and the Rochelle-measured
+// FINGER_DIR / DORSAL_DIR fallback is used instead.
+function attachEnemySword(enemy, swordFile) {
+  const spec = ENEMY_SWORDS[swordFile];
+  if (!spec || !enemy.model) return;
+  gltfLoader.load(swordFile, (gltf) => {
+    if (!enemy.model) return;
+    const pivot = new THREE.Group();
+    pivot.add(gltf.scene);
+    scene.add(pivot);
+    const hand = findHandBone(enemy.model, 'R');
+    if (!hand) { pivot.removeFromParent(); return; }
+    try {
+      enemy.model.updateMatrixWorld(true);
+      pivot.updateMatrixWorld(true);
+      const axesH = measureHandAxes(enemy.model, 'R') || { finger: FINGER_DIR, dorsal: DORSAL_DIR };
+      const e1 = new THREE.Vector3(0, spec.bladeSign, 0);
+      const e2 = new THREE.Vector3(1, 0, 0);
+      const e3 = new THREE.Vector3().crossVectors(e1, e2).normalize();
+      const f1 = axesH.finger.clone(), f2 = axesH.dorsal.clone();
+      const f3 = new THREE.Vector3().crossVectors(f1, f2).normalize();
+      const R = new THREE.Matrix4().multiplyMatrices(
+        new THREE.Matrix4().makeBasis(f1, f2, f3),
+        new THREE.Matrix4().makeBasis(e1, e2, e3).transpose()
+      );
+      const q = new THREE.Quaternion().setFromRotationMatrix(R);
+      hand.attach(pivot);
+      pivot.quaternion.copy(q);
+      pivot.updateMatrixWorld(true);
+      // Put the grip centre on the palm, in world space (scale-agnostic):
+      // measure where the grip centre is now, then move the pivot so it
+      // lands on the hand.
+      const gripWorld = pivot.localToWorld(new THREE.Vector3(0, spec.gripY, 0));
+      const handWorld = new THREE.Vector3();
+      hand.getWorldPosition(handWorld);
+      const pivotWorld = pivot.getWorldPosition(new THREE.Vector3());
+      const desired = pivotWorld.clone().add(handWorld).sub(gripWorld);
+      hand.worldToLocal(desired);
+      pivot.position.copy(desired);
+      enemy.sword = pivot;
+    } catch (err) { pivot.removeFromParent(); }
+  }, undefined, () => {});
+}
 function makeEnemy(i) {
   const slot = ENEMY_ROSTER[i];
   const enemy = {
     i, state: 'waiting', // waiting -> rising -> walking -> chasing -> menacing -> falling -> gone
     x: ENEMY_SPAWNS[i][0], z: ENEMY_SPAWNS[i][1], y: -0.6,
     riseT: 0, fallT: 0, sway: Math.random() * 6.28,
-    is3D: !!slot.is3D, mesh: null, model: null, mixer: null, _cur: null,
+    is3D: !!slot.is3D, mesh: null, model: null, mixer: null, _cur: null, sword: null,
   };
   if (slot.is3D) {
     // A real 3D masked enemy (Mixamo-rigged GLB). The group sits on the
@@ -625,7 +698,8 @@ function makeEnemy(i) {
     // async — the group exists immediately, the model + mixer join when
     // ready. The enemy's walk/idle clips are the shared mxClips (same
     // Walking / Standing_Idle the player uses), played through
-    // playMxCharClip on this enemy's own mixer.
+    // playMxCharClip on this enemy's own mixer. Its fencing sword (if
+    // the slot has one) attaches to the right hand once the model loads.
     const group = new THREE.Group();
     group.position.set(enemy.x, -0.6, enemy.z);
     group.visible = false; scene.add(group);
@@ -637,6 +711,7 @@ function makeEnemy(i) {
       enemy.model = m;
       enemy.mixer = new THREE.AnimationMixer(m);
       enemy._cur = null;
+      if (slot.sword) attachEnemySword(enemy, slot.sword);
     }, undefined, () => {});
     enemies.push(enemy); return enemy;
   }
