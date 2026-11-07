@@ -835,6 +835,33 @@ function playEnemyAnim(e, key) {
 function updateEnemies(dt, t) {
   for (const e of enemies) {
     if (e.state === 'waiting' || e.state === 'gone') continue;
+    // Isolate a fault to one enemy: if one enemy's update throws (bad clip,
+    // bad model, bad material), it must not abort the whole enemy loop and
+    // freeze the fight (a stuck falling corpse + no next spawn). The faulty
+    // enemy is forced gone + hidden so it cannot throw again next frame.
+    try { updateOneEnemy(e, dt, t); }
+    catch (err) {
+      console.warn('theater: enemy update failed, forcing gone', e.i, err);
+      e.state = 'gone'; if (e.mesh) e.mesh.visible = false;
+    }
+  }
+  // Watchdog: the fight must never stall and a corpse must never persist.
+  // If an enemy has been falling for > 1.5 s (the fall is 0.6 s), force it
+  // gone + hidden. If the game is live, enemies remain, and no enemy is in
+  // any live state, spawn the next one — so a missed spawn can never stall
+  // the fight at N/8.
+  for (const e of enemies) {
+    if (e.state === 'falling' && e.fallT > 1.5) {
+      console.warn('theater: falling enemy stuck, forcing gone', e.i);
+      e.state = 'gone'; if (e.mesh) e.mesh.visible = false;
+    }
+  }
+  if (started && !won && !cine && !bowPhase && defeated < 8) {
+    const live = enemies.some((e) => e.state === 'rising' || e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'falling');
+    if (!live) { console.warn('theater: no live enemy, watchdog spawning next'); spawnNextEnemy(); }
+  }
+}
+function updateOneEnemy(e, dt, t) {
     // A 3D enemy has its own mixer; advance it every frame while active.
     // (The walk/idle clips are the shared mxClips, root-travel stripped
     // like the player's, so the enemy's movement comes from the game
@@ -855,7 +882,7 @@ function updateEnemies(dt, t) {
         e.mesh.rotation.y = Math.atan2(camera.position.x - e.x, camera.position.z - e.z);
       }
       if (k >= 1) { e.state = 'walking'; }
-      continue;
+      return;
     }
     if (e.state === 'falling') {
       e.fallT += dt;
@@ -882,7 +909,7 @@ function updateEnemies(dt, t) {
         e.mesh.material.opacity = 1 - k;
       }
       if (k >= 1) { e.state = 'gone'; e.mesh.visible = false; }
-      continue;
+      return;
     }
     // walking / chasing / menacing.
     const dx = player.position.x - e.x, dz = player.position.z - e.z;
@@ -893,7 +920,7 @@ function updateEnemies(dt, t) {
       if (Math.abs(e.x) > 0.4) { tx = 0; tz = e.z; }
       else if (e.z > 7.5) { tx = 0; tz = 7.5; }
       else if (e.z > 5) { tx = 0; tz = 5; }
-      else { e.state = 'chasing'; continue; }
+      else { e.state = 'chasing'; return; }
       const ddx = tx - e.x, ddz = tz - e.z, dd = Math.hypot(ddx, ddz);
       if (dd > 0.1) {
         const sp = 1.2 * dt;
@@ -939,7 +966,6 @@ function updateEnemies(dt, t) {
       e.mesh.position.set(e.x, e.y + 0.9, e.z);
     }
   }
-}
 
 // ---- Destructible triggers (all one-shot, all by slashing near them) ----
 function enemiesNear(x, z, r) {
