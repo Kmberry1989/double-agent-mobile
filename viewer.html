@@ -257,7 +257,16 @@ const WEAPONS = [
   { name: 'white suppressor', file: 'assets/weapons/white_suppressor.glb' },
   { name: 'white walther', file: 'assets/weapons/white_walther.glb' }
 ];
+// The three Drive clips (bow + both sword attacks) declare FBX
+// UnitScaleFactor 1.0 (centimetres); the repo clips declare 100, so their
+// Hips positions are ~100x too big as loaded and would fling the model
+// ~100 m up. They get the same /180 fix the theater applies.
 const ANIMS = ["bow_1046932","Climbing_Ladder","Crawling","Crouch_Death","Crouch_Idle","Crouched_Walking","Death","Death_From_Front_Headshot","Driving","Drunk_Idle","Drunk_Stumbling_Walking","Drunk_Walk","Dying_Backwards","Entering_Car","Exiting_Car","Falling","Falling_Back_Death","Falling_Down","Female_Crouch_Pose","Firing_Rifle","Firing_Rifle_Crouch_Walking","Grabbing_Pistol","Head_Nod_Yes","Hit_Reaction","Honking_Horn","Idle_Crouching","Idle_To_Running","Jump","Knocked_Out","Landing","Looking_Around","Male_Crouch_Pose","Opening_Door_Inwards","Picking_Up_Object","Pistol_Aim","Pistol_Fire_Recoil","Pistol_Idle","Pistol_Kneeling_Idle","Pistol_Run","Pistol_Walk","Pistol_Walk_Arc","Pointing_Forward","Punching","Reloading_Rifle","Reloading_Walking","Rifle_Aiming_Idle","Rifle_Crouch_Walk","Rifle_Death","Rifle_Idle","Rifle_Run","Rifle_Walk","Rumba_Dancing","Running","Salsa_Dancing__1","Salsa_Dancing__4","Salsa_Dancing__5","Salsa_Dancing__6","Salsa_Dancing__7","Shaking_Head_No","Shooting_Pistol_Corner","Shrugging","Side_Kick","Sitting_Idle","Sneaking_Forward","Sprint_Forward","Standing_Idle","Standing_React_Death_Forward","Standing_Sprint_Forward","Standing_Up","sword_attack","sword_regular_combo","Taking_Cover_Idle","Talking","Talking_On_A_Cell_Phone","Turning","Typing","Vault_Over_Box","Walking","Walking_While_Aiming_Rifle","Waving"];
+// The three Drive clips (bow + both sword attacks) declare FBX
+// UnitScaleFactor 1.0 (centimetres); the repo clips declare 100, so their
+// Hips positions are ~100x too big as loaded and would fling the model
+// ~100 m up. They get the same /180 fix the theater applies.
+const DRIVE_CLIPS = ["bow_1046932","sword_attack","sword_regular_combo"];
 
 const app = document.getElementById('app');
 const scene = new THREE.Scene();
@@ -315,6 +324,7 @@ const weaponSelL = document.getElementById('weaponSelL');
   WEAPONS.forEach(w => { const o = document.createElement('option'); o.value = w.name; o.textContent = w.name; weaponSelL.appendChild(o); }); }
 
 let model = null, mixer = null, action = null, clip = null, embeddedAnims = [];
+let curIsGLB = false; // true when the current model was loaded as a GLB
 let playing = true, loop = true, stripRoot = true, showArrows = true, showTarget = false;
 let camMode = 'orbit', yaw = 0, pitch = -0.1, freePos = new THREE.Vector3(2.5, 1.8, 4);
 let fitDist = 4, fitCenter = new THREE.Vector3(0, 0.9, 0);
@@ -337,6 +347,79 @@ function stripRootTravel(c) {
     } return nt;
   });
   return new THREE.AnimationClip(c.name, c.duration, tracks);
+}
+// Drive clips declare FBX UnitScaleFactor 1.0 (centimetres); the repo
+// clips declare 100, so the loader leaves Drive Hips positions ~100x too
+// big. Divide Hips position by 180 and re-base XZ to the first frame, so
+// the character stays in place and only the relative motion (crouch,
+// lunge) survives. Y is divided but NOT re-based: it is the hips height.
+// The divisor is 180, not 100: the clip's Hips are centimetres for a
+// 1.8 m character, and the model is 1.0 m raw under a 1.8x fit scale, so
+// the local Hips value must be (cm / 100) / 1.8 = cm / 180 — otherwise
+// the root scale multiplies it again and the hips land 1.8x too high.
+// Same function as theater.html's fixDriveClip.
+function fixDriveClip(clip) {
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') >= 0 && t.name.endsWith('.position') && nt.values && nt.values.length >= 3) {
+      const x0 = nt.values[0] / 180, z0 = nt.values[2] / 180;
+      for (let i = 0; i + 2 < nt.values.length; i += 3) {
+        nt.values[i] = nt.values[i] / 180 - x0;
+        nt.values[i + 1] = nt.values[i + 1] / 180;
+        nt.values[i + 2] = nt.values[i + 2] / 180 - z0;
+      }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
+// The masquerade GLBs are Tripo models whose Armature is rotated +90°
+// about X, so the Hips bone's local frame has Z as the vertical. The
+// shared Mixamo clips are Y-up metres. Played raw, the clip's Hips
+// position maps to world +Z instead of +Y, so the whole body lies flat
+// on the floor — the theater's slot 1 prone bug (fixed there in 7f19d6a).
+// Convert only the Hips track into the skeleton's frame: Hips position
+// rotated by the inverse of the rotation from the model root to the Hips
+// parent and divided by the parent-chain scale (man_navy needs x100),
+// Hips quaternion premultiplied by the same inverse rotation. Only the
+// Hips needs it: it is the only bone with a position track, and every
+// bone below it hangs off the Hips. Same function as theater.html's
+// convertClipForTripo. Applied AFTER stripRootTravel (the strip re-bases
+// X/Z in the Y-up frame; converting first would put the vertical on Z
+// and the strip would freeze the height).
+function convertClipForTripo(clip, model) {
+  let hips = null;
+  model.traverse((o) => { if (!hips && o.isBone && o.name.toLowerCase().indexOf('hips') >= 0) hips = o; });
+  if (!hips || !hips.parent) return clip;
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3(1, 1, 1);
+  let node = hips.parent;
+  const chain = [];
+  while (node && node !== model) { chain.unshift(node); node = node.parent; }
+  for (const n of chain) { q.multiply(n.quaternion); s.multiply(n.scale); }
+  const qInv = q.clone().invert();
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') < 0) return nt;
+    if (t.name.endsWith('.position')) {
+      const v = new THREE.Vector3();
+      for (let i = 0; i + 2 < nt.values.length; i += 3) {
+        v.set(nt.values[i], nt.values[i + 1], nt.values[i + 2]).applyQuaternion(qInv);
+        nt.values[i] = v.x / s.x; nt.values[i + 1] = v.y / s.y; nt.values[i + 2] = v.z / s.z;
+      }
+    } else if (t.name.endsWith('.quaternion')) {
+      const qq = new THREE.Quaternion();
+      for (let i = 0; i + 3 < nt.values.length; i += 4) {
+        qq.set(nt.values[i], nt.values[i + 1], nt.values[i + 2], nt.values[i + 3]);
+        qq.premultiply(qInv);
+        nt.values[i] = qq.x; nt.values[i + 1] = qq.y; nt.values[i + 2] = qq.z; nt.values[i + 3] = qq.w;
+      }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name + '_tripo', clip.duration, tracks);
 }
 function rootTravel(c) {
   const hips = c.tracks.find(t => t.name.toLowerCase().includes('hips') && t.name.endsWith('.position'));
@@ -869,6 +952,7 @@ function isMixamoRig(obj) {
 }
 function afterModel(obj, info) {
   model = obj; scene.add(obj);
+  curIsGLB = (info[2] === 'glb');
   const isCat = info[0] === 'Mabel' || info[0] === 'Margo' || info[0] === 'Moxie';
   const fit = fitModel(obj, isCat ? 0.35 : 1.8);
   collectBones(obj);
@@ -926,7 +1010,13 @@ function playAnim(name) {
   setStatus('Loading animation ' + name + '…');
   fbxLoader.load('assets/animations/' + name + '.fbx?v=' + ASSET_V, obj => {
     const raw = obj.animations && obj.animations[0]; if (!raw) { setStatus('No clip in ' + name); return; }
-    clip = stripRoot ? stripRootTravel(raw) : raw;
+    let c = raw;
+    // Drive clips (bow + both sword attacks) are centimetres, not metres.
+    if (DRIVE_CLIPS.indexOf(name) >= 0) c = fixDriveClip(c);
+    clip = stripRoot ? stripRootTravel(c) : c;
+    // A Mixamo-rigged GLB (the masquerade enemies) is a Z-up Tripo
+    // skeleton; the shared Y-up clips lay it flat without this.
+    if (curIsGLB && isMixamoRig(model)) clip = convertClipForTripo(clip, model);
     startClip(name, raw);
   }, undefined, () => setStatus('Failed to load animation ' + name));
 }
