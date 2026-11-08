@@ -706,26 +706,24 @@ fbxLoader.load('assets/characters/Rochelle_combat.fbx', (obj) => {
   head.position.y = 1.95; player.add(head); playerModel = body;
 });
 
-// ---- Enemies (billboard sprites + 3D masked enemies, data-driven roster) ----
-// 8 slots. 4 are real 3D masquerade characters (Mixamo-rigged GLBs),
-// each armed with a fencing sword on its right hand:
-// slot 1 = masquerade_woman_blue (blue gown, blue/gold mask — matches
-// woman4, so it REPLACES the woman4 billboard) + silver sword;
-// slot 5 = masquerade_red_black (black/red costume, red/gold mask —
-// matches woman5, fills a pending slot) + gold sword;
-// slot 6 = masquerade_man_black (black tuxedo, black/silver mask —
-// matches man1, fills a pending slot) + silver sword;
-// slot 7 = masquerade_man_navy (navy tuxedo, gold mask — matches man2,
-// fills a pending slot) + gold sword.
-// The other 4 slots are billboard sprites, unarmed (a 3D sword on a 2D
-// sprite would not read). Only 2 billboard images exist in the repo so
-// far (woman1, woman6 — the woman4 image is no longer used, its slot is
-// 3D); the remaining pending slots (woman2, woman3) are Kyle's fixes,
-// pending. A pending slot tries its intended filename first and falls
-// back to cycling the 2 available images if the file is not there yet —
-// so the fixed images drop in by filename with no code change. (The
-// fallback cycles woman1/woman6; woman4 is no longer a fallback because
-// its slot is a 3D character now.)
+// ---- Enemies (all 3D masked enemies, data-driven roster) ----
+// 8 slots, all real 3D masquerade characters (Mixamo-rigged GLBs), each
+// armed with a fencing sword on its right hand. Only 4 distinct models
+// exist in the repo, so each appears twice, spread out so no two adjacent
+// slots share a model. A model keeps the same sword on both appearances.
+// slot 0 = masquerade_man_black + silver sword;
+// slot 1 = masquerade_woman_blue + silver sword;
+// slot 2 = masquerade_red_black + gold sword;
+// slot 3 = masquerade_man_navy + gold sword;
+// slot 4 = masquerade_woman_blue + silver sword;
+// slot 5 = masquerade_red_black + gold sword;
+// slot 6 = masquerade_man_black + silver sword;
+// slot 7 = masquerade_man_navy + gold sword.
+// (The billboard sprites are gone — the flat PNG enemies read as paper
+// cutouts next to the 3D ones. enemy_woman1.png and enemy_woman6.png stay
+// in the repo, unreferenced; woman2/woman3 were never delivered. If Kyle
+// sends 3D models for woman1/woman2/woman3/woman6, swap them into slots
+// 0/2/3/4 so all 8 are distinct.)
 // Fencing swords, measured in Blender from the GLB (blade along local Y,
 // node origin at the geometry centre — NOT at the grip, unlike the
 // katana's original file). Sword 1 (silver): guard (widest X, 0.265 m)
@@ -739,11 +737,11 @@ const ENEMY_SWORDS = {
   'assets/theater/enemies/fencing_sword_2.glb': { gripY: -0.35, bladeSign: 1 },
 };
 const ENEMY_ROSTER = [
-  { img: 'assets/theater/enemies/enemy_woman1.png', pending: false },
+  { model: 'assets/theater/enemies/masquerade_man_black.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_1.glb' },
   { model: 'assets/theater/enemies/masquerade_woman_blue.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_1.glb' },
-  { img: 'assets/theater/enemies/enemy_woman6.png', pending: false },
-  { img: 'assets/theater/enemies/enemy_woman2.png', pending: true },
-  { img: 'assets/theater/enemies/enemy_woman3.png', pending: true },
+  { model: 'assets/theater/enemies/masquerade_red_black.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_2.glb' },
+  { model: 'assets/theater/enemies/masquerade_man_navy.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_2.glb' },
+  { model: 'assets/theater/enemies/masquerade_woman_blue.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_1.glb' },
   { model: 'assets/theater/enemies/masquerade_red_black.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_2.glb' },
   { model: 'assets/theater/enemies/masquerade_man_black.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_1.glb' },
   { model: 'assets/theater/enemies/masquerade_man_navy.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_2.glb' },
