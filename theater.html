@@ -408,6 +408,16 @@ colliders.push({ x: -12.4, z: 6, r: 0.8 }); colliders.push({ x: 12.4, z: 6, r: 0
 // ---- Character helpers (same patterns as ballroom-rochelle.html) ----
 function fitCharacter(obj, height) {
   obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  // Three 0.160 measures a SkinnedMesh's bounding box from the skinned
+  // vertex positions, which need the bones' world matrices. A freshly
+  // loaded GLB has not had updateMatrixWorld run yet, so the bones read
+  // as identity and the box collapses (woman_blue measured 0.216 m tall
+  // instead of 1.0 m) — the fit then applied an 8.35x scale instead of
+  // 1.8x, and the 3D enemies came out ~2.0 m wide x 2.4 m deep (the
+  // "giant corpse" the live browser showed; the simulation on three
+  // 0.186 measured correctly without this, so it never saw it). Force the
+  // world matrices up to date before measuring.
+  obj.updateMatrixWorld(true);
   let bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
   if (!size.y) return;
   obj.scale.setScalar(height / size.y);
@@ -458,15 +468,22 @@ function fixDriveClip(clip) {
   // scene. Divide Hips position by 100 and re-base XZ to the first frame,
   // so the character stays in place and only the relative motion (crouch,
   // lunge) survives. Y is divided but NOT re-based: it is the hips height.
+  // The divisor is 180, not 100: the clip's Hips are centimetres for a
+  // 1.8 m character, and the model is 1.0 m raw under a 1.8x fit scale, so
+  // the local Hips value must be (cm / 100) / 1.8 = cm / 180 — otherwise
+  // the root scale multiplies it again and the hips land 1.8x too high
+  // (sword attacks put Rochelle's hips at 1.8–3.3 m, floating her near
+  // the ceiling for the whole clamped clip). The bow is a deep formal bow
+  // (hips 0.35–0.43 m world), which is the clip's intent.
   const tracks = clip.tracks.map((t) => {
     const nt = t.clone();
     const bone = t.name.split('.')[0].toLowerCase();
     if (bone.indexOf('hips') >= 0 && t.name.endsWith('.position') && nt.values && nt.values.length >= 3) {
-      const x0 = nt.values[0] / 100, z0 = nt.values[2] / 100;
+      const x0 = nt.values[0] / 180, z0 = nt.values[2] / 180;
       for (let i = 0; i + 2 < nt.values.length; i += 3) {
-        nt.values[i] = nt.values[i] / 100 - x0;
-        nt.values[i + 1] = nt.values[i + 1] / 100;
-        nt.values[i + 2] = nt.values[i + 2] / 100 - z0;
+        nt.values[i] = nt.values[i] / 180 - x0;
+        nt.values[i + 1] = nt.values[i + 1] / 180;
+        nt.values[i + 2] = nt.values[i + 2] / 180 - z0;
       }
     }
     return nt;
