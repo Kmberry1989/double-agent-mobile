@@ -118,6 +118,12 @@ const MODELS = [
     ['Rochelle undercover textured', 'assets/characters/Rochelle_undercover_textured.glb', 'glb', ''],
     ['Vickie gown', 'assets/characters/Vickie_gown.glb', 'glb', '']
   ]},
+  { group: 'Theater enemies (GLB)', items: [
+    ['Masquerade man black', 'assets/theater/enemies/masquerade_man_black.glb', 'glb', ''],
+    ['Masquerade man navy', 'assets/theater/enemies/masquerade_man_navy.glb', 'glb', ''],
+    ['Masquerade red black', 'assets/theater/enemies/masquerade_red_black.glb', 'glb', ''],
+    ['Masquerade woman blue', 'assets/theater/enemies/masquerade_woman_blue.glb', 'glb', '']
+  ]},
   { group: 'Props (GLB)', items: [
     ['ballroom bar', 'assets/props/ballroom_bar.glb', 'glb', ''],
     ['ballroom bar top', 'assets/props/ballroom_bar_top.glb', 'glb', ''],
@@ -139,6 +145,17 @@ const MODELS = [
     ['filing cabinet', 'assets/props/filing_cabinet.glb', 'glb', ''],
     ['roadblock', 'assets/props/roadblock.glb', 'glb', ''],
     ['sandbags', 'assets/props/sandbags.glb', 'glb', '']
+  ]},
+  { group: 'Theater props (GLB)', items: [
+    ['audience seats', 'assets/theater/models/audience_seats.glb', 'glb', ''],
+    ['footlights', 'assets/theater/models/footlights.glb', 'glb', ''],
+    ['sandbag', 'assets/theater/models/sandbag.glb', 'glb', ''],
+    ['set flat', 'assets/theater/models/set_flat.glb', 'glb', ''],
+    ['spotlight', 'assets/theater/models/spotlight.glb', 'glb', ''],
+    ['theater barrel', 'assets/theater/models/barrel.glb', 'glb', ''],
+    ['theater crate 1', 'assets/theater/models/crate_1.glb', 'glb', ''],
+    ['theater crate 2', 'assets/theater/models/crate_2.glb', 'glb', ''],
+    ['theater curtain', 'assets/theater/models/curtain.glb', 'glb', '']
   ]},
   { group: 'Weapons & gear (GLB)', items: [
     ['aks74u', 'assets/weapons/aks74u.glb', 'glb', ''],
@@ -163,6 +180,8 @@ const MODELS = [
     ['black walther', 'assets/weapons/black_walther.glb', 'glb', ''],
     ['black watch', 'assets/weapons/black_watch.glb', 'glb', ''],
     ['cufflinks', 'assets/weapons/cufflinks.glb', 'glb', ''],
+    ['fencing sword 1 (silver)', 'assets/theater/enemies/fencing_sword_1.glb', 'glb', ''],
+    ['fencing sword 2 (gold)', 'assets/theater/enemies/fencing_sword_2.glb', 'glb', ''],
     ['katana', 'assets/weapons/katana.glb', 'glb', ''],
     ['mp5k', 'assets/weapons/mp5k.glb', 'glb', ''],
     ['ppk', 'assets/weapons/ppk.glb', 'glb', ''],
@@ -213,6 +232,8 @@ const WEAPONS = [
   { name: 'black walther', file: 'assets/weapons/black_walther.glb' },
   { name: 'black watch', file: 'assets/weapons/black_watch.glb' },
   { name: 'cufflinks', file: 'assets/weapons/cufflinks.glb' },
+  { name: 'fencing sword 1', file: 'assets/theater/enemies/fencing_sword_1.glb' },
+  { name: 'fencing sword 2', file: 'assets/theater/enemies/fencing_sword_2.glb' },
   { name: 'katana', file: 'assets/weapons/katana.glb' },
   { name: 'mp5k', file: 'assets/weapons/mp5k.glb' },
   { name: 'ppk', file: 'assets/weapons/ppk.glb' },
@@ -236,7 +257,7 @@ const WEAPONS = [
   { name: 'white suppressor', file: 'assets/weapons/white_suppressor.glb' },
   { name: 'white walther', file: 'assets/weapons/white_walther.glb' }
 ];
-const ANIMS = ["Climbing_Ladder","Crawling","Crouch_Death","Crouch_Idle","Crouched_Walking","Death","Death_From_Front_Headshot","Driving","Drunk_Idle","Drunk_Stumbling_Walking","Drunk_Walk","Dying_Backwards","Entering_Car","Exiting_Car","Falling","Falling_Back_Death","Falling_Down","Female_Crouch_Pose","Firing_Rifle","Firing_Rifle_Crouch_Walking","Grabbing_Pistol","Head_Nod_Yes","Hit_Reaction","Honking_Horn","Idle_Crouching","Idle_To_Running","Jump","Knocked_Out","Landing","Looking_Around","Male_Crouch_Pose","Opening_Door_Inwards","Picking_Up_Object","Pistol_Aim","Pistol_Fire_Recoil","Pistol_Idle","Pistol_Kneeling_Idle","Pistol_Run","Pistol_Walk","Pistol_Walk_Arc","Pointing_Forward","Punching","Reloading_Rifle","Reloading_Walking","Rifle_Aiming_Idle","Rifle_Crouch_Walk","Rifle_Death","Rifle_Idle","Rifle_Run","Rifle_Walk","Rumba_Dancing","Running","Salsa_Dancing__1","Salsa_Dancing__4","Salsa_Dancing__5","Salsa_Dancing__6","Salsa_Dancing__7","Shaking_Head_No","Shooting_Pistol_Corner","Shrugging","Side_Kick","Sitting_Idle","Sneaking_Forward","Sprint_Forward","Standing_Idle","Standing_React_Death_Forward","Standing_Sprint_Forward","Standing_Up","Taking_Cover_Idle","Talking","Talking_On_A_Cell_Phone","Turning","Typing","Vault_Over_Box","Walking","Walking_While_Aiming_Rifle","Waving"];
+const ANIMS = ["bow_1046932","Climbing_Ladder","Crawling","Crouch_Death","Crouch_Idle","Crouched_Walking","Death","Death_From_Front_Headshot","Driving","Drunk_Idle","Drunk_Stumbling_Walking","Drunk_Walk","Dying_Backwards","Entering_Car","Exiting_Car","Falling","Falling_Back_Death","Falling_Down","Female_Crouch_Pose","Firing_Rifle","Firing_Rifle_Crouch_Walking","Grabbing_Pistol","Head_Nod_Yes","Hit_Reaction","Honking_Horn","Idle_Crouching","Idle_To_Running","Jump","Knocked_Out","Landing","Looking_Around","Male_Crouch_Pose","Opening_Door_Inwards","Picking_Up_Object","Pistol_Aim","Pistol_Fire_Recoil","Pistol_Idle","Pistol_Kneeling_Idle","Pistol_Run","Pistol_Walk","Pistol_Walk_Arc","Pointing_Forward","Punching","Reloading_Rifle","Reloading_Walking","Rifle_Aiming_Idle","Rifle_Crouch_Walk","Rifle_Death","Rifle_Idle","Rifle_Run","Rifle_Walk","Rumba_Dancing","Running","Salsa_Dancing__1","Salsa_Dancing__4","Salsa_Dancing__5","Salsa_Dancing__6","Salsa_Dancing__7","Shaking_Head_No","Shooting_Pistol_Corner","Shrugging","Side_Kick","Sitting_Idle","Sneaking_Forward","Sprint_Forward","Standing_Idle","Standing_React_Death_Forward","Standing_Sprint_Forward","Standing_Up","sword_attack","sword_regular_combo","Taking_Cover_Idle","Talking","Talking_On_A_Cell_Phone","Turning","Typing","Vault_Over_Box","Walking","Walking_While_Aiming_Rifle","Waving"];
 
 const app = document.getElementById('app');
 const scene = new THREE.Scene();
@@ -329,6 +350,11 @@ function rootTravel(c) {
 // (The first viewer version also subtracted the centre height, sinking
 // every model ~0.9 m below the floor.)
 function fitModel(obj, targetH) {
+  // Update world matrices first: on a freshly loaded GLB SkinnedMesh the
+  // bones' matrixWorld is still identity, so Box3.setFromObject reads a
+  // collapsed skinned bbox (the theater's 8.35x giant — woman_blue measured
+  // 0.216 m instead of 1.0 m). Same fix as theater.html 89b3020.
+  obj.updateMatrixWorld(true);
   const bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
   if (!size.y) return;
   obj.scale.setScalar(targetH / size.y);
@@ -831,6 +857,16 @@ function clearModel() {
   if (mixer) { mixer.stopAllAction(); mixer = null; }
   action = null; clip = null; embeddedAnims = []; hipsArrow.visible = torsoArrow.visible = false;
 }
+// A Mixamo rig uses mixamorig bone names, so the shared Mixamo FBX clips
+// (the ANIMS list) play on it — that is how the theater drives the
+// masquerade enemies (walk/idle are repo FBX clips, not embedded). A GLB
+// with a different skeleton (ActionForge snake_case, the cat rig) cannot
+// use those clips, so it gets no animation options from the shared list.
+function isMixamoRig(obj) {
+  let found = false;
+  obj.traverse(o => { if (!found && o.isBone && (o.name || '').toLowerCase().indexOf('mixamorig') >= 0) found = true; });
+  return found;
+}
 function afterModel(obj, info) {
   model = obj; scene.add(obj);
   const isCat = info[0] === 'Mabel' || info[0] === 'Margo' || info[0] === 'Moxie';
@@ -842,11 +878,20 @@ function afterModel(obj, info) {
   let hasBones = false, boneCount = 0;
   obj.traverse(o => { if (o.isBone) { hasBones = true; boneCount++; } });
   mixer = new THREE.AnimationMixer(obj);
-  if (!hasBones && !embeddedAnims.length) setAnimOptions([]);
-  else setAnimOptions(embeddedAnims.length ? embeddedAnims.map(a => a.name) : (info[2] === 'fbx' ? ANIMS : []));
+  // Animation options: embedded clips first (if any — the cats, and the
+  // masquerade enemies' single source clip), then the shared Mixamo FBX
+  // clips for any Mixamo-rigged model (FBX, or a GLB like the masquerade
+  // enemies whose skeleton uses mixamorig names). A non-Mixamo GLB with no
+  // embedded clips (ActionForge characters, props) gets no animations,
+  // since the Mixamo clips would not move its bones.
+  const mixamo = isMixamoRig(obj);
+  let names = embeddedAnims.map(a => a.name);
+  if (mixamo) names = names.concat(ANIMS.filter(n => names.indexOf(n) < 0));
+  if (!hasBones && !names.length) setAnimOptions([]);
+  else setAnimOptions(names);
   if (pendingAnim) { const pa = pendingAnim; pendingAnim = null; animSel.value = pa; playAnim(pa); setView('side'); }
+  else if (mixamo && hasBones) { animSel.value = 'Standing_Idle'; playAnim('Standing_Idle'); }
   else if (embeddedAnims.length) { animSel.value = embeddedAnims[0].name; playAnim(embeddedAnims[0].name); }
-  else if (info[2] === 'fbx' && hasBones) { animSel.value = 'Standing_Idle'; playAnim('Standing_Idle'); }
   resetView();
   if (weaponSel.value) loadWeapon(weaponSel.value);
   if (weaponSelL.value) loadWeaponL(weaponSelL.value);
@@ -871,18 +916,19 @@ function loadModel(name) {
 function playAnim(name) {
   if (!mixer || !model) return;
   if (embeddedAnims.length) {
-    const c = embeddedAnims.find(a => a.name === name); if (!c) return;
-    clip = c;
-  } else {
-    setStatus('Loading animation ' + name + '…');
-    fbxLoader.load('assets/animations/' + name + '.fbx?v=' + ASSET_V, obj => {
-      const raw = obj.animations && obj.animations[0]; if (!raw) { setStatus('No clip in ' + name); return; }
-      clip = stripRoot ? stripRootTravel(raw) : raw;
-      startClip(name, raw);
-    }, undefined, () => setStatus('Failed to load animation ' + name));
-    return;
+    const c = embeddedAnims.find(a => a.name === name);
+    if (c) { clip = c; startClip(name, clip); return; }
+    // Not an embedded clip — fall through to the shared FBX file below.
+    // (A Mixamo-rigged GLB like a masquerade enemy offers both its one
+    // embedded source clip and the shared ANIMS list; the shared clips
+    // load from assets/animations/ like any FBX model's.)
   }
-  startClip(name, clip);
+  setStatus('Loading animation ' + name + '…');
+  fbxLoader.load('assets/animations/' + name + '.fbx?v=' + ASSET_V, obj => {
+    const raw = obj.animations && obj.animations[0]; if (!raw) { setStatus('No clip in ' + name); return; }
+    clip = stripRoot ? stripRootTravel(raw) : raw;
+    startClip(name, raw);
+  }, undefined, () => setStatus('Failed to load animation ' + name));
 }
 function startClip(name, raw) {
   if (action) action.stop();
