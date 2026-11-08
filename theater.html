@@ -491,6 +491,58 @@ function fixDriveClip(clip) {
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
 
+// Tripo (masquerade) skeletons are Z-up: their Armature is rotated +90°
+// about X, so the Hips bone's local frame has Z as the vertical — and
+// man_navy's bones are centimetres (Armature scale 0.01). The shared
+// Mixamo clips are Y-up metres, so played raw on a Tripo skeleton the
+// Hips position (0, ~0.54, 0) maps to world +Z instead of +Y and the
+// whole body lies flat on the floor: slot 1 spawned prone and 'walked'
+// the aisle on its back while the state machine (which only moves e.x
+// and e.z) reported it walking. The previous simulation missed it
+// because it only checked the state name and the bounding box — and a
+// SkinnedMesh bounding box is computed once from the bind pose and then
+// cached, so it always reads upright. Convert the Hips track into the
+// skeleton's frame: rotate the Hips position by the inverse of the
+// rotation from the model root to the Hips parent and divide by the
+// parent-chain scale (man_navy needs x100), and premultiply the Hips
+// quaternion by the same inverse rotation. Only the Hips needs it — it
+// is the only bone with a position track, and every bone below it hangs
+// off the Hips, so once the Hips frame matches, the whole chain does.
+// The player (Mixamo FBX, Y-up) keeps the shared clips untouched.
+function convertClipForTripo(clip, model) {
+  let hips = null;
+  model.traverse((o) => { if (!hips && o.isBone && o.name.toLowerCase().indexOf('hips') >= 0) hips = o; });
+  if (!hips || !hips.parent) return clip;
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3(1, 1, 1);
+  let node = hips.parent;
+  const chain = [];
+  while (node && node !== model) { chain.unshift(node); node = node.parent; }
+  for (const n of chain) { q.multiply(n.quaternion); s.multiply(n.scale); }
+  const qInv = q.clone().invert();
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') < 0) return nt;
+    if (t.name.endsWith('.position')) {
+      const v = new THREE.Vector3();
+      for (let i = 0; i + 2 < nt.values.length; i += 3) {
+        v.set(nt.values[i], nt.values[i + 1], nt.values[i + 2]).applyQuaternion(qInv);
+        nt.values[i] = v.x / s.x; nt.values[i + 1] = v.y / s.y; nt.values[i + 2] = v.z / s.z;
+      }
+    } else if (t.name.endsWith('.quaternion')) {
+      const qq = new THREE.Quaternion();
+      for (let i = 0; i + 3 < nt.values.length; i += 4) {
+        qq.set(nt.values[i], nt.values[i + 1], nt.values[i + 2], nt.values[i + 3]);
+        qq.premultiply(qInv);
+        nt.values[i] = qq.x; nt.values[i + 1] = qq.y; nt.values[i + 2] = qq.z; nt.values[i + 3] = qq.w;
+      }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name + '_tripo', clip.duration, tracks);
+}
+
 // ---- Player (Rochelle_combat, Mixamo, dual katanas) ----
 const player = new THREE.Group(); player.position.set(0, STAGE_TOP, -8); scene.add(player);
 let playerModel = null, mixer = null;
@@ -847,7 +899,18 @@ function faceEnemy3D(e, dx, dz) {
   e.mesh.rotation.y = Math.atan2(-dz, dx);
 }
 function playEnemyAnim(e, key) {
-  if (e.is3D) playMxCharClip(e, key);
+  if (!e.is3D || !e.mixer || !mxClips[key] || !e.model) return;
+  // 3D enemies play a per-enemy converted copy of the shared clip (see
+  // convertClipForTripo): the raw Y-up Mixamo clip lays a Z-up Tripo
+  // skeleton flat. Convert once per enemy per clip and cache it. The
+  // fade/switch logic mirrors playMxCharClip so a clip change still
+  // cross-fades instead of snapping.
+  if (!e._tripoClips) e._tripoClips = {};
+  if (!e._tripoClips[key]) e._tripoClips[key] = convertClipForTripo(mxClips[key], e.model);
+  const act = e.mixer.clipAction(e._tripoClips[key]);
+  if (e._cur === act && act.isRunning()) return;
+  if (e._cur && e._cur !== act) e._cur.fadeOut(0.15);
+  act.reset().fadeIn(0.15).play(); e._cur = act;
 }
 function updateEnemies(dt, t) {
   for (const e of enemies) {
