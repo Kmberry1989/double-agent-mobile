@@ -1027,7 +1027,7 @@ function startClip(name, raw) {
   action.clampWhenFinished = !loop;
   action.timeScale = parseFloat(document.getElementById('speedSel').value);
   action.reset().play(); playing = true; document.getElementById('playBtn').textContent = 'Pause';
-  setStatus(`${modelSel.value} — ${name}\nduration ${clip.duration.toFixed(2)} s, ${clip.tracks.length} tracks\n${rootTravel(raw)}${stripRoot ? ' (root XZ stripped)' : ' (root travel kept)'}`);
+  setStatus(`${modelSel.value} — ${name}\nduration ${clip.duration.toFixed(2)} s, ${clip.tracks.length} tracks\n${rootTravel(clip)}${stripRoot ? ' (root XZ stripped)' : ' (root travel kept)'}`);
 }
 modelSel.addEventListener('change', () => loadModel(modelSel.value));
 animSel.addEventListener('change', () => playAnim(animSel.value));
