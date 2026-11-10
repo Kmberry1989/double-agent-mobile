@@ -46,6 +46,12 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+// Human characters stand 5 cm off the floor (feet less likely to clip
+// into / sink below it). Added to every human character's standing Y:
+// player spawn, guest spawn, guest idle bob (cats are NOT lifted —
+// they sit/lie on the floor).
+const CHAR_LIFT = 0.05;
 const gltfLoader = new GLTFLoader();
 // Draco decoder: most GLBs in this repo are Draco-compressed (white_lambo, weapons, ballroom props, cats).
 // Without this, GLTFLoader throws 'No DRACOLoader instance provided' and the model silently fails to load.
@@ -269,7 +275,7 @@ function playCharClip(char, key) {
   act.reset().fadeIn(0.15).play(); char._cur = act;
 }
 // ---- Player (Rochelle_undercover, Mixamo — no weapon is ever attached) ----
-const player = new THREE.Group(); player.position.set(0, 0, 8); scene.add(player);
+const player = new THREE.Group(); player.position.set(0, CHAR_LIFT, 8); scene.add(player);
 let playerModel = null, mixer = null;
 const fbxLoader = new FBXLoader();
 // Player Rochelle is now Mixamo (Rochelle_undercover_textured.glb), so
@@ -341,7 +347,7 @@ function makeGuest(npc) {
   body.position.y = 1.0; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), new THREE.MeshStandardMaterial({ color: npc.skin }));
   head.position.y = 1.92; g.add(head); npc.capsuleParts = [body, head];
-  g.position.set(npc.x, 0, npc.z); scene.add(g);
+  g.position.set(npc.x, CHAR_LIFT, npc.z); scene.add(g);
   npc.group = g; npc.phase = Math.random() * 6.28; npc.wp = 0; npc.pause = 0;
   return npc;
 }
@@ -1026,7 +1032,7 @@ function animate() {
         if (n.fedTimer <= 0) { fleeCat(n); continue; }
         continue;
       }
-      n.group.position.y = Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
+      n.group.position.y = (n.role === 'cat' ? 0 : CHAR_LIFT) + Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
       if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
       // Getting close to an unfed chase cat spooks it into running.
       if (n.role === 'cat' && n.chase && !n.fed && !n.fleeing && !(windowOpen && n === missionTarget()) && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }

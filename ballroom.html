@@ -45,6 +45,12 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+// Human characters stand 5 cm off the floor (feet less likely to clip
+// into / sink below it). Added to every human character's standing Y:
+// player spawn + teleport, guest spawn, guest idle bob (cats are NOT
+// lifted — they sit/lie on the floor).
+const CHAR_LIFT = 0.05;
 const gltfLoader = new GLTFLoader();
 // Draco decoder: most GLBs in this repo are Draco-compressed (white_lambo, weapons, ballroom props, cats).
 // Without this, GLTFLoader throws 'No DRACOLoader instance provided' and the model silently fails to load.
@@ -447,7 +453,7 @@ function playCharClip(char, key) {
 // Each character uses only its own skeleton's clips, never mixed.
 // Root XZ travel is stripped from the player clips (game code moves the
 // player), Y bob is kept, so walk stays in place under the player group.
-const player = new THREE.Group(); player.position.set(0, 0, 8); scene.add(player);
+const player = new THREE.Group(); player.position.set(0, CHAR_LIFT, 8); scene.add(player);
 let playerModel = null, mixer = null;
 const fbxLoader = new FBXLoader();
 const mxClips = {};
@@ -627,7 +633,7 @@ function makeGuest(npc) {
   body.position.y = 1.0; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), new THREE.MeshStandardMaterial({ color: npc.skin }));
   head.position.y = 1.92; g.add(head); npc.capsuleParts = [body, head];
-  g.position.set(npc.x, 0, npc.z); scene.add(g);
+  g.position.set(npc.x, CHAR_LIFT, npc.z); scene.add(g);
   npc.group = g; npc.phase = Math.random() * 6.28; npc.wp = 0; npc.pause = 0;
   return npc;
 }
@@ -1313,7 +1319,7 @@ function animate() {
         if (n.fedTimer <= 0) { fleeCat(n); continue; }
         continue;
       }
-      n.group.position.y = Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
+      n.group.position.y = (n.role === 'cat' ? 0 : CHAR_LIFT) + Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
       if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
       // Getting close to an unfed chase cat spooks it into running.
       if (n.role === 'cat' && n.chase && !n.fed && !n.fleeing && !(windowOpen && n === missionTarget()) && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }
@@ -1543,7 +1549,7 @@ if (new URLSearchParams(location.search).has('test')) {
     get cameraAttached() { return cameraAttached; }, fireCameraFlash, get flashCount() { return flashCount; },
     get flashLightIntensity() { return slrFlashLight ? slrFlashLight.intensity : -1; },
     get cameraGroup() { return slrGroup; },
-    teleport: (x, z, y) => { player.position.set(x, 0, z); yaw = y; },
+    teleport: (x, z, y) => { player.position.set(x, CHAR_LIFT, z); yaw = y; },
     slrScreenPos: () => { if (!slrGroup) return null; const v = new THREE.Vector3(); slrGroup.getWorldPosition(v); v.project(camera); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; } };
 }
 

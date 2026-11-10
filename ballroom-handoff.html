@@ -46,6 +46,14 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+// Human characters stand 5 cm off the floor (feet less likely to clip
+// into / sink below it). Added to every human character's standing Y,
+// relative to whatever floor they are on: player spawn (drive, -1.5),
+// drive steps + door threshold, stair/balcony height, guest spawn,
+// guest idle bob, Donald's fall-flat spot, rendezvous dance. Cats are
+// NOT lifted — they sit/lie on the floor.
+const CHAR_LIFT = 0.05;
 const gltfLoader = new GLTFLoader();
 // Draco decoder: most GLBs in this repo are Draco-compressed (white_lambo, weapons, ballroom props, cats).
 // Without this, GLTFLoader throws 'No DRACOLoader instance provided' and the model silently fails to load.
@@ -540,7 +548,7 @@ function playCharClip(char, key) {
 // with root XZ travel stripped so walk stays in place under the player
 // group. After the rendezvous, the same clip set drives Rochelle, who is
 // also Mixamo-rigged (Rochelle_undercover_textured.glb, 41 bones).
-const player = new THREE.Group(); player.position.set(0, -1.5, 40); scene.add(player); // outside, on the round drive, facing the mansion
+const player = new THREE.Group(); player.position.set(0, -1.5 + CHAR_LIFT, 40); scene.add(player); // outside, on the round drive, facing the mansion
 let playerModel = null, mixer = null;
 const fbxLoader = new FBXLoader();
 const mxClips = {};
@@ -655,7 +663,7 @@ function makeGuest(npc) {
   body.position.y = 1.0; g.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), new THREE.MeshStandardMaterial({ color: npc.skin }));
   head.position.y = 1.92; g.add(head); npc.capsuleParts = [body, head];
-  g.position.set(npc.x, 0, npc.z); scene.add(g);
+  g.position.set(npc.x, CHAR_LIFT, npc.z); scene.add(g);
   npc.group = g; npc.phase = Math.random() * 6.28; npc.wp = 0; npc.pause = 0;
   return npc;
 }
@@ -1453,7 +1461,7 @@ function animate() {
     handoffCine.t += dt;
     if (handoffPhase === 'donald' && handoffCine.t >= handoffCine.dur) {
       // Donald beat done: he falls flat in the hall, camera pans back.
-      donald.falling = 3.5; donald.group.position.set(0, 0, 8);
+      donald.falling = 3.5; donald.group.position.set(0, CHAR_LIFT, 8);
       handoffPhase = 'discussion'; discussionIdx = 0; showDiscussionLine();
       handoffCine.fromPos = camera.position.clone(); handoffCine.fromLook = new THREE.Vector3(0, 1.2, 12.5);
       handoffCine.toPos = handoffPairCam; handoffCine.toLook = handoffMid.clone();
@@ -1491,15 +1499,15 @@ function animate() {
       if (Math.abs(player.position.x) > 1.5 && player.position.z < 15) player.position.z = 15;
       if (Math.abs(player.position.x) <= 2.5 && player.position.z >= 14 && player.position.z <= 20) {
         const stepIdx = Math.min(5, Math.floor((20 - player.position.z) / 1));
-        player.position.y = -1.5 + (stepIdx + 1) * 0.25;
-      } else if (player.position.z > 14) player.position.y = -1.5;
-      if (player.position.z < 14 && Math.abs(player.position.x) <= 1.5) { player.position.y = 0; if (missionStage === 'outside') { missionStage = 'handoff'; updateMissionHUD(); } }
+        player.position.y = -1.5 + (stepIdx + 1) * 0.25 + CHAR_LIFT;
+      } else if (player.position.z > 14) player.position.y = -1.5 + CHAR_LIFT;
+      if (player.position.z < 14 && Math.abs(player.position.x) <= 1.5) { player.position.y = CHAR_LIFT; if (missionStage === 'outside') { missionStage = 'handoff'; updateMissionHUD(); } }
     } else {
       player.position.x = Math.max(-HALL_X + 1, Math.min(HALL_X - 1, player.position.x));
       player.position.z = Math.max(-HALL_Z + 1, Math.min(HALL_Z - 1, player.position.z));
       // Spiral staircase + balcony (NE corner): height follows the helix while
       // on the stairs, stays 6 on the balcony, 0 on the ground floor.
-      player.position.y = stairBalconyY(player.position);
+      player.position.y = stairBalconyY(player.position) + CHAR_LIFT;
     }
     if (missionStage === 'outside' && player.position.z <= 13) { missionStage = 'handoff'; updateMissionHUD(); }
     for (const c of colliders) {
@@ -1602,7 +1610,7 @@ function animate() {
         if (n.fedTimer <= 0) { fleeCat(n); continue; }
         continue;
       }
-      n.group.position.y = Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
+      n.group.position.y = (n.role === 'cat' ? 0 : CHAR_LIFT) + Math.abs(Math.sin(t * 1.5 + n.phase)) * 0.03;
       if (n.pause > 0) { n.pause -= dt; n.moving = false; continue; }
       // Getting close to an unfed chase cat spooks it into running.
       if (n.role === 'cat' && n.chase && !n.fed && !n.fleeing && !(windowOpen && n === missionTarget()) && n.group.position.distanceTo(player.position) < 2.0) { fleeCat(n); continue; }
@@ -1643,8 +1651,8 @@ function animate() {
         if (mxClips['idle']) { playClip('idle'); playMxCharClip(rochelleNPC, 'idle'); }
       } else {
         const ang = (handoffDanceT - 1.2) * 0.35, r = 0.6;
-        player.position.set(handoffMid.x + Math.cos(ang) * r, 0, handoffMid.z + Math.sin(ang) * r);
-        rochelleNPC.group.position.set(handoffMid.x - Math.cos(ang) * r, 0, handoffMid.z - Math.sin(ang) * r);
+        player.position.set(handoffMid.x + Math.cos(ang) * r, CHAR_LIFT, handoffMid.z + Math.sin(ang) * r);
+        rochelleNPC.group.position.set(handoffMid.x - Math.cos(ang) * r, CHAR_LIFT, handoffMid.z - Math.sin(ang) * r);
         player.rotation.y = Math.atan2(rochelleNPC.group.position.x - player.position.x, rochelleNPC.group.position.z - player.position.z) - Math.PI;
         rochelleNPC.group.rotation.y = Math.atan2(player.position.x - rochelleNPC.group.position.x, player.position.z - rochelleNPC.group.position.z);
         if (mxClips['rumba']) { playClip('rumba'); playMxCharClip(rochelleNPC, 'rumba'); }

@@ -54,6 +54,14 @@ const texLoader = new THREE.TextureLoader();
 // the centre steps (x -1.5..1.5, z 6..7.5); the stage front face is a
 // wall everywhere else (enforced by the ground-height step check).
 const STAGE_TOP = 0.9;
+// Human characters stand 5 cm off the floor (feet less likely to clip
+// into / sink below it). Added to every human character's standing Y:
+// player spawn + ground follow, enemy rise + ground follow. The lift is
+// relative to the floor height groundHeight returns (stage 0.9, steps
+// 0.6/0.3, house 0), so characters stand 0.05 above the stage and 0.05
+// above the house floor. The tip-over fall only rotates/fades the inner
+// model, so it needs no change.
+const CHAR_LIFT = 0.05;
 function groundHeight(x, z) {
   if (z <= 6 && z >= -10 && Math.abs(x) <= 14) return STAGE_TOP;
   if (z > 6 && z <= 7.5 && Math.abs(x) <= 1.5) {
@@ -568,7 +576,7 @@ function convertClipForTripo(clip, model) {
 }
 
 // ---- Player (Rochelle_combat, Mixamo, dual katanas) ----
-const player = new THREE.Group(); player.position.set(0, STAGE_TOP, -8); scene.add(player);
+const player = new THREE.Group(); player.position.set(0, STAGE_TOP + CHAR_LIFT, -8); scene.add(player);
 let playerModel = null, mixer = null;
 const mxClips = {};
 function playMxCharClip(char, key) {
@@ -988,7 +996,7 @@ function updateOneEnemy(e, dt, t) {
     if (e.state === 'rising') {
       e.riseT += dt;
       const k = Math.min(e.riseT / 1.0, 1);
-      e.y = -0.6 + 0.6 * k;
+      e.y = -0.6 + 0.6 * k + CHAR_LIFT;
       if (e.is3D) {
         // Rise out of the seat, feet at e.y, facing the centre aisle (the
         // first step of the walk path), playing the idle.
@@ -1077,7 +1085,7 @@ function updateOneEnemy(e, dt, t) {
       e.mesh.position.x = e.x + Math.sin(t * 2 + e.sway) * 0.05;
       if (d > 1.6) e.state = 'chasing';
     }
-    e.y = groundHeight(e.x, e.z);
+    e.y = groundHeight(e.x, e.z) + CHAR_LIFT;
     if (e.is3D) {
       // The group sits on the ground (feet at e.y); its rotation.y is the
       // facing, set in the state branches above. Rotation.x stays 0.
@@ -1390,11 +1398,11 @@ function animate() {
     const newG = groundHeight(nx, nz);
     if (Math.abs(newG - curG) <= 0.45) {
       player.position.x = nx; player.position.z = nz;
-      player.position.y = newG;
+      player.position.y = newG + CHAR_LIFT;
     }
     player.position.x = Math.max(-13.5, Math.min(13.5, player.position.x));
     player.position.z = Math.max(-9.5, Math.min(29.5, player.position.z));
-    player.position.y = groundHeight(player.position.x, player.position.z);
+    player.position.y = groundHeight(player.position.x, player.position.z) + CHAR_LIFT;
     for (const c of colliders) {
       const ddx = player.position.x - c.x, ddz = player.position.z - c.z, d = Math.hypot(ddx, ddz);
       if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
