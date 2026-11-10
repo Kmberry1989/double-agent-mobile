@@ -10,7 +10,9 @@
   input, textarea { -webkit-user-select: text; user-select: text; }
   #app { position: fixed; inset: 0; }
   canvas { display: block; touch-action: none; }
-  #bar { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: rgba(0,0,0,0.72); align-items: center; z-index: 5; }
+  #bar { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 96px 8px 8px; background: rgba(0,0,0,0.72); align-items: center; z-index: 5; }
+  #uiToggle { position: fixed; top: 8px; right: 8px; z-index: 10; font-size: 13px; padding: 6px 10px; background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; }
+  body.ui-hidden #bar, body.ui-hidden #timeline { display: none; }
   #bar select, #bar button { font-size: 13px; padding: 6px 8px; background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; max-width: 180px; }
   #bar button.on { background: #2e7d32; border-color: #66bb6a; }
   #bar label { font-size: 12px; color: #bbb; }
@@ -78,6 +80,7 @@
   <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Animation time">
   <div id="status">Loading…</div>
 </div>
+<button id="uiToggle" type="button">Hide UI</button>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -1076,6 +1079,19 @@ document.getElementById('shootBtn').addEventListener('click', () => {
   loadModel('Kyle'); // weapon option values come from filenames, lowercase
 });
 document.getElementById('levelsBtn').addEventListener('click', () => { const p = document.getElementById('levelsPanel'); p.hidden = !p.hidden; });
+// Hide/show the whole overlay (top bar + bottom timeline) so the 3D view
+// is unobstructed. The toggle button lives outside #bar/#timeline, so it
+// stays visible while the panels are hidden. H key does the same (ignored
+// while typing in an input/select).
+const uiToggleBtn = document.getElementById('uiToggle');
+function setUIHidden(hidden) {
+  document.body.classList.toggle('ui-hidden', hidden);
+  uiToggleBtn.textContent = hidden ? 'Show UI' : 'Hide UI';
+}
+uiToggleBtn.addEventListener('click', () => setUIHidden(!document.body.classList.contains('ui-hidden')));
+window.addEventListener('keydown', (e) => {
+  if ((e.key === 'h' || e.key === 'H') && e.target && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) setUIHidden(!document.body.classList.contains('ui-hidden'));
+});
 document.getElementById('camBtn').addEventListener('click', e => {
   camMode = camMode === 'orbit' ? 'free' : 'orbit';
   e.target.textContent = 'Camera: ' + (camMode === 'orbit' ? 'Orbit' : 'Free look');
