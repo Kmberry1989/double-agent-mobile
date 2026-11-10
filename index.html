@@ -611,6 +611,154 @@ addGLBToObstacle(desk3, 'assets/props/desk_keyboard_monitor_pencup.glb', 1.6, 0.
 });
 const filing = box(8, -29, 0.8, 0.5, 1.2, 0x777777, undefined, { material: 'metal' });
 addGLBToObstacle(filing, 'assets/props/filing_cabinet.glb', 0.8, 1.2, 0.5);
+// ---------- Security office (2026-11-10, Kyle's 37 GLBs) ----------
+// A defined security office east of the office cluster, in the zone
+// x 10..18, z -31..-25, against the blue building's south face line.
+// The south side is open (entrance at x=14, z=-25, framed by a doorframe
+// with the security door swung open beside it); the east wall has a
+// second exit (doorframe at x=18, z=-28). The player walks in from the
+// courtyard, looks around, and leaves either way — this is not a sealed
+// room. Nothing here blocks the EXFIL (38,-38), the spawn (-38,38), or
+// any guard patrol (nearest waypoint is G4's (25,-30), 7 m east of the
+// east wall). All 37 GLBs are Kyle's uploads (assets/props/), measured
+// in three.js 0.160.0 — all ~1 m in their longest axis, 1 mesh / 1
+// material / 1 embedded image each, all with normals. The fit targets
+// below (targetW, targetH, targetD) come from those measurements.
+// Collision pieces use the box()+addGLBToObstacle() pattern (the box is
+// the gameplay mesh; it goes invisible when the GLB loads). Overhead and
+// floor pieces are visual-only (placeGLB) — they sit above head height
+// or flush on the floor and block nothing.
+function placeGLB(path, targetW, targetH, targetD, x, y, z, rotY){
+  gltfLoader.load(path, (gltf)=>{
+    const c = fitPropChild(gltf.scene, targetW, targetH, targetD); if (!c) return;
+    const g = new THREE.Group(); g.add(c); g.position.set(x, y, z); if (rotY) g.rotation.y = rotY; scene.add(g);
+  }, undefined, ()=>{});
+}
+// --- Walls (security-walls.glb, 0.992 x 0.793 x 0.801 raw) ---
+// Butt-jointed, no overlap: north wall x 10.4..17.6, west wall z -30.6..-25,
+// east wall split around the east exit (gap z -28.5..-27.5).
+const secWallN = box(14, -31, 7.2, 0.8, 2.2, 0x555555, undefined, { material: 'metal' });
+addGLBToObstacle(secWallN, 'assets/props/security-walls.glb', 1.8, 2.2, 0.8, [[-2.7, 0, 0, 0], [-0.9, 0, 0, 0], [0.9, 0, 0, 0], [2.7, 0, 0, 0]]);
+const secWallW = box(10, -27.8, 0.8, 5.6, 2.2, 0x555555, undefined, { material: 'metal' });
+addGLBToObstacle(secWallW, 'assets/props/security-walls.glb', 0.8, 2.2, 1.87, [[0, 0, -1.87, 0], [0, 0, 0, 0], [0, 0, 1.87, 0]]);
+const secWallEN = box(18, -29.55, 0.8, 2.1, 2.2, 0x555555, undefined, { material: 'metal' });
+addGLBToObstacle(secWallEN, 'assets/props/security-walls.glb', 0.8, 2.2, 1.05, [[0, 0, -0.525, 0], [0, 0, 0.525, 0]]);
+const secWallES = box(18, -26.25, 0.8, 2.5, 2.2, 0x555555, undefined, { material: 'metal' });
+addGLBToObstacle(secWallES, 'assets/props/security-walls.glb', 0.8, 2.2, 1.25, [[0, 0, -0.625, 0], [0, 0, 0.625, 0]]);
+// North wall cap (security-wall-panels.glb is a flat horizontal panel,
+// 1.001 x 0.023 x 0.317 raw — used here as a cap, not a vertical wall).
+placeGLB('assets/props/security-wall-panels.glb', 7.2, 0.05, 0.9, 14, 2.25, -31, 0);
+// Control panel on the north wall's interior face (dials-switches-wall.glb,
+// 0.708 x 1.001 x 0.2 raw). 5 cm proud of the wall face, no overlap.
+placeGLB('assets/props/dials-switches-wall.glb', 0.8, 1.1, 0.1, 16, 1.5, -30.5, 0);
+// Pipe run along the north wall's interior face (pipe.glb, 1 m long in Z;
+// rotated so the length runs along X). Overhead at y=2.0, visual-only.
+[11, 13, 15, 17].forEach((x)=>{
+  placeGLB('assets/props/pipe.glb', 0.1, 0.1, 2, x, 2.0, -30.5, Math.PI / 2);
+});
+// --- Entrances ---
+// South entrance: doorframe + the security door swung open beside it
+// (the entrance stays open — the player walks straight in).
+const secDoorFrameS = box(14, -25, 1.4, 0.2, 2.3, 0x444444, undefined, { material: 'metal' });
+addGLBToObstacle(secDoorFrameS, 'assets/props/metal-doorframe.glb', 1.4, 2.3, 0.15);
+const secDoorOpen = box(14.9, -25.5, 0.15, 0.9, 2.1, 0x444444, undefined, { material: 'metal' });
+addGLBToObstacle(secDoorOpen, 'assets/props/metal-security-door.glb', 0.9, 2.1, 0.15, [[0, 0, 0, Math.PI / 2]]);
+// East exit: doorframe only (open, no door) in the east wall gap.
+const secDoorFrameE = box(18, -28, 0.2, 1.0, 2.3, 0x444444, undefined, { material: 'metal' });
+addGLBToObstacle(secDoorFrameE, 'assets/props/metal-doorframe.glb', 1.0, 2.3, 0.15, [[0, 0, 0, Math.PI / 2]]);
+// Low brick walls flanking the south entrance (brick-industrial-hollow.glb,
+// 0.996 x 0.243 x 0.914 raw). Knee-high boundary markers, not a seal —
+// the player walks in through the doorway or around either end.
+const secBrickW = box(11.5, -25, 2, 0.25, 0.5, 0x8a7a5a, undefined, { texture: 'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp', texRepeat: [1, 1] });
+addGLBToObstacle(secBrickW, 'assets/props/brick-industrial-hollow.glb', 2, 0.5, 0.25);
+const secBrickE = box(16.5, -25, 2, 0.25, 0.5, 0x8a7a5a, undefined, { texture: 'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp', texRepeat: [1, 1] });
+addGLBToObstacle(secBrickE, 'assets/props/brick-industrial-hollow.glb', 2, 0.5, 0.25);
+// --- Security workstation ---
+// Security desk + surveillance monitors + chair + servers + radio +
+// mousepad + mouse + clipboard. The desk faces the same way as the
+// existing office desks (chair on the south side, facing north).
+const secDesk = box(12.5, -29, 1.6, 0.8, 0.75, 0x6a4a2a, undefined, { material: 'wood' });
+addGLBToObstacle(secDesk, 'assets/props/security-desk.glb', 1.6, 0.75, 0.8);
+// Surveillance monitors on the desk's back edge, facing the chair (south).
+// PHONE CHECK: the monitor bank's screen must face the chair — if it
+// faces the building instead, this needs rotY = Math.PI.
+gltfLoader.load('assets/props/surveillance-monitors-on.glb', (gltf)=>{
+  const c = fitPropChild(gltf.scene, 1.2, 0.7, 0.1); if (!c) return;
+  const g = new THREE.Group(); g.add(c); g.position.set(0, 0.725, -0.28); secDesk.mesh.add(g);
+}, undefined, ()=>{});
+const secChair = box(12.5, -27.5, 0.6, 0.6, 1.0, 0x333333, undefined, {});
+addGLBToObstacle(secChair, 'assets/props/office-chair.glb', 0.6, 1.0, 0.6, [[0, 0, 0, Math.PI]]);
+// Server rack: three server units stacked (servers.glb, 1.0 x 0.451 x
+// 0.174 raw), each fitted to one rack slot.
+const secServers = box(15, -29, 1.0, 0.6, 1.4, 0x333333, undefined, { material: 'metal' });
+addGLBToObstacle(secServers, 'assets/props/servers.glb', 1.0, 0.45, 0.5, [[0, -0.45, 0, 0], [0, 0, 0, 0], [0, 0.45, 0, 0]]);
+// Desk items sit on the security desk's top (local y = 0.375 is the top
+// surface; each item's centre is top + half its fitted height, same
+// pattern as the existing desk_keyboard / desk_mouse / desk_binders).
+gltfLoader.load('assets/props/security-radio.glb', (gltf)=>{
+  const c = fitPropChild(gltf.scene, 0.35, 0.25, 0.25); if (!c) return;
+  const g = new THREE.Group(); g.add(c); g.position.set(-0.55, 0.5, -0.15); secDesk.mesh.add(g);
+}, undefined, ()=>{});
+gltfLoader.load('assets/props/mousepad.glb', (gltf)=>{
+  const c = fitPropChild(gltf.scene, 0.45, 0.02, 0.3); if (!c) return;
+  const g = new THREE.Group(); g.add(c); g.position.set(0.45, 0.385, 0.15); secDesk.mesh.add(g);
+}, undefined, ()=>{});
+gltfLoader.load('assets/props/mouse-computer.glb', (gltf)=>{
+  const c = fitPropChild(gltf.scene, 0.08, 0.03, 0.12); if (!c) return;
+  const g = new THREE.Group(); g.add(c); g.position.set(0.45, 0.41, 0.15); secDesk.mesh.add(g);
+}, undefined, ()=>{});
+gltfLoader.load('assets/props/clipboard.glb', (gltf)=>{
+  const c = fitPropChild(gltf.scene, 0.25, 0.02, 0.35); if (!c) return;
+  const g = new THREE.Group(); g.add(c); g.position.set(-0.1, 0.385, 0.15); secDesk.mesh.add(g);
+}, undefined, ()=>{});
+// --- Vents ---
+// Real vent on the blue building's south face, beside the existing vent
+// grille panel at (0,1.5,-30.98) — the panel stays as the fallback.
+// (vent-wall.glb, 0.999 x 0.713 x 0.097 raw.)
+placeGLB('assets/props/vent-wall.glb', 1.2, 0.85, 0.1, -3, 1.5, -30.93, 0);
+// Duct run from the building face to above the security desk (vent-tunnel
+// .glb, 0.999 x 0.388 x 0.382 raw), four 1.8 m sections at y=2.8.
+// Overhead, visual-only — the duct bottom (2.575 m) is above head height.
+[6.5, 8.3, 10.1, 11.9].forEach((x)=>{
+  placeGLB('assets/props/vent-tunnel.glb', 1.8, 0.45, 0.45, x, 2.8, -29, 0);
+});
+// Ceiling vent hanging below the duct's east end, above the security desk
+// (vent-ceiling.glb, 0.997 x 0.077 x 0.995 raw). Its top sits just under
+// the duct bottom so it reads as connected.
+placeGLB('assets/props/vent-ceiling.glb', 1.2, 0.08, 1.2, 12.5, 2.55, -29, 0);
+// Beam under the duct (metal-structure.glb, 1.0 x 0.644 x 0.3 raw),
+// running north-south; its top (2.55 m) sits just under the duct bottom.
+placeGLB('assets/props/metal-structure.glb', 0.3, 0.3, 3, 12.5, 2.4, -29, 0);
+// Duct support post (metal-structures.glb, 0.522 x 1.001 x 0.735 raw),
+// ground to just under the duct bottom.
+const secPost = box(10.8, -29, 0.4, 0.4, 2.55, 0x555555, undefined, { material: 'metal' });
+addGLBToObstacle(secPost, 'assets/props/metal-structures.glb', 0.4, 2.55, 0.4);
+// Ceiling wires + mesh overhead in the office (visual-only).
+placeGLB('assets/props/ceiling-wires.glb', 3, 0.15, 0.15, 12.5, 2.9, -29, 0);
+placeGLB('assets/props/ceiling-mesh.glb', 2, 0.1, 0.3, 15, 2.9, -27, 0);
+// --- Cover (destructible crates, like the existing ones) ---
+const secCratesPallet = box(11, -30, 1.0, 1.0, 0.6, 0xa0824a, undefined, { destructible: true, hp: 150, material: 'wood', texture: 'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp', texRepeat: [1, 1] });
+addGLBToObstacle(secCratesPallet, 'assets/props/crates-on-pallet.glb', 1.0, 0.6, 1.0);
+const secCrateHollow = box(11, -26.5, 1.0, 1.0, 0.6, 0xa0824a, undefined, { destructible: true, hp: 150, material: 'wood', texture: 'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp', texRepeat: [1, 1] });
+addGLBToObstacle(secCrateHollow, 'assets/props/crate-hollow.glb', 1.0, 0.6, 1.0);
+const secCrateSolid = box(16.5, -26.5, 0.6, 0.6, 0.6, 0xa0824a, undefined, { destructible: true, hp: 150, material: 'wood', texture: 'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp', texRepeat: [1, 1] });
+addGLBToObstacle(secCrateSolid, 'assets/props/crate-solid.glb', 0.6, 0.6, 0.6);
+const secCrates = box(16.5, -30, 1.0, 1.0, 0.6, 0xa0824a, undefined, { destructible: true, hp: 150, material: 'wood', texture: 'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp', texRepeat: [1, 1] });
+addGLBToObstacle(secCrates, 'assets/props/crates.glb', 1.0, 0.6, 1.0);
+// --- Spare doors stored flat against the east wall's interior face ---
+// (heavy-door / metal-door / metal-door-simple, each ~0.5 x 1.0 x 0.1 raw).
+// Fitted wide-in-Z then rotated so the face points west into the office.
+[[17.5, -30, 'assets/props/heavy-door.glb'], [17.5, -29, 'assets/props/metal-door.glb'], [17.5, -26, 'assets/props/metal-door-simple.glb']].forEach(([x, z, path])=>{
+  const o = box(x, z, 0.15, 0.6, 2.0, 0x444444, undefined, { material: 'metal' });
+  addGLBToObstacle(o, path, 0.6, 2.0, 0.1, [[0, 0, 0, Math.PI / 2]]);
+});
+// --- Floor pieces (visual-only, flush on the ground, no collision) ---
+// Floor slab under the workstation (floor-white.glb, 0.999 x 0.229 x
+// 0.919 raw) and two pallets + a floor grate by the south entrance.
+placeGLB('assets/props/floor-white.glb', 3, 0.08, 2.5, 12.5, 0.04, -29, 0);
+placeGLB('assets/props/pallet.glb', 1.2, 0.08, 0.6, 12.5, 0.04, -26, 0);
+placeGLB('assets/props/pallets.glb', 1.2, 0.08, 0.5, 15.5, 0.04, -27, 0);
+placeGLB('assets/props/mesh.glb', 0.6, 0.05, 1.2, 14, 0.025, -25.5, 0);
 // Visual-only ground patches (no collision, no LOS, no shooting — see groundPatch).
 // They sit on open ground, clear of walls, crates, and buildings.
 groundPatch(0, 36, 40, 3, 0x8a7a5a, 'assets/textures/ground/ground_dirt_path_1024.webp', 10, 1);      // south dirt path
