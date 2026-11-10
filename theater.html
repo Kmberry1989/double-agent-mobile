@@ -121,6 +121,30 @@ const wallN = box(0, 5, -10.5, 30, 10, 1, 0x3a1a1a); applyTex(wallN, TEX + 'thea
 const wallS = box(0, 5, 30.5, 30, 10, 1, 0x3a1a1a); applyTex(wallS, TEX + 'theater_house_wallpaper_1024.webp', 8, 2);
 const wallW = box(-14.5, 5, 10, 1, 10, 42, 0x3a1a1a); applyTex(wallW, TEX + 'theater_house_wallpaper_1024.webp', 10, 2);
 const wallE = box(14.5, 5, 10, 1, 10, 42, 0x3a1a1a); applyTex(wallE, TEX + 'theater_house_wallpaper_1024.webp', 10, 2);
+const THEATER_WALLS = [wallN, wallS, wallE, wallW];
+// Camera occlusion: a wall between the camera and the player must not
+// render, or it blocks the view of the player (Kyle: don't render walls
+// behind the player while they block the camera view). Each frame, raycast
+// from the camera to the player's chest; any of the four house walls the
+// ray hits is hidden until the ray no longer hits it. Render-only: the
+// walls stay in the scene (collision and enemy logic untouched — nothing
+// here removes them from any list, and the raycaster intersects meshes
+// regardless of visibility).
+const camRay = new THREE.Raycaster();
+const _camDir = new THREE.Vector3();
+const _chest = new THREE.Vector3();
+function updateWallOcclusion() {
+  _chest.set(player.position.x, player.position.y + 1.6, player.position.z);
+  _camDir.copy(_chest).sub(camera.position);
+  const dist = _camDir.length();
+  if (dist < 0.01) { for (const w of THEATER_WALLS) w.visible = true; return; }
+  _camDir.normalize();
+  camRay.set(camera.position, _camDir);
+  camRay.far = dist;
+  const hits = camRay.intersectObjects(THEATER_WALLS, false);
+  const hit = new Set(hits.map(h => h.object));
+  for (const w of THEATER_WALLS) w.visible = !hit.has(w);
+}
 flatPlane(0, 10, 10, 28, 40, 0x2a3a3a, TEX + 'theater_ceiling_1024.webp', 6, 8, Math.PI / 2);
 // Sconces (glowing fixtures, no extra lights) on the house side walls.
 [[-13.9, 10], [-13.9, 18], [-13.9, 26], [13.9, 10], [13.9, 18], [13.9, 26]].forEach(([x, z]) => {
@@ -1385,7 +1409,9 @@ function animate() {
     const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
     camera.position.set(player.position.x + back.x * 5, player.position.y + 2.6, player.position.z + back.z * 5);
     camera.lookAt(player.position.x - back.x * 3, player.position.y + 1.6, player.position.z - back.z * 3);
+    updateWallOcclusion();
   } else {
+    for (const w of THEATER_WALLS) w.visible = true;
     camera.position.set(0, 2.5, 16);
     camera.lookAt(0, 2, 0);
   }
