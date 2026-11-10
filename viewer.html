@@ -399,33 +399,9 @@ function convertClipForTripo(clip, model) {
   while (node && node !== model) { chain.unshift(node); node = node.parent; }
   for (const n of chain) { q.multiply(n.quaternion); s.multiply(n.scale); }
   const qInv = q.clone().invert();
-  // Sideways-walk fix (2026-11-10, Kyle: "Theater enemies all walk
-  // sideways"): the Hips-only conversion above makes the body upright,
-  // but the leg bones still swing in the wrong plane. The Mixamo walk clip
-  // swings the legs about the model's forward axis, so the feet step
-  // sideways (Z, ~0.94 m) instead of forward (X, ~0.05 m). Conjugating
-  // each leg bone's quaternion by a 90-degree Y rotation (q' = R * q *
-  // R^-1) rotates the swing axis from forward to lateral, so the feet
-  // stride forward (~0.86-0.97 m) with only ~0.08-0.12 m of sideways
-  // drift. Verified by simulation (three 0.160.0) on the Walking clip;
-  // the idle clip is unaffected (feet move ~0.01 m either way). Leg bones:
-  // upleg, leg, foot, toebase, toe_end (either side).
-  const R_Y90 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-  const R_Y90_INV = R_Y90.clone().invert();
-  const isLegBone = (bone) => bone.indexOf('upleg') >= 0 || bone.indexOf('leg') >= 0 || bone.indexOf('foot') >= 0 || bone.indexOf('toebase') >= 0 || bone.indexOf('toe_end') >= 0;
   const tracks = clip.tracks.map((t) => {
     const nt = t.clone();
     const bone = t.name.split('.')[0].toLowerCase();
-    if (t.name.endsWith('.quaternion') && isLegBone(bone)) {
-      const qq = new THREE.Quaternion();
-      for (let i = 0; i + 3 < nt.values.length; i += 4) {
-        qq.set(nt.values[i], nt.values[i + 1], nt.values[i + 2], nt.values[i + 3]);
-        qq.premultiply(R_Y90);
-        const tmp = qq.clone().multiply(R_Y90_INV);
-        nt.values[i] = tmp.x; nt.values[i + 1] = tmp.y; nt.values[i + 2] = tmp.z; nt.values[i + 3] = tmp.w;
-      }
-      return nt;
-    }
     if (bone.indexOf('hips') < 0) return nt;
     if (t.name.endsWith('.position')) {
       const v = new THREE.Vector3();

@@ -544,33 +544,9 @@ function convertClipForTripo(clip, model) {
   while (node && node !== model) { chain.unshift(node); node = node.parent; }
   for (const n of chain) { q.multiply(n.quaternion); s.multiply(n.scale); }
   const qInv = q.clone().invert();
-  // Sideways-walk fix (2026-11-10, Kyle: "Theater enemies all walk
-  // sideways"): the Hips-only conversion above makes the body upright,
-  // but the leg bones still swing in the wrong plane. The Mixamo walk clip
-  // swings the legs about the model's forward axis, so the feet step
-  // sideways (Z, ~0.94 m) instead of forward (X, ~0.05 m). Conjugating
-  // each leg bone's quaternion by a 90-degree Y rotation (q' = R * q *
-  // R^-1) rotates the swing axis from forward to lateral, so the feet
-  // stride forward (~0.86-0.97 m) with only ~0.08-0.12 m of sideways
-  // drift. Verified by simulation (three 0.160.0) on the Walking clip;
-  // the idle clip is unaffected (feet move ~0.01 m either way). Leg bones:
-  // upleg, leg, foot, toebase, toe_end (either side).
-  const R_Y90 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-  const R_Y90_INV = R_Y90.clone().invert();
-  const isLegBone = (bone) => bone.indexOf('upleg') >= 0 || bone.indexOf('leg') >= 0 || bone.indexOf('foot') >= 0 || bone.indexOf('toebase') >= 0 || bone.indexOf('toe_end') >= 0;
   const tracks = clip.tracks.map((t) => {
     const nt = t.clone();
     const bone = t.name.split('.')[0].toLowerCase();
-    if (t.name.endsWith('.quaternion') && isLegBone(bone)) {
-      const qq = new THREE.Quaternion();
-      for (let i = 0; i + 3 < nt.values.length; i += 4) {
-        qq.set(nt.values[i], nt.values[i + 1], nt.values[i + 2], nt.values[i + 3]);
-        qq.premultiply(R_Y90);
-        const tmp = qq.clone().multiply(R_Y90_INV);
-        nt.values[i] = tmp.x; nt.values[i + 1] = tmp.y; nt.values[i + 2] = tmp.z; nt.values[i + 3] = tmp.w;
-      }
-      return nt;
-    }
     if (bone.indexOf('hips') < 0) return nt;
     if (t.name.endsWith('.position')) {
       const v = new THREE.Vector3();
@@ -933,16 +909,17 @@ function spawnNextEnemy() {
   if (!next) return;
   next.state = 'rising'; next.riseT = 0; next.mesh.visible = true;
 }
-// 3D masked enemies face local +X in three.js — measured in Blender from
-// the toe bones (forward = Blender +X, which maps to three.js +X) and
-// confirmed by the shoulder axis (Blender +Y, i.e. three.js -Z) and the
-// chest/face protrusion. To face a world movement direction (dx, dz),
-// rotate Y by atan2(-dz, dx). (A +Z-forward model would use atan2(dx, dz);
-// these Tripo models are +X-forward, so the turn is different.)
+// 3D masked enemies face local +Z in three.js. (The toe bones and the
+// Hips' local Z axis misleadingly suggested +X, but the live browser
+// check on 5e5ca91 proved +Z: with the old atan2(-dz, dx) turn, all three
+// watched enemies walked the aisle in left profile, faces pointing
+// stage-left (+X) while traveling toward the stage (-Z) — a 90-degree
+// facing error. A +Z-forward model turns by atan2(dx, dz).) To face a
+// world movement direction (dx, dz), rotate Y by atan2(dx, dz).
 function faceEnemy3D(e, dx, dz) {
   const d = Math.hypot(dx, dz);
   if (d < 0.01) return;
-  e.mesh.rotation.y = Math.atan2(-dz, dx);
+  e.mesh.rotation.y = Math.atan2(dx, dz);
 }
 function playEnemyAnim(e, key) {
   if (!e.is3D || !e.mixer || !mxClips[key] || !e.model) return;
@@ -1028,15 +1005,15 @@ function updateOneEnemy(e, dt, t) {
       const k = Math.min(e.fallT / 0.6, 1);
       if (e.is3D) {
         // Tip the whole character forward (face-plant) and fade its
-        // materials. The tip is rotation.z on the inner model — the model
-        // faces local +X, so the Z axis is its left-right axis and a
-        // rotation about Z tips it forward/backward in the facing plane.
+        // materials. The tip is rotation.x on the inner model — the model
+        // faces local +Z, so the X axis is its left-right axis and a
+        // rotation about X tips it forward/backward in the facing plane.
         // (The outer group's rotation.y carries the facing, so the tip
         // does not fight it.) Guarded: if the GLB has not loaded yet,
         // there is no model to tip or fade, but the state machine still
         // advances and the enemy is counted as defeated.
         if (e.model) {
-          e.model.rotation.z = -Math.PI / 2 * k;
+          e.model.rotation.x = Math.PI / 2 * k;
           e.model.traverse((o) => {
             if (!o.isMesh) return;
             const mats = Array.isArray(o.material) ? o.material : [o.material];
