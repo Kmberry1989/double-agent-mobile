@@ -748,17 +748,19 @@ fbxLoader.load('assets/characters/Rochelle_combat.fbx', (obj) => {
 // in the repo, unreferenced; woman2/woman3 were never delivered. If Kyle
 // sends 3D models for woman1/woman2/woman3/woman6, swap them into slots
 // 0/2/3/4 so all 8 are distinct.)
-// Fencing swords, measured in Blender from the GLB (blade along local Y,
-// node origin at the geometry centre — NOT at the grip, unlike the
-// katana's original file). Sword 1 (silver): guard (widest X, 0.265 m)
-// at Y +0.27, pommel at Y +0.49 — blade points -Y (tip at Y -0.50),
-// grip centre Y +0.38. Sword 2 (gold): guard (widest X, 0.338 m) at
-// Y -0.20, pommel at Y -0.50 — blade points +Y (tip at Y +0.50), grip
-// centre Y -0.35. The two files are mirrored in Y, so the blade sign
+// Fencing swords, measured in three.js from the GLB geometry
+// (2026-11-10 re-measure — the 83a9f09 comment had the axis wrong: the
+// blade runs along local Z, NOT local Y; the Y span is only ~0.12 m).
+// Node origin at the geometry centre — NOT at the grip, unlike the
+// katana's original file. Sword 1 (silver): guard (widest X, 0.266 m)
+// at Z -0.25, pommel at Z -0.50 — blade points +Z (tip at Z +0.50),
+// grip centre Z -0.38. Sword 2 (gold): guard (widest X, 0.338 m) at
+// Z +0.20, pommel at Z +0.50 — blade points -Z (tip at Z -0.50), grip
+// centre Z +0.35. The two files are mirrored in Z, so the blade sign
 // and grip offset are per-file, not shared.
 const ENEMY_SWORDS = {
-  'assets/theater/enemies/fencing_sword_1.glb': { gripY: 0.38, bladeSign: -1 },
-  'assets/theater/enemies/fencing_sword_2.glb': { gripY: -0.35, bladeSign: 1 },
+  'assets/theater/enemies/fencing_sword_1.glb': { gripZ: -0.38, bladeSign: 1 },
+  'assets/theater/enemies/fencing_sword_2.glb': { gripZ: 0.35, bladeSign: -1 },
 };
 const ENEMY_ROSTER = [
   { model: 'assets/theater/enemies/masquerade_man_black.glb', is3D: true, sword: 'assets/theater/enemies/fencing_sword_1.glb' },
@@ -782,7 +784,7 @@ const enemies = [];
 // Same hand-attach pattern as the katana on Rochelle: align the weapon's
 // axes to the hand's measured finger/dorsal axes, then position the pivot
 // so the grip centre lands on the palm. Differences from the katana:
-// the sword's blade runs along local Y (not Z) and its guard is the
+// the sword's blade runs along local Z (not Y) and its guard is the
 // wide-X part, so the weapon basis is e1 = blade direction (toward the
 // tip, per-file sign), e2 = guard wide axis (X), e3 = cross(e1, e2);
 // and the grip offset is measured in world space (not a hand-local baked
@@ -807,7 +809,7 @@ function attachEnemySword(enemy, swordFile) {
       enemy.model.updateMatrixWorld(true);
       pivot.updateMatrixWorld(true);
       const axesH = measureHandAxes(enemy.model, 'R') || { finger: FINGER_DIR, dorsal: DORSAL_DIR };
-      const e1 = new THREE.Vector3(0, spec.bladeSign, 0);
+      const e1 = new THREE.Vector3(0, 0, spec.bladeSign);
       const e2 = new THREE.Vector3(1, 0, 0);
       const e3 = new THREE.Vector3().crossVectors(e1, e2).normalize();
       const f1 = axesH.finger.clone(), f2 = axesH.dorsal.clone();
@@ -823,7 +825,7 @@ function attachEnemySword(enemy, swordFile) {
       // Put the grip centre on the palm, in world space (scale-agnostic):
       // measure where the grip centre is now, then move the pivot so it
       // lands on the hand.
-      const gripWorld = pivot.localToWorld(new THREE.Vector3(0, spec.gripY, 0));
+      const gripWorld = pivot.localToWorld(new THREE.Vector3(0, 0, spec.gripZ));
       const handWorld = new THREE.Vector3();
       hand.getWorldPosition(handWorld);
       const pivotWorld = pivot.getWorldPosition(new THREE.Vector3());
