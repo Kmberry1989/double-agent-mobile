@@ -192,6 +192,13 @@ addTrim(11.85, 0.15, 0.14, 0xe8ddc8, 0.01); // upper crown molding, cream, just 
 box(11, 6.1, -13.95, 12, 0.2, 0.08, 0x3a2410); // north balcony, x 5..17, against the north wall
 box(0, 6.1, 13.95, 12, 0.2, 0.08, 0x3a2410); // south balcony, x -6..6, against the south wall
 box(19.95, 6.1, 0, 0.08, 0.2, 27.8, 0x3a2410); // east walkway, z -13.9..13.9, against the east wall
+// Balcony trim: baseboard-height trim along the balcony floor edges where
+// the balcony meets the upper walls (north balcony north edge, south
+// balcony south edge, east walkway east edge). Proud of the upper wall
+// faces by 0.01, same dark wood as the baseboard.
+box(11, 6.1, -13.95, 12, 0.2, 0.08, 0x3a2410); // north balcony, x 5..17, against the north wall
+box(0, 6.1, 13.95, 12, 0.2, 0.08, 0x3a2410); // south balcony, x -6..6, against the south wall
+box(19.95, 6.1, 0, 0.08, 0.2, 27.8, 0x3a2410); // east walkway, z -13.9..13.9, against the east wall
 // ---- Interior windows + curtain rods (night ball, ported from ballroom.html, 2026-11-11) ----
 // Tall white-framed windows on the interior walls, night sky behind the
 // glass (it is a nighttime ball and the walls are solid). Dark-brass rods
@@ -287,8 +294,12 @@ addWindow(19.96, -7, -Math.PI / 2); addWindow(19.96, 0, -Math.PI / 2); addWindow
     applyTex(cp, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
   });
 }
-// Carpet runner (entrance to dance floor) and a rug in front of the bar.
-flatPlane(0, 0.03, 7.5, 2.5, 11, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4);
+// Continuous carpet (2026-11-11): one red-gold runner the full length of
+// the room, south entrance door (z=13) to north exit door (z=-13), 2.5 m
+// wide at y=0.03 (above the dance floor at y=0.02, no z-fight), plus a
+// branch runner east to the bar rug so the bar rug joins the main run.
+flatPlane(0, 0.03, 0, 2.5, 26, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 9);
+flatPlane(6.125, 0.03, 6, 9.75, 2.5, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 4, 1);
 flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom/ballroom_rug_medallion_large_1024.webp', 1, 1);
 // Spiral staircase + second-story balcony, NE corner (2026-11-06, walkable).
 // Helix: 15 steps, one full turn, 0.4 m rise per step, floor (y=0) to balcony
@@ -328,11 +339,11 @@ applyTex(balcN, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_bro
 // centre column guards the east side of the stairwell.
 box(10.25, 7.0, -10.5, 10.5, 0.08, 0.08, 0x3a2a18); // south rail, x 5-15.5
 box(16.75, 7.0, -10.5, 0.5, 0.08, 0.08, 0x3a2a18); // south rail stub, x 16.5-17
-box(5, 7.0, -12.25, 0.08, 0.08, 3.5, 0x3a2a18); // west rail, z -14..-10.5
+box(5, 7.0, -11.25, 0.08, 0.08, 1.5, 0x3a2a18); // west rail, z -12..-10.5 (bedroom 1 west wall covers z -14..-12)
 // North strip east rail removed (2026-11-06): this edge is now the open step from the north balcony onto the east walkway.
 for (let x = 5.75; x <= 14.75; x += 1.5) box(x, 6.5, -10.5, 0.08, 1, 0.08, 0x3a2a18);
 box(17, 6.5, -10.5, 0.08, 1, 0.08, 0x3a2a18);
-for (let z = -13.25; z <= -11.75; z += 1.5) box(5, 6.5, z, 0.08, 1, 0.08, 0x3a2a18);
+box(5, 6.5, -11.75, 0.08, 1, 0.08, 0x3a2a18); // west rail post (the z=-13.25 post is inside bedroom 1)
 // Second-floor balcony above the entrance + walkways (2026-11-06).
 // South balcony: x -6..6, z 10.5..13.9, centred over the double doors, so the
 // player can stand above the entrance and look down into the ballroom.
@@ -350,19 +361,80 @@ applyTex(walkE, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_bro
 // the south balcony's east rail (z 12.5..13.9), where the south strip walks
 // onto it. The east walkway's west rail has gaps at both ends: the north
 // strip (where he steps on from the north balcony) and the south strip.
-box(0, 7.0, 10.5, 12, 0.08, 0.08, 0x3a2a18); // south balcony north rail, x -6..6
-box(-6, 7.0, 12.2, 0.08, 0.08, 3.4, 0x3a2a18); // south balcony west rail, z 10.5..13.9
+box(2, 7.0, 10.5, 8, 0.08, 0.08, 0x3a2a18); // south balcony north rail, x -2..6 (bathroom north wall covers x -6..-2)
+// South balcony west rail removed (2026-11-11): the bathroom west wall (x=-6) is that edge now.
 box(6, 7.0, 11.5, 0.08, 0.08, 2.0, 0x3a2a18); // south balcony east rail, z 10.5..12.5 (gap z 12.5..13.9 is the opening)
 box(11.5, 7.0, 12.5, 11, 0.08, 0.08, 0x3a2a18); // south strip north rail, x 6..17
 box(17, 7.0, 0, 0.08, 0.08, 25, 0x3a2a18); // east walkway west rail, z -12.5..12.5
-for (let x = -5.25; x <= 5.25; x += 1.5) box(x, 6.5, 10.5, 0.08, 1, 0.08, 0x3a2a18);
-for (let z = 11.25; z <= 12.75; z += 1.5) box(-6, 6.5, z, 0.08, 1, 0.08, 0x3a2a18);
+for (let x = -0.75; x <= 5.25; x += 1.5) box(x, 6.5, 10.5, 0.08, 1, 0.08, 0x3a2a18);
+// South balcony west rail posts removed (2026-11-11): inside the bathroom west wall (x=-6).
 box(6, 6.5, 11.25, 0.08, 1, 0.08, 0x3a2a18);
 for (let x = 6.75; x <= 16.25; x += 1.5) box(x, 6.5, 12.5, 0.08, 1, 0.08, 0x3a2a18);
 for (let z = -11.75; z <= 11.75; z += 1.5) box(17, 6.5, z, 0.08, 1, 0.08, 0x3a2a18);
+// Second-story bedrooms + bathroom (2026-11-11): the second story is
+// bedrooms + balcony + bathroom, not just open walkways. Two bedrooms
+// along the north side (split from the north balcony footprint) and one
+// bathroom on the south side (west part of the south balcony). Walls are
+// the same damask wallpaper as the hall, with dark-wood baseboard trim.
+// The rooms sit on the existing balcony floors (balcW / balcS), so no new
+// floor boxes are needed; the BALC / BALC2 walkable check already holds
+// the player at y=6 inside them. Doors are swung open flat against the
+// wall inside each room, so the doorways stay clear. No furniture —
+// no bed/tub GLB exists in assets/props/.
+const ROOM_TEX = 'assets/textures/ballroom/ballroom_wall_damask_burgundy_gold_1024.webp';
+const ROOM_DOOR_TEX = 'assets/textures/ballroom/ballroom_door_double_mahogany_1024.webp';
+// --- Bedroom 1 (west): x 5..11, z -14..-12. Door on its south wall at x 7.4..8.6.
+const b1sA = box(6.2, 9, -12, 2.4, 6, 0.2, 0x5a2f22); applyTex(b1sA, ROOM_TEX, 1, 2);
+const b1sB = box(9.8, 9, -12, 2.4, 6, 0.2, 0x5a2f22); applyTex(b1sB, ROOM_TEX, 1, 2);
+const b1sL = box(8, 10.05, -12, 1.2, 3.9, 0.2, 0x5a2f22); applyTex(b1sL, ROOM_TEX, 1, 2); // lintel over the door (opening y 6..8.1)
+const b1w = box(5, 9, -13, 0.2, 6, 2, 0x5a2f22); applyTex(b1w, ROOM_TEX, 1, 2); // west wall (the balcony west rail now only covers z -12..-10.5)
+// --- Bedroom 2 (east): x 11..15, z -14..-12. Door on its south wall at x 13.4..14.6.
+const b2sA = box(12.2, 9, -12, 2.4, 6, 0.2, 0x5a2f22); applyTex(b2sA, ROOM_TEX, 1, 2);
+const b2sB = box(14.8, 9, -12, 0.4, 6, 0.2, 0x5a2f22); applyTex(b2sB, ROOM_TEX, 1, 2);
+const b2sL = box(14, 10.05, -12, 1.2, 3.9, 0.2, 0x5a2f22); applyTex(b2sL, ROOM_TEX, 1, 2); // lintel over the door (opening y 6..8.1)
+const b2e = box(15, 9, -13, 0.2, 6, 2, 0x5a2f22); applyTex(b2e, ROOM_TEX, 1, 2); // east wall (landing x 15..17 stays open for the stairs)
+// Partition wall between the bedrooms (x=11, z -14..-12).
+const bPart = box(11, 9, -13, 0.2, 6, 2, 0x5a2f22); applyTex(bPart, ROOM_TEX, 1, 2);
+// --- Bathroom (south, west part): x -6..-2, z 10.5..13.9. Door on its east wall at z 11.6..12.8.
+const baN = box(-4, 9, 10.5, 4, 6, 0.2, 0x5a2f22); applyTex(baN, ROOM_TEX, 1, 2); // north wall (replaces the north rail for x -6..-2)
+const baW = box(-6, 9, 12.2, 0.2, 6, 3.4, 0x5a2f22); applyTex(baW, ROOM_TEX, 1, 2); // west wall (replaces the west rail)
+const baEA = box(-2, 9, 11.05, 0.2, 6, 1.1, 0x5a2f22); applyTex(baEA, ROOM_TEX, 1, 2); // east wall, north of the door
+const baEB = box(-2, 9, 13.35, 0.2, 6, 1.1, 0x5a2f22); applyTex(baEB, ROOM_TEX, 1, 2); // east wall, south of the door
+const baEL = box(-2, 10.05, 12.2, 0.2, 3.9, 1.2, 0x5a2f22); applyTex(baEL, ROOM_TEX, 1, 2); // lintel over the door (opening y 6..8.1)
+// Room baseboards (dark wood, 0.2 tall, 0.01 proud of the wall face it
+// fronts): along the circulation side of the bedroom south walls and the
+// open-balcony side of the bathroom east wall, split around the doorways.
+box(6.2, 6.1, -11.85, 2.4, 0.2, 0.08, 0x3a2410);
+box(9.8, 6.1, -11.85, 2.4, 0.2, 0.08, 0x3a2410);
+box(12.2, 6.1, -11.85, 2.4, 0.2, 0.08, 0x3a2410);
+box(14.8, 6.1, -11.85, 0.4, 0.2, 0.08, 0x3a2410);
+box(-1.85, 6.1, 11.05, 0.08, 0.2, 1.1, 0x3a2410);
+box(-1.85, 6.1, 13.35, 0.08, 0.2, 1.1, 0x3a2410);
+// Room doors, swung open flat against the wall inside each room so the
+// doorways stay clear. Hinge at the west jamb (bedrooms) / north jamb
+// (bathroom); panel 1.2 m wide x 2.1 m tall, mahogany.
+function roomDoor(hx, hz, rotY) {
+  const g = new THREE.Group(); g.position.set(hx, 6, hz); g.rotation.y = rotY; scene.add(g);
+  const p = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.1, 0.08), new THREE.MeshStandardMaterial({ color: 0x3a2a18 }));
+  p.position.set(0.6, 1.05, 0); g.add(p); applyTex(p, ROOM_DOOR_TEX, 1, 1);
+  return g;
+}
+roomDoor(7.4, -12.15, Math.PI); // bedroom 1, flat against its south wall inside the room
+roomDoor(13.4, -12.15, Math.PI); // bedroom 2, flat against its south wall inside the room
+roomDoor(-2.15, 11.6, -Math.PI / 2); // bathroom, flat against its east wall inside the room
 // Exit door (north) + entrance (south): one single double-door texture.
 const exitDoor = box(0, 1.5, -HALL_Z + 0.1, 3, 3, 0.3, 0x2e7d32);
 applyTex(exitDoor, 'assets/textures/ballroom/ballroom_door_double_mahogany_1024.webp', 1, 1);
+// Side doors (2026-11-11, visual only): matching double doors on the east
+// and west walls, in the gaps between the windows. Same 3x3 m size and
+// mahogany texture as the north/south doors; they do not open. West door
+// at z=-3.5 sits between the west windows at z=-7 and z=0; east door at
+// z=3.5 sits between the east windows at z=0 and z=11, clear of the bar
+// (bar spans x 15.5..19.5, z 5.1..6.9; the door spans z 2..5).
+const westDoor = box(-19.9, 1.5, -3.5, 3, 3, 0.3, 0x3a2a18); westDoor.rotation.y = Math.PI / 2;
+applyTex(westDoor, 'assets/textures/ballroom/ballroom_door_double_mahogany_1024.webp', 1, 1);
+const eastDoor = box(19.9, 1.5, 3.5, 3, 3, 0.3, 0x3a2a18); eastDoor.rotation.y = -Math.PI / 2;
+applyTex(eastDoor, 'assets/textures/ballroom/ballroom_door_double_mahogany_1024.webp', 1, 1);
 // Double doors are built in the exterior block below (auto-open on approach).
 // Chandeliers: 6 now (3 north + 3 south, so the entrance side is no longer
 // dark), brighter — point lights 30 -> 80, distance 22 -> 30. Real
@@ -370,14 +442,14 @@ applyTex(exitDoor, 'assets/textures/ballroom/ballroom_door_double_mahogany_1024.
 const CHANDELIERS = [[-10, -4], [0, -1], [10, -4], [-10, 8], [0, 10], [10, 8]];
 const chandelierProc = [];
 CHANDELIERS.forEach(([x, z]) => {
-  const s = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.2 }));
-  s.position.set(x, 5.2, z); scene.add(s); chandelierProc.push(s);
-  const l = new THREE.PointLight(0xffc94d, 80, 30); l.position.set(x, 4.8, z); scene.add(l);
+  const s = new THREE.Mesh(new THREE.SphereGeometry(1.05, 16, 12), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.2 }));
+  s.position.set(x, 4.85, z); scene.add(s); chandelierProc.push(s);
+  const l = new THREE.PointLight(0xffc94d, 80, 30); l.position.set(x, 4.45, z); scene.add(l);
 });
 gltfLoader.load('assets/props/ballroom_chandelier.glb', (gltf)=>{
   CHANDELIERS.forEach(([x, z])=>{
-    const g = fitPropGroup(gltf.scene.clone(), 1.1, 1.4, 1.1); if (!g) return;
-    g.position.set(x, 5.2, z); scene.add(g); applyTexToGroup(g, 'assets/textures/ballroom/ballroom_chandelier_crystal_glass_1024.webp');
+    const g = fitPropGroup(gltf.scene.clone(), 1.65, 2.1, 1.65); if (!g) return;
+    g.position.set(x, 4.85, z); scene.add(g); applyTexToGroup(g, 'assets/textures/ballroom/ballroom_chandelier_crystal_glass_1024.webp');
   });
   chandelierProc.forEach((m)=>{ m.visible = false; });
 }, undefined, ()=>{});
@@ -431,14 +503,27 @@ colliders.push({ x: 17.5, z: 6, r: 2.6, y: 0 }); // bar, ground floor only
 // balcony railings (yMin) only block up on the balcony, never the climber below.
 colliders.push({ x: STAIR_C.x, z: STAIR_C.z, r: 0.7 });
 [5.75, 7.25, 8.75, 10.25, 11.75, 13.25, 14.75, 17].forEach((x)=>colliders.push({ x, z: -10.5, r: 0.8, yMin: 5.5 })); // south railing (gap x 15.5-16.5 is the stair arrival)
-[[-13.25], [-11.75]].forEach(([z])=>colliders.push({ x: 5, z, r: 0.8, yMin: 5.5 })); // west railing
+colliders.push({ x: 5, z: -11.75, r: 0.8, yMin: 5.5 }); // west railing (the z=-13.25 post is inside bedroom 1)
 // (north strip east railing removed 2026-11-06: that edge is the open step onto the east walkway)
 // South balcony + walkway railings (2026-11-06): y-gated like the north balcony.
-[-5.25, -3.75, -2.25, -0.75, 0.75, 2.25, 3.75, 5.25].forEach((x)=>colliders.push({ x, z: 10.5, r: 0.8, yMin: 5.5 })); // south balcony north railing
-[11.25, 12.75].forEach((z)=>colliders.push({ x: -6, z, r: 0.8, yMin: 5.5 })); // south balcony west railing
+[-0.75, 0.75, 2.25, 3.75, 5.25].forEach((x)=>colliders.push({ x, z: 10.5, r: 0.8, yMin: 5.5 })); // south balcony north railing (bathroom north wall covers x -6..-2)
+// South balcony west railing removed (2026-11-11): the bathroom west wall (x=-6) is that edge now.
 colliders.push({ x: 6, z: 11.25, r: 0.8, yMin: 5.5 }); // south balcony east railing (opening z 12.5..13.9 has none)
 [6.75, 8.25, 9.75, 11.25, 12.75, 14.25, 15.75].forEach((x)=>colliders.push({ x, z: 12.5, r: 0.8, yMin: 5.5 })); // south strip north railing
 for (let z = -11.75; z <= 11.75; z += 1.5) colliders.push({ x: 17, z, r: 0.8, yMin: 5.5 }); // east walkway west railing
+// Bedroom + bathroom wall colliders (2026-11-11): circles along each wall
+// segment, r=0.8, placed so the door gaps stay open (the doorway itself
+// has no collider). y-gated to the second story.
+[5.6, 6.6].forEach((x)=>colliders.push({ x, z: -12, r: 0.8, yMin: 5.5 })); // bedroom 1 south wall, west of its door
+[9.4, 10.6].forEach((x)=>colliders.push({ x, z: -12, r: 0.8, yMin: 5.5 })); // bedroom 1 south wall, east of its door
+[-13.4, -12.4].forEach((z)=>colliders.push({ x: 5, z, r: 0.8, yMin: 5.5 })); // bedroom 1 west wall
+[11.6, 12.6].forEach((x)=>colliders.push({ x, z: -12, r: 0.8, yMin: 5.5 })); // bedroom 2 south wall, west of its door (east stub covered by the east-wall collider)
+[-13.4, -12.4].forEach((z)=>colliders.push({ x: 15, z, r: 0.8, yMin: 5.5 })); // bedroom 2 east wall
+[-13.4, -12.4].forEach((z)=>colliders.push({ x: 11, z, r: 0.8, yMin: 5.5 })); // partition wall between the bedrooms
+[-5.4, -4.2, -3.0].forEach((x)=>colliders.push({ x, z: 10.5, r: 0.8, yMin: 5.5 })); // bathroom north wall
+[11.1, 12.3, 13.5].forEach((z)=>colliders.push({ x: -6, z, r: 0.8, yMin: 5.5 })); // bathroom west wall
+colliders.push({ x: -2, z: 10.9, r: 0.8, yMin: 5.5 }); // bathroom east wall, north of its door
+colliders.push({ x: -2, z: 13.5, r: 0.8, yMin: 5.5 }); // bathroom east wall, south of its door
 // ---- Exterior: mansion drive, round drive, bushes, steps, double doors (2026-11-04) ----
 // Kyle's mission starts outside. Ground is 1.5 m below the ballroom floor,
 // so a 6-step flight climbs from the drive to the double doors.
@@ -1644,10 +1729,10 @@ function animate() {
     }
     if (missionStage === 'outside' && player.position.z <= 13) { missionStage = 'handoff'; updateMissionHUD(); }
     for (const c of colliders) {
-      // y-gated colliders: ground furniture (y:0) only blocks near the floor,
-      // balcony railings (yMin:5.5) only block up on the balcony.
-      if (c.y !== undefined && Math.abs(player.position.y - c.y) > 2) continue;
-      if (c.yMin !== undefined && player.position.y < c.yMin) continue;
+      // y-gated colliders: ground furniture (y:0) only blocks on the ground floor,
+      // balcony railings / room walls (yMin:5.5) only block up on the balcony.
+      if (c.y !== undefined && player.position.y - CHAR_LIFT !== c.y) continue;
+      if (c.yMin !== undefined && player.position.y - CHAR_LIFT < c.yMin) continue;
       const ddx = player.position.x - c.x, ddz = player.position.z - c.z, d = Math.hypot(ddx, ddz);
       if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
     }
