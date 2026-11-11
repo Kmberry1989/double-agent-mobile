@@ -117,6 +117,16 @@ Shopping mall hostage situation during Christmas shopping season, with C4 bombs.
 - C4 defusal mechanic — system, not a model: defuse interaction (hold to defuse, wire cut, or sequence — Kyle to pick) and a mission timer for the bomb detonation countdown
 - Mall ambience and bomb audio — Christmas music faint in the background, crowd murmur, storefront sounds, C4 timer beeps, defusal success chime, defusal fail alarm
 
+## 9. Ballroom second story — bedrooms + bathroom furniture (new, 2026-11-11)
+The second story (commit f6212c1) has two bedrooms and a bathroom, unfurnished — no bed or tub GLB exists in the repo. Furniture for those rooms:
+- Double beds (2) — two double beds with bedding, pillows, and a headboard, one per bedroom (each bedroom about 6 m wide by 3.5 m deep)
+- Nightstands + bedside lamps — bedside tables with a small lamp on each, beside the beds
+- Dresser + wardrobe — a dresser with drawers and a wardrobe for clothes storage, for the bedrooms
+- Bathtub — a bathtub for the bathroom (about 4 m by 3.4 m)
+- Bathroom vanity + mirror — a vanity with a sink and a mirror above it
+- Toilet — a toilet for the bathroom
+- Towel rack + towels — a towel rack with folded and hanging towels, for the bathroom wall
+
 ## 6. Obtained but unwired — awaiting your pick, NOT missing
 Do not re-request these. They are verified on disk and ready to wire on your tap:
 - Dance: Samba, Twist, YMCA, Macarena, Hokey Pokey, Dancing (needs root strip)
