@@ -512,7 +512,7 @@ box(0,-42,90,2,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_c
 box(-20,-18,14,2,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(18,-12,2,16,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/props/prop_sandbag_wall_hessian_1024.webp',texRepeat:[5,1]});
 box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/props/prop_sandbag_wall_sagging_spill_1024.webp',texRepeat:[5,1]}); box(-28,24,2,12,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(8,-26,18,2,3,0x777777,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[4,1]});
 box(-14,0,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(-10,2,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(12,6,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]});
-box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/raw/painted-metal-blue.jpg',texRepeat:[2,1]});
+box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/walls/wall_metal_flat_blue_painted_1024.webp',texRepeat:[2,1]});
 box(-32,8,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/raw/painted-metal-red.jpg',texRepeat:[2,1]}); box(34,28,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/raw/painted-metal-olive.jpg',texRepeat:[2,1]});
 // SILENT START: a walled alcove in the southwest corner. The player spawns here,
 // alone — no guard patrol waypoint and no security camera is within 30 m of it.
@@ -1003,9 +1003,9 @@ function wallPipe(x, y, z, h, texPath){
   return m;
 }
 // Blue building south face (z=-31): 2 AC units + a vertical pipe.
-acUnit(-3, 2.5, -30.9, 0, 'assets/textures/raw/painted-metal-blue.jpg');
-acUnit(3, 2.5, -30.9, 0, 'assets/textures/raw/painted-metal-blue.jpg');
-wallPipe(6, 2, -30.9, 4, 'assets/textures/raw/painted-metal-blue.jpg');
+acUnit(-3, 2.5, -30.9, 0, 'assets/textures/walls/wall_metal_flat_blue_painted_1024.webp');
+acUnit(3, 2.5, -30.9, 0, 'assets/textures/walls/wall_metal_flat_blue_painted_1024.webp');
+wallPipe(6, 2, -30.9, 4, 'assets/textures/walls/wall_metal_flat_blue_painted_1024.webp');
 // Red building east face (x=-28): 1 AC unit + a vertical pipe.
 acUnit(-27.9, 2.5, 8, Math.PI / 2, 'assets/textures/raw/painted-metal-red.jpg');
 wallPipe(-27.9, 2, 12, 4, 'assets/textures/raw/painted-metal-red.jpg');
@@ -1541,7 +1541,7 @@ function damageDestructible(o, dmg, point, normal){
 // can never leave it, and it is in no gameplay list — it blocks no movement,
 // shooting, or guard vision. Clouds are 8 shared-material sprites with a
 // canvas-generated soft-puff texture (no external assets, no per-frame
-// texture regeneration). Rain is 1000 line segments in a box around the
+// texture regeneration). Rain is 250 line segments in a box around the
 // player (capped for phones; ~1000 trivial JS ops + one small buffer upload
 // per frame, far below 0.1 ms). Storm adds lightning: a brief whole-scene
 // flash (sky shader + lights + background/fog) at random 6–18 s intervals,
@@ -1604,11 +1604,11 @@ for (let i = 0; i < 8; i++){
   sp.position.set(-140 + Math.random() * 280, 45 + Math.random() * 45, -140 + Math.random() * 280);
   skyGroup.add(sp); clouds.push(sp);
 }
-// Rain: 1000 short line segments in a 60x30x60 box. Reused every frame;
+// Rain: 250 short line segments in a 60x30x60 box. Reused every frame;
 // the group is re-centred on the player, so rain always falls around you.
 // Fall speed / slant come from the active weather preset (Storm falls
 // faster and slants harder than plain Rain).
-const RAIN_COUNT = 1000;
+const RAIN_COUNT = 250;
 let rainFallSpeed = 30, rainSlant = 2;
 const rainPos = new Float32Array(RAIN_COUNT * 6);
 const rainDrops = [];
@@ -1629,15 +1629,15 @@ function updateRain(dt){
   }
   rainGeo.attributes.position.needsUpdate = true;
 }
+// Courtyard weather is rain-only (Kyle, 2026-11-11): just Rain and
+// Storm. Clear/Cloudy/Fog were removed — the Y key and the WX button
+// cycle Rain <-> Storm only, and Storm stays the default.
 const WEATHERS = {
-  Clear:  { fogColor: 0x87a5a0, fogNear: 60, fogFar: 140, top: 0x2f6fc0, horizon: 0xd9e8e6, sunI: 1.0,  hemi: 0.9,  sun: 1.2, cloudOp: 0.75, cloudTint: 0xffffff, rain: false, rainSpeed: 30, rainSlant: 2, wet: false },
-  Cloudy: { fogColor: 0x9aa5a8, fogNear: 45, fogFar: 110, top: 0x5a7a94, horizon: 0xc8cfcf, sunI: 0.25, hemi: 0.7,  sun: 0.7, cloudOp: 1.0,  cloudTint: 0xd0d5d8, rain: false, rainSpeed: 30, rainSlant: 2, wet: false },
   Rain:   { fogColor: 0x6f7d82, fogNear: 30, fogFar: 85,  top: 0x3d4f5e, horizon: 0x8a9499, sunI: 0.05, hemi: 0.55, sun: 0.4, cloudOp: 1.0,  cloudTint: 0x8f979c, rain: true,  rainSpeed: 30, rainSlant: 2, wet: false },
   Storm:  { fogColor: 0x4a5458, fogNear: 22, fogFar: 90,  top: 0x1e2a33, horizon: 0x5a6468, sunI: 0.0,  hemi: 0.5,  sun: 0.3, cloudOp: 1.0,  cloudTint: 0x565e63, rain: true,  rainSpeed: 42, rainSlant: 5, wet: true },
-  Fog:    { fogColor: 0xb8c0bd, fogNear: 8,  fogFar: 45,  top: 0x9aa8a6, horizon: 0xcdd2cd, sunI: 0.1,  hemi: 0.65, sun: 0.5, cloudOp: 0.35, cloudTint: 0xe8ecea, rain: false, rainSpeed: 30, rainSlant: 2, wet: false }
 };
-const WEATHER_ORDER = ['Clear', 'Cloudy', 'Rain', 'Storm', 'Fog'];
-let weather = 'Clear';
+const WEATHER_ORDER = ['Rain', 'Storm'];
+let weather = 'Storm';
 // Rain/thunder audio state (procedural Web Audio, no files). rainWanted is
 // set by setWeather from the preset's rain flag; rainNodes holds the
 // running rain loop. audioReady flips true once the AudioContext exists —
