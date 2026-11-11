@@ -646,6 +646,28 @@ function playMxCharClipOnce(char, key) {
     if (key !== 'atkQuick' && key !== 'atkQuickL') mxClips[key + 'L'] = mirrorClip(base);
   }, undefined, () => {});
 });
+// Acrobatic finishers (Kyle's 2026-11-11 uploads) — the meter special
+// cycles through these. All full 65-bone Mixamo, metre-scale, so they
+// load with stripRootTravel like the sword clips, and each gets a
+// mirrored twin. Low_Crawl is in the repo + viewer but NOT wired here
+// (in place, prone — no theater use; it could serve a future courtyard
+// prone/crawl mechanic). The uploaded Jumping is a genuinely different
+// take from the repo's Jumping (longer, with a spin/dive), so it lives
+// as Jumping_Spin and the repo file is untouched.
+[['butterflyTwirl', 'Butterfly_Twirl.fbx'],
+ ['flipKickFront', 'Flip_Kick_Front.fbx'],
+ ['flyingThrow', 'Flying_Shoulder_Throw.fbx'],
+ ['flipKick', 'Flip_Kick.fbx'],
+ ['invertedDoubleKick', 'Inverted_Double_Kick_To_Kip_Up.fbx'],
+ ['jumpingSpin', 'Jumping_Spin.fbx']].forEach(([key, file]) => {
+  fbxLoader.load('assets/animations/' + file, (obj) => {
+    const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+    if (!raw) return;
+    const base = stripRootTravel(raw);
+    mxClips[key] = base;
+    mxClips[key + 'L'] = mirrorClip(base);
+  }, undefined, () => {});
+});
 function playClip(key) { if (!player.mixer) return; playMxCharClip(player, key); mixer = player.mixer; }
 
 // Katana attach — the viewer.html grip logic (per-hand baked offsets).
@@ -1419,15 +1441,20 @@ function updateDash(dt) {
     onConnect(hitCheck(3.2, 0.6));
   }
 }
-// The special: the three-slash Advancing Combo, sweeping wide (3.5 m,
-// ~145 deg arc) so it hits every enemy in front of her. It auto-fires
-// when the meter fills; its kills advance the combo but do not refill
-// the meter (regular hits charge the special; the special does not
-// charge itself).
+// The special: a big finisher, cycling through the three-slash
+// Advancing Combo and the six acrobatic finishers (each with its
+// mirrored twin), so it never repeats the same move twice in a row.
+// Whichever finisher plays, the hit is the same wide sweep (3.5 m,
+// ~145 deg arc) hitting every enemy in front of her. Its kills advance
+// the combo but do not refill the meter (regular hits charge the
+// special; the special does not charge itself).
+const SPECIAL_CYCLE = ['atkCombo', 'atkComboL', 'butterflyTwirl', 'butterflyTwirlL', 'flipKickFront', 'flipKickFrontL', 'flyingThrow', 'flyingThrowL', 'flipKick', 'flipKickL', 'invertedDoubleKick', 'invertedDoubleKickL', 'jumpingSpin', 'jumpingSpinL'];
+let specialCount = 0;
 function fireSpecial() {
   specialQueued = false;
   startSlowMo(1.2, SLOWMO_SCALE); // the big combo opens in slow motion
-  const key = 'atkCombo';
+  const key = SPECIAL_CYCLE[specialCount % SPECIAL_CYCLE.length];
+  specialCount++;
   if (mxClips[key]) { playMxCharClipOnce(player, key); slashTimer = mxClips[key].duration; slashCooldown = mxClips[key].duration; }
   else slashCooldown = 1.2;
   const kills = hitCheck(SPECIAL_RANGE, 0.3);
