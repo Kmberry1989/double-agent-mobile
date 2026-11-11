@@ -97,6 +97,26 @@ Textures obtained, unwired (files exist, not referenced in any page — do not r
 - Cat tail flick — not separately labeled in the 30 pooled cat actions, so it is kept below as a still-missing clip unless it is already inside an idle/sit clip.
 - Opening_Door_Inwards clip exists in the courtyard animation manifest; an interior door system is still missing.
 
+## 7. Halloween mission — Trick or Treat (new, from the story plan 2026-11-11)
+Neighborhood outdoor mission on Halloween night. Terrorists disguised in costumes blend in with trick-or-treaters. Kyle in costume must identify them by their tells and stop them without harming kids or civilians.
+- Neighborhood street and houses — residential street with houses, porches, sidewalks, front yards, driveways, lit windows and porch lights, sized for a player on foot among trick-or-treaters
+- Jack-o'-lanterns and Halloween decorations — carved jack-o'-lanterns with lit faces, cobwebs, plastic skeletons, tombstones, porch decorations
+- Trick-or-treater NPCs in costumes (Mixamo) — kids and adults in a ghost, witch, vampire, superhero, and pumpkin costume, each carrying a candy bag, wandering door to door
+- Terrorists disguised in costumes (Mixamo) — five terrorists in different Halloween costumes, no candy bag, moving with purpose, avoiding porch lights, distinct from the trick-or-treater NPCs
+- Candy bags and treat buckets — paper bags, plastic pumpkins, buckets for trick-or-treating, carried by trick-or-treaters
+- Halloween night ambience — distant trick-or-treater chatter, porch doors, crickets, light wind
+- Tag / confirm mechanic — system, not a model: observe a suspect, spot the tell, tag to confirm, then act. Tagging a civilian or a kid is a failure.
+
+## 8. Christmas mall mission — The Mall (new, from the story plan 2026-11-11)
+Shopping mall hostage situation during Christmas shopping season, with C4 bombs. Defuse the bombs and rescue the hostages before the timer runs out.
+- Shopping mall interior — large multi-store mall with a central atrium, storefronts, a food court, escalators, a big decorated Christmas tree, Christmas lights and garlands, sized for a player on foot among shoppers
+- Christmas tree and mall decorations — large decorated Christmas tree with lights and ornaments, garlands, wreaths, hanging lights, for a mall atrium
+- Shopper and hostage NPCs (Mixamo) — shoppers in winter clothes carrying shopping bags, and hostages held in place with hands up
+- Mall terrorists (Mixamo) — terrorists in dark clothing with weapons, guarding bombs and hostages
+- C4 bombs — models already exist as real GLBs in the repo (see section 5). Do not regenerate. Wire the existing C4 into the mall mission with a timer display.
+- C4 defusal mechanic — system, not a model: defuse interaction (hold to defuse, wire cut, or sequence — Kyle to pick) and a mission timer for the bomb detonation countdown
+- Mall ambience and bomb audio — Christmas music faint in the background, crowd murmur, storefront sounds, C4 timer beeps, defusal success chime, defusal fail alarm
+
 ## 6. Obtained but unwired — awaiting your pick, NOT missing
 Do not re-request these. They are verified on disk and ready to wire on your tap:
 - Dance: Samba, Twist, YMCA, Macarena, Hokey Pokey, Dancing (needs root strip)
