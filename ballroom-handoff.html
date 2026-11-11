@@ -1001,16 +1001,16 @@ function buildCatClipLibraries() {
 function loadCatGLB(cat) {
   gltfLoader.load('assets/cats/' + cat.name + '.glb', (gltf) => {
     const obj = gltf.scene;
-    fitCharacter(obj, 0.22);
+    fitCharacter(obj, 0.198);
     cat.group.add(obj); cat.model = obj;
     cat.mixer = new THREE.AnimationMixer(obj); cat._curCatClip = null;
     cat.group.children.forEach((child) => {
       if (child.isMesh && child.geometry.type !== 'TorusGeometry' && !(child.material && child.material.emissiveIntensity === 1.4)) child.visible = false;
     });
-    // Shrink the procedural collar/tag to match the 0.22 m GLB cat (they were sized for the 0.5 m procedural cat).
+    // Shrink the procedural collar/tag to match the 0.198 m GLB cat (they were sized for the 0.5 m procedural cat).
     cat.group.children.forEach((child) => {
-      if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.44); child.position.set(0, 0.15, 0.14); }
-      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.44); child.position.set(0, 0.10, 0.21); }
+      if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.396); child.position.set(0, 0.135, 0.126); }
+      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.396); child.position.set(0, 0.09, 0.189); }
     });
     const src = {};
     (gltf.animations || []).forEach((clip) => {
