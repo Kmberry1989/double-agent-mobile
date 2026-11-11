@@ -14,17 +14,16 @@ Checked against the mobile repo on 2026-11-05. Items already in the repo and wir
 - Ballroom waltz: user-supplied mono AAC, wired as looping background music, volume by zone — loudest inside the ballroom (0.7), faint outside (0.12), fading through the doors/steps (commit 7c27935)
 - South road: asphalt road south from the round drive to z 75, beyond the player limit (z 45), lawn extended to cover it; two procedural placeholder cars (red sedan west curb, blue car on the south road) — real car GLBs still wanted
 - Bushes: now clustered faceted lobes (3 shapes) with the lawn grass/clover texture, still procedural — real bush GLB still wanted
+- Ballroom second-story furniture (2026-11-11 intake): double beds x2, nightstands + lamps, dresser + wardrobe, bathtub, vanity + mirror, toilet, towel rack + towels — WIRED into the bedrooms/bathroom in all three ballroom pages
 
 ## 1. Mansion exterior — real models to replace today's procedural build
 Today's exterior (handoff page) is procedural: round drive, bushes, mansion wings, columns, portico, and 6 steps are geometry, not supplied models. Bushes are now clustered faceted lobes, not single spheres, and the south drive has a road off it — both still procedural.
 - Bush / hedge GLB — rounded mansion-style bushes, to replace the procedural clustered bushes around the drive, facade, and island
 - Mansion facade GLB — stone front, windows, and portico, to replace procedural wings and columns
 - Stone steps GLB — a flight of steps, to replace the 6 procedural step boxes
-- Other vehicles — real car GLBs, to replace the two procedural placeholder cars (red sedan, blue car on the south road)
 - North yard and road — no yard or road exists outside the north exit yet. Needed for the end cinematic escape, separate from the south drive and its road
 
 ## 2. End cinematic
-- Boarding and drive-off animation set — cats and agents getting onto / into the vehicle and driving off. Vehicle model itself is NOT missing (White Lambo is in the repo).
 - Open decision, not an asset: the Lambo is parked curbside in the south drive, the escape exit is the north door. Whether the escape uses the south Lambo, a north vehicle, or the Lambo moves north is still open.
 - Cat tail flick clip — not separately labeled in the pooled cat actions (see 5a).
 
@@ -34,14 +33,10 @@ Characters, Mixamo rigs only (per the Mixamo-for-everyone direction):
 - Band trio models — Mixamo piano player, drummer, and bass player
 
 Props:
-- Grand piano — black, lid open, keys, bench
 - Drum kit — small jazz kit: kick, snare, hi-hat, ride cymbal
 - Double bass — upright, with bow
-- Cake table — round, white cloth, tiered cake, knife, plates
 
 Bar props:
-- Wine glasses, whiskey tumblers, cocktail and champagne glasses
-- Bar bottles — wine, whiskey, liquor, champagne, no readable brand text
 - Bar stools, back bar shelving and mirror, pendant lights over the bar
 - Cocktail shaker, ice bucket and bar tools, wine rack and decanter
 - Bar mats, coasters, napkins, garnish tray and extra glassware
@@ -100,9 +95,7 @@ Textures obtained, unwired (files exist, not referenced in any page — do not r
 ## 7. Halloween mission — Trick or Treat (new, from the story plan 2026-11-11)
 Neighborhood outdoor mission on Halloween night. Terrorists disguised in costumes blend in with trick-or-treaters. Kyle in costume must identify them by their tells and stop them without harming kids or civilians.
 - Neighborhood street and houses — residential street with houses, porches, sidewalks, front yards, driveways, lit windows and porch lights, sized for a player on foot among trick-or-treaters
-- Jack-o'-lanterns and Halloween decorations — carved jack-o'-lanterns with lit faces, cobwebs, plastic skeletons, tombstones, porch decorations
 - Trick-or-treater NPCs in costumes (Mixamo) — kids and adults in a ghost, witch, vampire, superhero, and pumpkin costume, each carrying a candy bag, wandering door to door
-- Terrorists disguised in costumes (Mixamo) — five terrorists in different Halloween costumes, no candy bag, moving with purpose, avoiding porch lights, distinct from the trick-or-treater NPCs
 - Candy bags and treat buckets — paper bags, plastic pumpkins, buckets for trick-or-treating, carried by trick-or-treaters
 - Halloween night ambience — distant trick-or-treater chatter, porch doors, crickets, light wind
 - Tag / confirm mechanic — system, not a model: observe a suspect, spot the tell, tag to confirm, then act. Tagging a civilian or a kid is a failure.
@@ -112,23 +105,20 @@ Shopping mall hostage situation during Christmas shopping season, with C4 bombs.
 - Shopping mall interior — large multi-store mall with a central atrium, storefronts, a food court, escalators, a big decorated Christmas tree, Christmas lights and garlands, sized for a player on foot among shoppers
 - Christmas tree and mall decorations — large decorated Christmas tree with lights and ornaments, garlands, wreaths, hanging lights, for a mall atrium
 - Shopper and hostage NPCs (Mixamo) — shoppers in winter clothes carrying shopping bags, and hostages held in place with hands up
-- Mall terrorists (Mixamo) — terrorists in dark clothing with weapons, guarding bombs and hostages
 - C4 bombs — models already exist as real GLBs in the repo (see section 5). Do not regenerate. Wire the existing C4 into the mall mission with a timer display.
 - C4 defusal mechanic — system, not a model: defuse interaction (hold to defuse, wire cut, or sequence — Kyle to pick) and a mission timer for the bomb detonation countdown
 - Mall ambience and bomb audio — Christmas music faint in the background, crowd murmur, storefront sounds, C4 timer beeps, defusal success chime, defusal fail alarm
-
-## 9. Ballroom second story — bedrooms + bathroom furniture (new, 2026-11-11)
-The second story (commit f6212c1) has two bedrooms and a bathroom, unfurnished — no bed or tub GLB exists in the repo. Furniture for those rooms:
-- Double beds (2) — two double beds with bedding, pillows, and a headboard, one per bedroom (each bedroom about 6 m wide by 3.5 m deep)
-- Nightstands + bedside lamps — bedside tables with a small lamp on each, beside the beds
-- Dresser + wardrobe — a dresser with drawers and a wardrobe for clothes storage, for the bedrooms
-- Bathtub — a bathtub for the bathroom (about 4 m by 3.4 m)
-- Bathroom vanity + mirror — a vanity with a sink and a mirror above it
-- Toilet — a toilet for the bathroom
-- Towel rack + towels — a towel rack with folded and hanging towels, for the bathroom wall
 
 ## 6. Obtained but unwired — awaiting your pick, NOT missing
 Do not re-request these. They are verified on disk and ready to wire on your tap:
 - Dance: Samba, Twist, YMCA, Macarena, Hokey Pokey, Dancing (needs root strip)
 - Drunk variants still unwired: Drunk Idle Variation (x2), Drunk Walk, Drunk Walk Backwards, Drunk Run Forward, Drunk Run Backward — Drunk_Idle, Drunk_Stumbling_Walking and Falling_Down are now wired for Donald, do not re-request those
 - Drinking, Bartending
+- Real cars (2026-11-11 intake): black sedan, dark sedan (x2), black SUV, black pickup truck — Draco GLBs in assets/props/, unwired
+- Boarding and drive-off clips (2026-11-11 intake): Driving, Entering Car, Exiting Car — FBX in assets/animations/, unwired
+- Grand piano + bench (2026-11-11 intake): grand_piano_black.glb, piano_bench_black.glb — Draco GLBs in assets/props/, unwired
+- Cake table (2026-11-11 intake): side_table_cake.glb — Draco GLB in assets/props/, unwired
+- Bar glassware and bottles (2026-11-11 intake): wine glasses row, bottles row, wine rack with bottles, mugs / steins rows — Draco GLBs in assets/props/, unwired
+- Halloween decorations (2026-11-11 intake): two jack-o'-lanterns (smiling + angry), sheet ghost, black cat, bare tree — Draco GLBs in assets/props/, unwired
+- Halloween terrorists, terror1-5 (2026-11-11 intake): FBX in assets/characters/ (terror5 arrived 2026-11-11, completing the set); terror5 also as Draco GLB in assets/theater/enemies/ — terror1-4 have no GLB yet
+- Mall terrorists / Christmas enemies (2026-11-11 intake): elf, lights, reindeer, santa, xmassweater — FBX in assets/characters/ + Draco GLB in assets/theater/enemies/, unwired (no mall mission page yet)
