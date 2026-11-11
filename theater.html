@@ -599,11 +599,26 @@ function playMxCharClipOnce(char, key) {
     if (raw) mxClips[key] = stripRootTravel(raw);
   }, undefined, () => {});
 });
-// Sword clips (Drive, fixed at load) + the formal bow clip (Drive, fixed).
-[['swordAttack', 'sword_attack.fbx'], ['swordCombo', 'sword_regular_combo.fbx'], ['bow', 'bow_1046932.fbx']].forEach(([key, file]) => {
+// Sword attacks — five new metre-scale clips (2026-11-11 intake), loaded
+// with stripRootTravel, NOT fixDriveClip: they are metres, and dividing
+// by 180 would collapse the Hips to ~7 mm. The old Drive clips
+// (sword_attack, sword_regular_combo) are retired from the theater; the
+// formal bow clip stays a Drive clip (fixDriveClip).
+[['bow', 'bow_1046932.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = fixDriveClip(raw);
+  }, undefined, () => {});
+});
+[['atkQuick', 'Sword And Shield Slash Quick.fbx'],
+ ['atkQuickL', 'Sword And Shield Slash Quick Left Hand.fbx'],
+ ['atkLunge', 'Sword And Sword Attack.fbx'],
+ ['atkRise', 'Sword And Shield Slash.fbx'],
+ ['atkChop', 'Sword And Shield Slash Advancing.fbx'],
+ ['atkCombo', 'Sword And Shield Slash Advancing Combo.fbx']].forEach(([key, file]) => {
+  fbxLoader.load('assets/animations/' + file, (obj) => {
+    const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+    if (raw) mxClips[key] = stripRootTravel(raw);
   }, undefined, () => {});
 });
 function playClip(key) { if (!player.mixer) return; playMxCharClip(player, key); mixer = player.mixer; }
@@ -1185,38 +1200,72 @@ function updateDestructibles(dt) {
   }
 }
 
-// ---- Slash (sword melee) ----
-let slashCooldown = 0, slashTimer = 0, slashAlt = false;
-function trySlash() {
+// ---- Sword attacks (five, 2026-11-11) ----
+// quick: fast tap — Quick Slash, alternates right/left hand per tap.
+// lunge: press and hold >= 0.5 s, release — Charged Lunge (double-arm,
+//   lunges 1.26 m, so it reaches 3.2 m). Early release falls back to quick.
+// rise: upward drag — Rising Slash (hand rises 0.4 m, returns).
+// chop: downward drag — Overhead Chop (hand peaks high, sweeps to the floor).
+// combo: double-tap — Advancing Combo, three slashes advancing ~1 m.
+const ATTACKS = {
+  quick: { clips: ['atkQuick', 'atkQuickL'], cooldown: 0.4, range: 2.4 },
+  lunge: { clips: ['atkLunge'], cooldown: 0.9, range: 3.2 },
+  rise: { clips: ['atkRise'], cooldown: 0.7, range: 2.4 },
+  chop: { clips: ['atkChop'], cooldown: 0.8, range: 2.4 },
+  combo: { clips: ['atkCombo'], cooldown: 1.2, range: 3.0 },
+};
+const HOLD_MS = 500, DOUBLE_TAP_MS = 350;
+let slashCooldown = 0, slashTimer = 0, quickAlt = false;
+let lastAttackType = '', lastAttackTime = 0;
+function doAttack(type) {
   if (!started || won || cine || bowPhase) return;
   if (slashCooldown > 0) return;
-  slashCooldown = 0.55;
-  slashAlt = !slashAlt;
-  const key = slashAlt ? 'swordCombo' : 'swordAttack';
+  const atk = ATTACKS[type];
+  if (!atk) return;
+  let key = atk.clips[0];
+  if (type === 'quick') { quickAlt = !quickAlt; key = quickAlt ? atk.clips[1] : atk.clips[0]; }
+  slashCooldown = atk.cooldown;
+  lastAttackType = type; lastAttackTime = performance.now();
   if (mxClips[key]) { playMxCharClipOnce(player, key); slashTimer = mxClips[key].duration; }
-  // Hit check: enemies and destructibles in front of Rochelle, within 2.4 m.
+  // Hit check: enemies and destructibles in front of Rochelle, within the
+  // attack's range (the lunge and combo reach further than a quick slash).
+  const range = atk.range;
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
-  const inFront = (x, z, range) => {
+  const inFront = (x, z) => {
     const dx = x - player.position.x, dz = z - player.position.z;
     const d = Math.hypot(dx, dz);
     if (d > range) return false;
     return (dx * fx + dz * fz) / (d || 1) > 0.6;
   };
   for (const e of enemies) {
-    if ((e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing') && inFront(e.x, e.z, 2.4)) defeatEnemy(e);
+    if ((e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing') && inFront(e.x, e.z)) defeatEnemy(e);
   }
-  for (const sb of sandbags) if (!sb.used && inFront(sb.x, sb.z, 2.4)) triggerSandbag(sb);
-  if (!chandelier.used && inFront(chandelier.cleat.x, chandelier.cleat.z, 2.4)) triggerChandelier();
-  for (const flat of setFlats) if (!flat.used && inFront(flat.x, flat.z, 2.4)) triggerSetFlat(flat);
+  for (const sb of sandbags) if (!sb.used && inFront(sb.x, sb.z)) triggerSandbag(sb);
+  if (!chandelier.used && inFront(chandelier.cleat.x, chandelier.cleat.z)) triggerChandelier();
+  for (const flat of setFlats) if (!flat.used && inFront(flat.x, flat.z)) triggerSetFlat(flat);
   if (!drapeState.used) {
     // Trigger anywhere along the drape's width: the closest point on the
     // drape segment (x -11.4..11.4, z=-5.8) to the player, not the centre.
     const dcx = Math.max(-DRAPE_HALF_W, Math.min(DRAPE_HALF_W, player.position.x));
-    if (inFront(dcx, drapeState.z, 2.4)) triggerDrape();
+    if (inFront(dcx, drapeState.z)) triggerDrape();
   }
-  if (!crates.used && inFront(crates.x, crates.z, 2.4)) triggerCrates();
-  for (const sp of [spotL, spotR]) if (!sp.used && inFront(sp.x, sp.z, 2.4)) triggerSpotlight(sp);
-  if (!footlightsState.used && inFront(footlightsState.x, footlightsState.z, 2.4)) triggerFootlights();
+  if (!crates.used && inFront(crates.x, crates.z)) triggerCrates();
+  for (const sp of [spotL, spotR]) if (!sp.used && inFront(sp.x, sp.z)) triggerSpotlight(sp);
+  if (!footlightsState.used && inFront(footlightsState.x, footlightsState.z)) triggerFootlights();
+}
+// trySlash = the default tap attack (quick slash). A second tap within
+// DOUBLE_TAP_MS of a quick slash upgrades it to the combo instead — the
+// check runs before the cooldown gate (the first tap's 0.4 s cooldown is
+// still running at 0.35 s), and the cooldown is cleared so the combo lands.
+function trySlash() {
+  if (!started || won || cine || bowPhase) return;
+  if (lastAttackType === 'quick' && performance.now() - lastAttackTime < DOUBLE_TAP_MS) {
+    slashCooldown = 0;
+    doAttack('combo');
+    lastAttackType = ''; // one combo per double-tap, no chaining
+    return;
+  }
+  doAttack('quick');
 }
 
 // ---- Game state / cinematic ----
@@ -1337,17 +1386,50 @@ document.getElementById('startBtn').onclick = () => {
   startCinematic();
   if (!isTouch) renderer.domElement.requestPointerLock();
 };
+// ---- Input: five attacks ----
+// Tap (click / Space / F / SLASH tap) = quick slash; a second tap within
+// 350 ms upgrades it to the combo (see trySlash). Hold >= 0.5 s and
+// release = charged lunge; release early = quick slash. A fast flick up
+// (mouse, pointer-locked) or swipe up (touch, on the scene) = rising
+// slash; flick / swipe down = overhead chop. Flicks and swipes also move
+// the view a little, the same as looking — that is the gesture.
+let holdStart = 0, holdKind = '';
+function holdBegin(kind) { if (holdStart) return; holdStart = performance.now(); holdKind = kind; }
+function holdEnd() {
+  if (!holdStart) return;
+  const held = performance.now() - holdStart;
+  holdStart = 0; holdKind = '';
+  if (held >= HOLD_MS) doAttack('lunge'); else trySlash();
+}
+function isAttackKey(e) { return e.key === ' ' || e.key.toLowerCase() === 'f'; }
 addEventListener('keydown', (e) => {
   keys[e.key.toLowerCase()] = true;
-  if ((e.key === ' ' || e.key.toLowerCase() === 'f') && started) { e.preventDefault(); trySlash(); }
+  if (isAttackKey(e) && started && !e.repeat) { e.preventDefault(); holdBegin('key'); }
 });
-addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+addEventListener('keyup', (e) => {
+  keys[e.key.toLowerCase()] = false;
+  if (isAttackKey(e) && holdKind === 'key') holdEnd();
+});
+let flickY = 0, flickT = 0;
 addEventListener('mousemove', (e) => {
-  if (document.pointerLockElement && started && !cine) { yaw -= e.movementX * 0.003; pitch = Math.max(-0.4, Math.min(0.5, pitch - e.movementY * 0.003)); }
+  if (document.pointerLockElement && started && !cine) {
+    yaw -= e.movementX * 0.003; pitch = Math.max(-0.4, Math.min(0.5, pitch - e.movementY * 0.003));
+    // Fast vertical flick: >= 120 px within 250 ms. Slow looking never
+    // accumulates that far — the window resets when it goes stale. Not
+    // while holding the mouse (that is a charge, not a flick).
+    if (!holdStart) {
+      const now = performance.now();
+      if (now - flickT > 250) { flickY = 0; flickT = now; }
+      flickY += e.movementY;
+      if (flickY <= -120) { flickY = 0; doAttack('rise'); }
+      else if (flickY >= 120) { flickY = 0; doAttack('chop'); }
+    }
+  }
 });
 renderer.domElement.addEventListener('mousedown', (e) => {
-  if (document.pointerLockElement && started && !cine && !won) trySlash();
+  if (document.pointerLockElement && started && !cine && !won) holdBegin('mouse');
 });
+addEventListener('mouseup', () => { if (holdKind === 'mouse') holdEnd(); });
 let joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
 const joy = document.getElementById('joy'), knob = document.getElementById('knob');
 joy.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; joyId = t.identifier; moveJoy(t); e.preventDefault(); }, { passive: false });
@@ -1359,9 +1441,10 @@ function moveJoy(t) {
   const m = Math.min(1, Math.hypot(dx, dy)) || 1; joyX = dx / Math.max(1, Math.hypot(dx, dy)) * m; joyY = dy / Math.max(1, Math.hypot(dx, dy)) * m;
   knob.style.left = (37 + joyX * 35) + 'px'; knob.style.top = (37 + joyY * 35) + 'px';
 }
+let lookStartX = 0, lookStartY = 0, lookStartT = 0;
 renderer.domElement.addEventListener('touchstart', (e) => {
   if (!started) return;
-  for (const t of e.changedTouches) { if (t.identifier !== joyId) { lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY; } }
+  for (const t of e.changedTouches) { if (t.identifier !== joyId) { lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY; lookStartX = t.clientX; lookStartY = t.clientY; lookStartT = performance.now(); } }
 }, { passive: true });
 renderer.domElement.addEventListener('touchmove', (e) => {
   for (const t of e.changedTouches) if (t.identifier === lookId) {
@@ -1369,8 +1452,22 @@ renderer.domElement.addEventListener('touchmove', (e) => {
     lastLX = t.clientX; lastLY = t.clientY;
   }
 }, { passive: true });
-renderer.domElement.addEventListener('touchend', (e) => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; });
-document.getElementById('slashBtn').addEventListener('touchstart', (e) => { e.preventDefault(); trySlash(); }, { passive: false });
+renderer.domElement.addEventListener('touchend', (e) => {
+  for (const t of e.changedTouches) if (t.identifier === lookId) {
+    // Fast, mostly-vertical swipe: >= 60 px in under 400 ms. Up = rising
+    // slash, down = overhead chop. (The same touch also moved the view
+    // while it travelled — that is the gesture.)
+    const dx = t.clientX - lookStartX, dy = t.clientY - lookStartY;
+    if (performance.now() - lookStartT < 400 && Math.abs(dy) >= 60 && Math.abs(dy) > Math.abs(dx) * 1.5) {
+      if (dy < 0) doAttack('rise'); else doAttack('chop');
+    }
+    lookId = null;
+  }
+});
+const slashBtn = document.getElementById('slashBtn');
+slashBtn.addEventListener('touchstart', (e) => { e.preventDefault(); holdBegin('btn'); }, { passive: false });
+slashBtn.addEventListener('touchend', (e) => { e.preventDefault(); if (holdKind === 'btn') holdEnd(); }, { passive: false });
+slashBtn.addEventListener('touchcancel', () => { holdStart = 0; holdKind = ''; });
 
 // ---- Loop ----
 function animate() {
