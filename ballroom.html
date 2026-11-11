@@ -880,7 +880,21 @@ function buildCatClipLibraries() {
 function loadCatGLB(cat) {
   gltfLoader.load('assets/cats/' + cat.name + '.glb', (gltf) => {
     const obj = gltf.scene;
-    fitCharacter(obj, 0.198);
+    // Fit from the BIND-POSE geometry bbox, NOT Box3.setFromObject:
+    // the cat GLB is a SkinnedMesh whose rest pose is folded, so
+    // setFromObject reads 0.059 m tall (not the true 0.25 m) and
+    // fitCharacter over-scales it 3.37x to ~0.84 m (hip-high on a
+    // guest). The geometry bbox is the true 0.25 m bind-pose height.
+    // (Measured in three 0.160.0, 2026-11-11: setFromObject 0.059 m,
+    // geometry bbox 0.250 m.) Collar/tag positions below assume this
+    // correct 0.198 m fit.
+    let gbb = new THREE.Box3();
+    obj.traverse((o) => { if (o.isMesh) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); gbb.union(o.geometry.boundingBox); } });
+    const gs = new THREE.Vector3(); gbb.getSize(gs);
+    const gc = new THREE.Vector3(); gbb.getCenter(gc);
+    const cs = 0.198 / gs.y;
+    obj.scale.setScalar(cs);
+    obj.position.set(-gc.x * cs, -gbb.min.y * cs, -gc.z * cs);
     cat.group.add(obj); cat.model = obj;
     cat.mixer = new THREE.AnimationMixer(obj); cat._curCatClip = null;
     cat.group.children.forEach((child) => {
