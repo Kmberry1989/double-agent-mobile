@@ -1287,7 +1287,7 @@ function playSlashMiss() { playSfx(pickSfx(SFX_FILES.slashMiss)); }
 // the clips are mirrored for variety. Every connecting hit fills the
 // meter; when it is full the special auto-fires after the current slash.
 const LOCK_RANGE = 8, STRIKE_RANGE = 2.4, SPECIAL_RANGE = 3.5;
-const METER_HITS = 4; // connecting hits to charge the special
+const METER_HITS = 5; // connecting hits to charge the special
 const DASH_SPEED = 14; // m/s; dash duration clamps to 0.25–0.5 s
 let combo = 0, meter = 0, specialQueued = false;
 let dash = null;
