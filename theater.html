@@ -1444,11 +1444,13 @@ function updateDash(dt) {
 // The special: a big finisher, cycling through the three-slash
 // Advancing Combo and the six acrobatic finishers (each with its
 // mirrored twin), so it never repeats the same move twice in a row.
+// The flips lead the cycle, so the first special a player sees is a
+// flip, not the combo.
 // Whichever finisher plays, the hit is the same wide sweep (3.5 m,
 // ~145 deg arc) hitting every enemy in front of her. Its kills advance
 // the combo but do not refill the meter (regular hits charge the
 // special; the special does not charge itself).
-const SPECIAL_CYCLE = ['atkCombo', 'atkComboL', 'butterflyTwirl', 'butterflyTwirlL', 'flipKickFront', 'flipKickFrontL', 'flyingThrow', 'flyingThrowL', 'flipKick', 'flipKickL', 'invertedDoubleKick', 'invertedDoubleKickL', 'jumpingSpin', 'jumpingSpinL'];
+const SPECIAL_CYCLE = ['butterflyTwirl', 'flipKickFront', 'flyingThrow', 'flipKick', 'invertedDoubleKick', 'jumpingSpin', 'atkCombo', 'butterflyTwirlL', 'flipKickFrontL', 'flyingThrowL', 'flipKickL', 'invertedDoubleKickL', 'jumpingSpinL', 'atkComboL'];
 let specialCount = 0;
 function fireSpecial() {
   specialQueued = false;
@@ -1557,8 +1559,10 @@ function updateBow(dt) {
     player.rotation.x = 0;
   }
   if (bowPhase.walked) {
-    // Walk out through the curtains to backstage.
-    player.position.z -= 1.6 * dt;
+    // Walk out through the curtains to backstage. Fast (3.5 m/s) — she
+    // may have finished the fight down the aisle, and a slow walk back
+    // from there stalls the finale.
+    player.position.z -= 3.5 * dt;
     player.rotation.y = 0; // face upstage (away from the audience)
     playClip('walk');
     if (player.position.z <= -8.5) showWin();
@@ -1600,7 +1604,7 @@ addEventListener('mousemove', (e) => {
   }
 });
 renderer.domElement.addEventListener('mousedown', (e) => {
-  if (document.pointerLockElement && started && !cine && !won) doChainAttack();
+  if (started && !cine && !won) doChainAttack();
 });
 let lookId = null, lastLX = 0, lastLY = 0, lookStartX = 0, lookStartY = 0, lookStartT = 0;
 renderer.domElement.addEventListener('touchstart', (e) => {
