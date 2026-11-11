@@ -137,21 +137,37 @@ walls.forEach((w)=>applyTex(w, 'assets/textures/ballroom/ballroom_wall_damask_bu
 // Wood wainscoting strip along the lower walls (player clamp is ±19/±13,
 // the strips sit at ±19.82/±13.82, so they are never walked into).
 [[0, -13.82, 40, 0.2], [0, 13.82, 40, 0.2], [-19.82, 0, 0.2, 28], [19.82, 0, 0.2, 28]].forEach(([x, z, w, d])=>{
-  const m = box(x, 0.6, z, w, 1.2, d, 0x3a2410); applyTex(m, 'assets/textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp', 8, 1);
+  const m = box(x, 0.6, z, w, 1.2, d, 0x3a2410);
+  // Square tiles: the wainscoting texture is a 4x4 panel grid, so repeat
+  // the long dimension in 1.2 m tiles (each tile 1.2x1.2 m, each panel
+  // 0.3 m square). The old repeat (8,1) stretched the panels ~4:1 wide.
+  applyTex(m, 'assets/textures/ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp', Math.max(w, d) / 1.2, 1);
 });
-// Ceiling (was open) with plaster/moulding, plus curtains on the north wall.
+// Ceiling (was open) with plaster/moulding.
 flatPlane(0, 5.95, 0, HALL_X * 2, HALL_Z * 2, 0xe8ddc8, 'assets/textures/ballroom/ballroom_ceiling_plaster_moulding_1024.webp', 6, 4, Math.PI / 2);
-[-12, -4, 4, 12].forEach((x)=>{
-  const c = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 3.5), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
-  c.position.set(x, 2.75, -13.65); scene.add(c); applyTex(c, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
-});
+// Wall trim (2026-11-11): thin solid-color strips along the walls — crown
+// molding below the ceiling, baseboard at the floor, chair rail capping
+// the wainscoting. Each strip sits proud of the face behind it (its back
+// face at least 0.01 m in front of that face) so no trim face is coplanar
+// with a wall or wainscoting face. inset = how far the back face sits in
+// front of the wall face (0.01 = just proud of the bare wall; 0.29 = just
+// proud of the wainscoting, whose room face is 0.28 in front of the wall).
+function addTrim(y, h, d, color, inset) {
+  box(0, y, -HALL_Z + inset + d / 2, HALL_X * 2, h, d, color); // north
+  box(0, y, HALL_Z - inset - d / 2, HALL_X * 2, h, d, color); // south
+  box(-HALL_X + inset + d / 2, y, 0, d, h, HALL_Z * 2, color); // west
+  box(HALL_X - inset - d / 2, y, 0, d, h, HALL_Z * 2, color); // east
+}
+addTrim(5.85, 0.15, 0.14, 0xe8ddc8, 0.01); // crown molding, cream, just below the ceiling
+addTrim(0.1, 0.2, 0.08, 0x3a2410, 0.29); // baseboard, dark wood, proud of the wainscoting
+addTrim(1.2, 0.08, 0.08, 0x3a2410, 0.29); // chair rail, dark wood, capping the wainscoting
 
 // ---- Interior windows + curtain rods (night ball, 2026-11-07) ----
 // Tall white-framed windows on the interior walls, night sky behind the
-// glass (it is a nighttime ball and the walls are solid). Rods only above
-// them — no curtains. Placed on real wall faces (interior faces at
-// z +/-14, x +/-20), clear of the doors, the north-wall velvet drapes,
-// the bar, and the tables.
+// glass (it is a nighttime ball and the walls are solid). Dark-brass rods
+// above them with velvet curtains pulled to the sides of each window.
+// Placed on real wall faces (interior faces at z +/-14, x +/-20), clear
+// of the doors, the bar, and the tables.
 function nightSkyTexture() {
   const c = document.createElement('canvas'); c.width = 256; c.height = 384;
   const g = c.getContext('2d');
@@ -197,7 +213,10 @@ function addWindow(x, z, rotY) {
   // Mullions: one vertical, two horizontal.
   const mv = new THREE.Mesh(new THREE.BoxGeometry(0.05, H - 0.18, 0.03), frameMat); mv.position.set(0, 0, 0.01); g.add(mv);
   [-H / 6, H / 6].forEach((py) => { const mh = new THREE.Mesh(new THREE.BoxGeometry(W - 0.18, 0.05, 0.03), frameMat); mh.position.set(0, py, 0.01); g.add(mh); });
-  // Curtain rod above: dark brass, finials, two brackets. Rod only, no curtain.
+  // Curtain rod above: dark brass, finials, two brackets. Velvet curtains
+  // hang from the rod, pulled to the sides of the window — flanking the
+  // glass, never covering it. Panel top at the rod, bottom at the
+  // wainscoting top (world y 1.2).
   const brass = new THREE.MeshStandardMaterial({ color: 0x8a6b2f, metalness: 0.85, roughness: 0.35 });
   const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, W + 0.5, 12), brass);
   rod.rotation.z = Math.PI / 2; rod.position.set(0, H / 2 + 0.32, 0.12); g.add(rod);
@@ -206,11 +225,14 @@ function addWindow(x, z, rotY) {
     fin.position.set(s * (W / 2 + 0.25), H / 2 + 0.32, 0.12); g.add(fin);
     const br = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, 0.12), brass);
     br.position.set(s * (W / 2 - 0.1), H / 2 + 0.32, 0.06); g.add(br);
+    const cp = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 3.9), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
+    cp.position.set(s * (W / 2 + 0.28), 0.06, 0.12); g.add(cp);
+    applyTex(cp, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
   });
   g.position.set(x, 3.1, z); g.rotation.y = rotY; scene.add(g);
   return g;
 }
-// North (velvet drapes at x -12/-4/4/12, exit door at 0) / south (entrance door at 0).
+// North (exit door at 0) / south (entrance door at 0).
 addWindow(-8, -13.96, 0); addWindow(8, -13.96, 0);
 addWindow(-9, 13.96, Math.PI); addWindow(9, 13.96, Math.PI);
 // West / east (bar sits at x 17.5, z 4..8 — no window there).
