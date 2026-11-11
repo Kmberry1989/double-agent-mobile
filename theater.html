@@ -10,11 +10,6 @@
   #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
   #win{display:none}
   button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
-  #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5}
-  #knob{position:absolute;left:37px;top:37px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.45)}
-  #slashBtn{position:fixed;right:18px;bottom:90px;width:84px;height:84px;border-radius:50%;background:#c9a227;color:#111;font-weight:800;font-size:15px;display:none;z-index:5;border:0}
-  body.touch #joy{display:block}
-  body.touch #slashBtn{display:block}
   a{color:#ffd97a}
   .levels{position:fixed;top:10px;right:10px;z-index:11;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:46vw}
   .levels a{background:rgba(0,0,0,.55);border:1px solid #8a6b3a;color:#ffd97a;border-radius:8px;padding:6px 10px;font-size:13px;text-decoration:none}
@@ -34,8 +29,6 @@
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>The Theater</h1><button id="startBtn">Enter the theater</button></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
-<div id="joy"><div id="knob"></div></div>
-<button id="slashBtn">SLASH</button>
 <script type="module">
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
@@ -959,6 +952,7 @@ function defeatEnemy(enemy, silent) {
   if (!enemy || enemy.state === 'falling' || enemy.state === 'gone') return;
   enemy.state = 'falling'; enemy.fallT = 0;
   defeated++; updateEnemyCount();
+  if (defeated >= 8) startSlowMo(2.0, SLOWMO_SCALE); // the final blow, in slow motion
   if (!silent) spawnNextEnemy();
 }
 function spawnNextEnemy() {
@@ -1289,6 +1283,23 @@ function playSlashMiss() { playSfx(pickSfx(SFX_FILES.slashMiss)); }
 const LOCK_RANGE = 8, STRIKE_RANGE = 2.4, SPECIAL_RANGE = 3.5;
 const METER_HITS = 5; // connecting hits to charge the special
 const DASH_SPEED = 14; // m/s; dash duration clamps to 0.25–0.5 s
+// ---- Cinematic slow-mo + fixed camera ----
+// The big moments play in slow motion from a fixed camera spot, movie
+// style — since she locks on anyway, the camera does not need to follow
+// her facing. Triggers: the meter special, and the final (8th) kill.
+// Slow-mo is a real-time window at 0.4x speed; the fixed camera cycles
+// through three set spots in the house.
+const SLOWMO_SCALE = 0.4;
+const CINE_CAMS = [
+  { x: 0, y: 1.6, z: 20 },   // front of house, low, up the aisle
+  { x: 11, y: 3.0, z: 0 },   // stage right, side angle
+  { x: 0, y: 7.5, z: 27 },   // high back, wide down at the action
+];
+let slowMo = null, cineCamIndex = 0;
+function startSlowMo(dur, scale) {
+  slowMo = { t: 0, dur, scale, cam: CINE_CAMS[cineCamIndex % CINE_CAMS.length] };
+  cineCamIndex++;
+}
 let combo = 0, meter = 0, specialQueued = false;
 let dash = null;
 const CLOSE_CYCLE = ['atkQuick', 'atkQuickL', 'atkRise', 'atkRiseL', 'atkChop', 'atkChopL', 'atkComboL'];
@@ -1415,6 +1426,7 @@ function updateDash(dt) {
 // charge itself).
 function fireSpecial() {
   specialQueued = false;
+  startSlowMo(1.2, SLOWMO_SCALE); // the big combo opens in slow motion
   const key = 'atkCombo';
   if (mxClips[key]) { playMxCharClipOnce(player, key); slashTimer = mxClips[key].duration; slashCooldown = mxClips[key].duration; }
   else slashCooldown = 1.2;
@@ -1563,20 +1575,10 @@ addEventListener('mousemove', (e) => {
 renderer.domElement.addEventListener('mousedown', (e) => {
   if (document.pointerLockElement && started && !cine && !won) doChainAttack();
 });
-let joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
-const joy = document.getElementById('joy'), knob = document.getElementById('knob');
-joy.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; joyId = t.identifier; moveJoy(t); e.preventDefault(); }, { passive: false });
-joy.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (t.identifier === joyId) moveJoy(t); e.preventDefault(); }, { passive: false });
-function endJoy(e) { for (const t of e.changedTouches) if (t.identifier === joyId) { joyId = null; joyX = joyY = 0; knob.style.left = '37px'; knob.style.top = '37px'; } }
-joy.addEventListener('touchend', endJoy); joy.addEventListener('touchcancel', endJoy);
-function moveJoy(t) {
-  const r = joy.getBoundingClientRect(); const dx = (t.clientX - (r.left + 65)) / 50, dy = (t.clientY - (r.top + 65)) / 50;
-  const m = Math.min(1, Math.hypot(dx, dy)) || 1; joyX = dx / Math.max(1, Math.hypot(dx, dy)) * m; joyY = dy / Math.max(1, Math.hypot(dx, dy)) * m;
-  knob.style.left = (37 + joyX * 35) + 'px'; knob.style.top = (37 + joyY * 35) + 'px';
-}
+let lookId = null, lastLX = 0, lastLY = 0, lookStartX = 0, lookStartY = 0, lookStartT = 0;
 renderer.domElement.addEventListener('touchstart', (e) => {
   if (!started) return;
-  for (const t of e.changedTouches) { if (t.identifier !== joyId) { lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY; } }
+  for (const t of e.changedTouches) { lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY; lookStartX = t.clientX; lookStartY = t.clientY; lookStartT = performance.now(); }
 }, { passive: true });
 renderer.domElement.addEventListener('touchmove', (e) => {
   for (const t of e.changedTouches) if (t.identifier === lookId) {
@@ -1585,15 +1587,24 @@ renderer.domElement.addEventListener('touchmove', (e) => {
   }
 }, { passive: true });
 renderer.domElement.addEventListener('touchend', (e) => {
-  for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null;
+  for (const t of e.changedTouches) if (t.identifier === lookId) {
+    // A quick tap on the scene (barely moved, under 0.5 s) is the attack
+    // — no on-screen buttons. A drag is just looking around.
+    const dx = t.clientX - lookStartX, dy = t.clientY - lookStartY;
+    if (performance.now() - lookStartT < 500 && Math.hypot(dx, dy) < 15) doChainAttack();
+    lookId = null;
+  }
 });
-const slashBtn = document.getElementById('slashBtn');
-slashBtn.addEventListener('touchstart', (e) => { e.preventDefault(); doChainAttack(); }, { passive: false });
 
 // ---- Loop ----
 function animate() {
   requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
+  let dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
+  if (slowMo) {
+    slowMo.t += dt; // real time
+    dt *= slowMo.scale; // everything (mixer, enemies, dash) runs slow
+    if (slowMo.t >= slowMo.dur) slowMo = null;
+  }
   if (slashCooldown > 0) slashCooldown -= dt;
   if (slashTimer > 0) slashTimer -= dt;
   // The meter special auto-fires the moment the current slash ends.
@@ -1609,7 +1620,6 @@ function animate() {
     if (!dash) {
     let fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
     let fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
-    if (joyId !== null) { fx += joyX; fz += -joyY; }
     ml = Math.hypot(fx, fz);
     if (ml > 1) { fx /= ml; fz /= ml; }
     const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);
@@ -1637,11 +1647,16 @@ function animate() {
       mixer.update(dt);
       if (slashTimer <= 0 && !dash) playClip(ml > 0.1 ? 'walk' : 'idle');
     }
-    if (defeated >= 8 && !bowPhase && !won) startBow();
+    if (defeated >= 8 && !bowPhase && !won && !slowMo) startBow();
   } else if (mixer && (cine || bowPhase)) {
     mixer.update(dt);
   }
-  if (!cine) {
+  if (!cine && slowMo && slowMo.cam) {
+    // Cinematic moment: fixed camera spot, framing Rochelle.
+    camera.position.set(slowMo.cam.x, slowMo.cam.y, slowMo.cam.z);
+    camera.lookAt(player.position.x, player.position.y + 1.6, player.position.z);
+    updateWallOcclusion();
+  } else if (!cine) {
     const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
     camera.position.set(player.position.x + back.x * 5, player.position.y + 2.6, player.position.z + back.z * 5);
     camera.lookAt(player.position.x - back.x * 3, player.position.y + 1.6, player.position.z - back.z * 3);
