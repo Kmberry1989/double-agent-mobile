@@ -988,8 +988,73 @@ function updateEnemyCount() {
   const el = document.getElementById('enemyCount');
   if (el) el.textContent = defeated + ' / 8';
 }
+// ---- Blood effects (katana cuts + enemy hits on Rochelle) ----
+// Two parts, both for the player and the enemies: a particle mist
+// (dark-red points that burst outward and fade) and, on top of it, a
+// small realistic blood-spatter sprite (blood_spatter.webp) that
+// stretches upward into the air a little and then fades away.
+const bloodFx = []; // active mists + spatter sprites
+let bloodSpatterTex = null;
+new THREE.TextureLoader().load('assets/textures/effects/blood_spatter.webp', (t) => { bloodSpatterTex = t; });
+function spawnBlood(x, y, z) {
+  // Particle mist: ~24 dark-red points bursting outward and up.
+  const n = 24, pos = new Float32Array(n * 3), vel = [];
+  for (let i = 0; i < n; i++) {
+    pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+    const a = Math.random() * Math.PI * 2, sp = 0.6 + Math.random() * 1.6;
+    vel.push(new THREE.Vector3(Math.cos(a) * sp, 0.5 + Math.random() * 1.8, Math.sin(a) * sp));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.PointsMaterial({ color: 0x8a0f0f, size: 0.14, transparent: true, opacity: 0.95, depthWrite: false });
+  const pts = new THREE.Points(g, m);
+  scene.add(pts);
+  bloodFx.push({ kind: 'mist', obj: pts, vel, t: 0, dur: 0.5 });
+  // Spatter sprite: a realistic splash that stretches upward a little
+  // and then fades away.
+  if (bloodSpatterTex) {
+    const sm = new THREE.SpriteMaterial({ map: bloodSpatterTex, transparent: true, opacity: 0.95, depthWrite: false });
+    const spr = new THREE.Sprite(sm);
+    spr.position.set(x, y, z);
+    spr.scale.set(0.5, 0.5, 1);
+    scene.add(spr);
+    bloodFx.push({ kind: 'spatter', obj: spr, t: 0, dur: 0.6 });
+  }
+}
+function updateBloodFx(dt) {
+  for (let i = bloodFx.length - 1; i >= 0; i--) {
+    const fx = bloodFx[i];
+    fx.t += dt;
+    const k = fx.t / fx.dur;
+    if (k >= 1) {
+      scene.remove(fx.obj);
+      if (fx.obj.geometry) fx.obj.geometry.dispose();
+      if (fx.obj.material) fx.obj.material.dispose();
+      bloodFx.splice(i, 1);
+      continue;
+    }
+    if (fx.kind === 'mist') {
+      const pos = fx.obj.geometry.attributes.position;
+      for (let j = 0; j < fx.vel.length; j++) {
+        fx.vel[j].y -= 3 * dt; // slight gravity
+        pos.array[j * 3] += fx.vel[j].x * dt;
+        pos.array[j * 3 + 1] += fx.vel[j].y * dt;
+        pos.array[j * 3 + 2] += fx.vel[j].z * dt;
+      }
+      pos.needsUpdate = true;
+      fx.obj.material.opacity = 0.95 * (1 - k);
+    } else {
+      // Spatter: stretches upward into the air a little, then fades.
+      const stretch = 1 + Math.min(k / 0.4, 1) * 0.7;
+      fx.obj.scale.set(0.5 * (1 + k * 0.4), 0.5 * stretch, 1);
+      fx.obj.material.opacity = 0.95 * (1 - Math.max(0, (k - 0.35) / 0.65));
+    }
+  }
+}
 function defeatEnemy(enemy, silent) {
   if (!enemy || enemy.state === 'falling' || enemy.state === 'gone') return;
+  // Blood where the katana cut: mist + spatter at the enemy's chest.
+  spawnBlood(enemy.x, (enemy.y || 0) + 1.3, enemy.z);
   enemy.state = 'falling'; enemy.fallT = 0;
   defeated++; updateEnemyCount();
   if (defeated >= 8) startSlowMo(2.0, SLOWMO_SCALE); // the final blow, in slow motion
@@ -1064,7 +1129,7 @@ function updateEnemies(dt, t) {
         e.state = 'gone'; if (e.mesh) e.mesh.visible = false;
       }
     }
-    const live = enemies.some((e) => e.state === 'rising' || e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting' || e.state === 'taunting' || e.state === 'attacking');
+    const live = enemies.some((e) => e.state === 'rising' || e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting');
     if (!live) { console.warn('theater: no live enemy, watchdog spawning next'); spawnNextEnemy(); }
   }
 }
@@ -1374,9 +1439,13 @@ const ENEMY_ATK_HIT_T = 0.7; // the hit lands this far into the swing
 const ENEMY_ATK_RECOVER = 2.0; // wait after a swing before the next one
 const ENEMY_ATK_RANGE = 2.2; // she must still be this close when it lands
 const KNOCKDOWN_HITS = 3; // hits in a row that knock her down
-const KNOCKDOWN_WINDOW = 5; // seconds — hits further apart do not count
+const KNOCKDOWN_WINDOW = 5; // game-time seconds — hits further apart do not count
 const RECOVER_TIME = 3; // seconds down before she gets back up
 let hitsTaken = 0, lastHitT = 0, knockedDown = false, downT = 0;
+let gameT = 0; // game time (accumulated dt) — the hit window uses this,
+// NOT real time: dt is clamped to 0.05, so on a slow device game time
+// runs slower than real time, and a real-time window would reset the
+// count between swings that are only ~3.4 game-seconds apart.
 const DASH_SPEED = 14; // m/s; dash duration clamps to 0.25–0.5 s
 // ---- Cinematic slow-mo + fixed camera ----
 // The big moments play in slow motion from a fixed camera spot, movie
@@ -1656,10 +1725,15 @@ function updateBow(dt) {
 // always gets back up.
 function onEnemyHit() {
   if (knockedDown || won || !started) return;
-  const now = performance.now() / 1000;
-  if (now - lastHitT > KNOCKDOWN_WINDOW) hitsTaken = 0;
+  // The window is in GAME time (gameT), not real time — see the gameT
+  // comment above. Consecutive hits ~3.4 game-seconds apart stay inside
+  // the 5 s window; a real-time clock would reset the count between
+  // swings on a slow device.
+  if (gameT - lastHitT > KNOCKDOWN_WINDOW) hitsTaken = 0;
   hitsTaken++;
-  lastHitT = now;
+  lastHitT = gameT;
+  // Blood where the enemy's chop landed: mist + spatter at her chest.
+  spawnBlood(player.position.x, player.position.y + 1.3, player.position.z);
   // Brief red flash so the hit reads.
   const flash = document.getElementById('dmgFlash');
   if (flash) {
@@ -1802,6 +1876,7 @@ function orbitCamPos(out) {
 function animate() {
   requestAnimationFrame(animate);
   let dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
+  gameT += dt; // game time — drives the knockdown hit window (see gameT)
   if (slowMo) {
     slowMo.t += dt; // real time
     dt *= slowMo.scale; // everything (mixer, enemies, dash) runs slow
@@ -1815,6 +1890,7 @@ function animate() {
   if (bowPhase) updateBow(dt);
   updateEnemies(dt, t);
   updateDestructibles(dt);
+  updateBloodFx(dt);
   // Debug overlay (?debug=enemy): live enemy states + knockdown counters.
   if (location.search.indexOf('debug=enemy') !== -1) {
     const dbg = document.getElementById('dbgEnemy');
