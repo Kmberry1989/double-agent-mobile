@@ -49,6 +49,8 @@
   <select id="weaponSelL" aria-label="Weapon in left hand"></select>
   <div id="wOff" hidden>
     <span class="wOffTitle">Weapon offset</span>
+    <button id="offHandR" type="button" class="on">Right hand</button>
+    <button id="offHandL" type="button">Left hand</button>
     <label>X <input id="offX" type="range" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset X"><input id="offXn" type="number" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset X value"></label>
     <label>Y <input id="offY" type="range" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset Y"><input id="offYn" type="number" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset Y value"></label>
     <label>Z <input id="offZ" type="range" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset Z"><input id="offZn" type="number" min="-0.5" max="0.5" step="0.001" value="0" aria-label="Weapon offset Z value"></label>
@@ -625,6 +627,34 @@ const BAKED_OFFSETS = {
   'katana|L': { x: -0.412, y: 0.061, z: -0.031, rx: 0, ry: 0, rz: 0, s: 1 },
 };
 let curWeaponName = '';
+// Which hand the offset panel edits ('R' or 'L'). Dual wielding needs
+// a per-hand offset: the hands are mirrors, so a weapon whose geometry
+// sits far from its node origin (the katana) needs its own '|L' entry
+// for the left hand. The panel used to edit only the right hand — the
+// left-hand entry could never be adjusted. The hand toggle below
+// switches which side the sliders, the readout, and Copy all target.
+let offHand = 'R';
+function offTarget() {
+  return offHand === 'L'
+    ? { name: curWeaponNameL, forLeft: true }
+    : { name: curWeaponName, forLeft: false };
+}
+function syncHandToggle() {
+  const r = document.getElementById('offHandR'), l = document.getElementById('offHandL');
+  if (!r || !l) return;
+  r.classList.toggle('on', offHand === 'R');
+  l.classList.toggle('on', offHand === 'L');
+  r.disabled = !curWeaponName;
+  l.disabled = !curWeaponNameL;
+  // If the selected hand has no weapon, fall back to the hand that does.
+  if (offHand === 'R' && !curWeaponName && curWeaponNameL) offHand = 'L';
+  if (offHand === 'L' && !curWeaponNameL && curWeaponName) offHand = 'R';
+  r.classList.toggle('on', offHand === 'R');
+  l.classList.toggle('on', offHand === 'L');
+}
+function syncWOffVisibility() {
+  wOffEl.hidden = !(curWeaponName || curWeaponNameL);
+}
 const wOffEl = document.getElementById('wOff');
 const offReadEl = document.getElementById('offRead');
 const OFF_AXES = ['x', 'y', 'z'];
@@ -666,11 +696,15 @@ function getOffset(name, forLeft) {
   return weaponOffsets.get(key);
 }
 function updateOffsetReadout() {
-  const o = getOffset(curWeaponName);
-  offReadEl.textContent = `${curWeaponName} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)} m | rot x=${o.rx}, y=${o.ry}, z=${o.rz} deg | scale ${o.s.toFixed(2)}`;
+  const t = offTarget();
+  if (!t.name) { offReadEl.textContent = 'offset: no weapon in this hand'; return; }
+  const o = getOffset(t.name, t.forLeft);
+  const key = t.forLeft ? t.name + '|L' : t.name;
+  offReadEl.textContent = `${key} offset: x=${fmt3(o.x)}, y=${fmt3(o.y)}, z=${fmt3(o.z)} m | rot x=${o.rx}, y=${o.ry}, z=${o.rz} deg | scale ${o.s.toFixed(2)}`;
 }
 function syncOffsetUI() {
-  const o = getOffset(curWeaponName);
+  const t = offTarget();
+  const o = t.name ? getOffset(t.name, t.forLeft) : { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, s: 1 };
   OFF_AXES.forEach(a => { offSliders[a].value = o[a]; offNums[a].value = fmt3(o[a]); });
   ROT_AXES.forEach(a => { rotSliders[a].value = o['r' + a]; rotNums[a].value = o['r' + a]; });
   offScale.value = o.s;
@@ -709,7 +743,8 @@ function applyWeaponScale(pivot, name) {
   pivot.scale.set(b.x * o.s, b.y * o.s, b.z * o.s);
 }
 function setOffsetAxis(a, v) {
-  const o = getOffset(curWeaponName);
+  const t = offTarget(); if (!t.name) return;
+  const o = getOffset(t.name, t.forLeft);
   // Range widened ±0.2 -> ±0.5 m: the katana's tuned X (+0.414) sits outside
   // the old range, and the old clamp would have snapped it to 0.2 the moment
   // the slider was touched, destroying the grip.
@@ -717,28 +752,39 @@ function setOffsetAxis(a, v) {
   offSliders[a].value = o[a];
   offNums[a].value = fmt3(o[a]);
   updateOffsetReadout();
-  applyWeaponOffset();
-  // Same weapon in the left hand shares the offset entry (hand-local, so it
-  // is the mirrored equivalent there) — keep it in step.
-  if (weaponPivotL && curWeaponNameL === curWeaponName) applyWeaponOffset(weaponPivotL, curWeaponNameL);
+  if (t.forLeft) { applyWeaponOffset(weaponPivotL, t.name); }
+  else {
+    applyWeaponOffset();
+    // Same weapon in the left hand shares the offset entry (hand-local, so it
+    // is the mirrored equivalent there) — keep it in step.
+    if (weaponPivotL && curWeaponNameL === curWeaponName) applyWeaponOffset(weaponPivotL, curWeaponNameL);
+  }
 }
 function setRotationAxis(a, v) {
-  const o = getOffset(curWeaponName);
+  const t = offTarget(); if (!t.name) return;
+  const o = getOffset(t.name, t.forLeft);
   o['r' + a] = Math.max(-180, Math.min(180, Math.round(v)));
   rotSliders[a].value = o['r' + a];
   rotNums[a].value = o['r' + a];
   updateOffsetReadout();
-  applyWeaponRotation();
-  if (weaponPivotL && curWeaponNameL === curWeaponName) applyWeaponRotation(weaponPivotL, curWeaponNameL);
+  if (t.forLeft) { applyWeaponRotation(weaponPivotL, t.name); }
+  else {
+    applyWeaponRotation();
+    if (weaponPivotL && curWeaponNameL === curWeaponName) applyWeaponRotation(weaponPivotL, curWeaponNameL);
+  }
 }
 function setScale(v) {
-  const o = getOffset(curWeaponName);
+  const t = offTarget(); if (!t.name) return;
+  const o = getOffset(t.name, t.forLeft);
   o.s = Math.max(0.5, Math.min(2, v));
   offScale.value = o.s;
   offScaleN.value = o.s.toFixed(2);
   updateOffsetReadout();
-  applyWeaponScale();
-  if (weaponPivotL && curWeaponNameL === curWeaponName) applyWeaponScale(weaponPivotL, curWeaponNameL);
+  if (t.forLeft) { applyWeaponScale(weaponPivotL, t.name); }
+  else {
+    applyWeaponScale();
+    if (weaponPivotL && curWeaponNameL === curWeaponName) applyWeaponScale(weaponPivotL, curWeaponNameL);
+  }
 }
 OFF_AXES.forEach(a => {
   offSliders[a].addEventListener('input', e => setOffsetAxis(a, parseFloat(e.target.value) || 0));
@@ -778,20 +824,33 @@ document.getElementById('offCopy').addEventListener('click', async e => {
   setTimeout(() => { btn.textContent = 'Copy'; }, 3000);
 });
 document.getElementById('offReset').addEventListener('click', () => {
-  // Reset restores the weapon's base placement (its baked entry, or the
-  // default for all weapons) — not zero. Deleting the cached entry makes
-  // getOffset() re-seed it from BAKED_OFFSETS / DEFAULT_OFFSET.
-  weaponOffsets.delete(curWeaponName);
+  // Reset restores the selected hand's weapon base placement (its baked
+  // entry, or the default for all weapons) — not zero. Deleting the
+  // cached entry makes getOffset() re-seed it from BAKED_OFFSETS /
+  // DEFAULT_OFFSET. For the left hand the '|L' entry is the one deleted.
+  const t = offTarget(); if (!t.name) return;
+  weaponOffsets.delete(t.forLeft ? t.name + '|L' : t.name);
   syncOffsetUI();
-  applyWeaponOffset();
-  applyWeaponRotation();
-  applyWeaponScale();
-  if (weaponPivotL && curWeaponNameL === curWeaponName) {
-    applyWeaponOffset(weaponPivotL, curWeaponNameL);
-    applyWeaponRotation(weaponPivotL, curWeaponNameL);
-    applyWeaponScale(weaponPivotL, curWeaponNameL);
+  if (t.forLeft) {
+    applyWeaponOffset(weaponPivotL, t.name);
+    applyWeaponRotation(weaponPivotL, t.name);
+    applyWeaponScale(weaponPivotL, t.name);
+  } else {
+    applyWeaponOffset();
+    applyWeaponRotation();
+    applyWeaponScale();
+    if (weaponPivotL && curWeaponNameL === curWeaponName) {
+      applyWeaponOffset(weaponPivotL, curWeaponNameL);
+      applyWeaponRotation(weaponPivotL, curWeaponNameL);
+      applyWeaponScale(weaponPivotL, curWeaponNameL);
+    }
   }
 });
+// Hand toggle: which side the offset panel edits. Switching re-syncs
+// the sliders to that hand's offset (right = shared entry, left = the
+// '|L' entry when one exists).
+document.getElementById('offHandR').addEventListener('click', () => { if (!curWeaponName) return; offHand = 'R'; syncHandToggle(); syncOffsetUI(); });
+document.getElementById('offHandL').addEventListener('click', () => { if (!curWeaponNameL) return; offHand = 'L'; syncHandToggle(); syncOffsetUI(); });
 // Hand axes, MEASURED 2026-11-06 (Node/Three.js on assets/characters/Agent_Kyle.fbx):
 // the four finger-base bones sit along hand-local +Y (avg dir (-0.012, 1.000,
 // 0.027)), so the fingers point along +Y — NOT -Y, which is why the old code
@@ -805,9 +864,11 @@ const DORSAL_DIR = new THREE.Vector3(0.569, 0.029, -0.822).normalize();
 function loadWeapon(name) {
   if (weaponPivot) { weaponPivot.removeFromParent(); weaponPivot = null; }
   curWeaponName = name || '';
-  wOffEl.hidden = !name;
+  syncWOffVisibility(); syncHandToggle();
   if (!name) return;
-  syncOffsetUI();
+  // Loading a right-hand weapon switches the panel to the right hand,
+  // so the sliders immediately edit the side you just picked.
+  offHand = 'R'; syncHandToggle(); syncOffsetUI();
   const w = WEAPONS.find(x => x.name === name); if (!w) return;
   gltfLoader.load(w.file + '?v=' + ASSET_V, (gltf) => {
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
@@ -885,7 +946,11 @@ weaponSel.addEventListener('change', () => loadWeapon(weaponSel.value));
 function loadWeaponL(name) {
   if (weaponPivotL) { weaponPivotL.removeFromParent(); weaponPivotL = null; }
   curWeaponNameL = name || '';
+  syncWOffVisibility(); syncHandToggle();
   if (!name) return;
+  // Loading a left-hand weapon switches the panel to the left hand, so
+  // the sliders immediately edit the side you just picked.
+  offHand = 'L'; syncHandToggle(); syncOffsetUI();
   const w = WEAPONS.find(x => x.name === name); if (!w) return;
   gltfLoader.load(w.file + '?v=' + ASSET_V, (gltf) => {
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
