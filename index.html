@@ -1080,6 +1080,16 @@ let health = 100, detection = 0, intel = 0, gameOver = false, won = false;
 let weapon = 'pistol'; // pistol | rifle
 const weapons = { pistol:{mag:12, max:12, dmg:34, rate:0.28}, rifle:{mag:30, max:30, dmg:50, rate:0.11} };
 let ammoInMag = 12, lastShot = 0, reloadUntil = 0, currentAnim = 'idle';
+// Reload is automatic: when the mag runs dry the reload starts on its
+// own (no key, no button, no "press R" message). startReload is the one
+// place that begins a reload — KeyR, the RELOAD button, and the
+// auto-reload in tryShoot all call it.
+function startReload() {
+  if (performance.now() > reloadUntil) {
+    reloadUntil = performance.now() + 1500;
+    playPlayerOneShot(weapon === 'rifle' ? 'reloadRifle' : 'reloadPistol');
+  }
+}
 // ---- Gun-battle + headshot slow motion ----
 // timeScale multiplies the gameplay dt in animate (1 = real time,
 // 0.4 = slow). It ramps smoothly toward timeScaleTarget (~0.5 s each
@@ -1926,7 +1936,7 @@ addEventListener('keydown', e=>{
   if (e.code==='Digit1'){ setWeaponVariant('Glock'); }
   if (e.code==='Digit2'){ setWeaponVariant('MP5K'); }
   if (e.code==='KeyL'){ playerLoadout = playerLoadout==='white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
-  if (e.code==='KeyR' && performance.now()>reloadUntil){ reloadUntil = performance.now()+1500; showMsg('Reloading…',1200); playPlayerOneShot(weapon==='rifle' ? 'reloadRifle' : 'reloadPistol'); }
+  if (e.code==='KeyR') startReload();
   if (e.code==='KeyF') tryTakedown();
   if (e.code==='KeyE') tryInteract();
   // New animation-only keys — no existing key is changed or remapped.
@@ -2015,9 +2025,7 @@ document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLo
     // cannot double-toggle Aim/Crouch or double-fire.
     el.addEventListener('click', (e)=>{ e.preventDefault(); if (Date.now() - lastTouchBtn < 600) return; onDown && onDown(); onUp && onUp(); });
   }
-  function doReload(){
-    if (performance.now() > reloadUntil){ reloadUntil = performance.now() + 1500; showMsg('Reloading…', 1200); playPlayerOneShot(weapon === 'rifle' ? 'reloadRifle' : 'reloadPistol'); }
-  }
+  function doReload(){ startReload(); }
   function doJump(){ if (grounded){ vy = 7.5; grounded = false; playPlayerOneShot('jump'); } }
   function doWeapon(){ cycleWeapon(); }
   function doLoadout(){ playerLoadout = playerLoadout === 'white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
@@ -2250,11 +2258,13 @@ function tryShoot(){
   noteActivity(); // shooting ends any idle orbit
   const now = performance.now();
   if (gameOver || won) return;
-  if (now<reloadUntil){ showMsg('Reloading…',800); return; }
+  if (now<reloadUntil) return;
   const w = weapons[weapon];
   if (now-lastShot < w.rate*1000) return;
-  if (ammoInMag<=0){ showMsg('Empty — press R to reload',1200); return; }
+  // Empty mag: reload starts automatically, no message, no key press.
+  if (ammoInMag<=0){ startReload(); return; }
   lastShot = now; ammoInMag--; lastGunfireT = now; // any shot feeds the battle slow-mo
+  if (ammoInMag<=0) startReload(); // the last round fires, then the reload starts on its own
   ejectCasing();
   playShotSound();
   playPlayerOneShot(weapon==='rifle' ? (crouching ? 'fireRifleCrouch' : 'fireRifle') : 'firePistol');
