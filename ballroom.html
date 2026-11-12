@@ -409,7 +409,7 @@ const BALC2 = [
   { x0: 6, x1: 17, z0: 12.5, z1: 13.9 },     // south strip along the south wall
   { x0: 17, x1: 19.9, z0: -13.9, z1: 13.9 }, // east walkway
 ];
-cyl(STAIR_C.x, 3.2, STAIR_C.z, 0.55, 0.55, 6.4, 0x3a2a18); // centre column
+const stairCol = cyl(STAIR_C.x, 3.2, STAIR_C.z, 0.55, 0.55, 6.4, 0x3a2a18); // centre column
 for (let i = 0; i < 15; i++) {
   const th = (180 + i * 24) * Math.PI / 180;
   const st = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 1.0), new THREE.MeshStandardMaterial({ color: 0x6b4a26 }));
@@ -1560,6 +1560,34 @@ function orbitCamPos(out) {
   return out;
 }
 
+// Camera occlusion (same pattern as theater.html): a wall between the
+// camera and the player must not render, or it blocks the view of the
+// player. Each frame, raycast from the camera to the player's chest;
+// any wall the ray hits is hidden until the ray no longer hits it.
+// Render-only: the walls stay in the scene (collision untouched), and
+// the raycaster intersects meshes regardless of visibility.
+// Occluders: the four ground-floor hall walls, the five upper walls,
+// the second-story bedroom/bathroom walls, and the staircase column.
+// The balcony floors, ceiling, railings, trim, windows and furniture
+// are NOT occluders (the floors/ceiling never sit on the camera ray;
+// the rest are too thin or too low to block it).
+const BALLROOM_WALLS = [...walls, ...upperWalls, b1sA, b1sB, b1sL, b1w, b2sA, b2sB, b2sL, b2e, bPart, baN, baW, baEA, baEB, baEL, stairCol];
+const camRay = new THREE.Raycaster();
+const _camDir = new THREE.Vector3();
+const _chest = new THREE.Vector3();
+function updateWallOcclusion() {
+  _chest.set(player.position.x, player.position.y + 1.6, player.position.z);
+  _camDir.copy(_chest).sub(camera.position);
+  const dist = _camDir.length();
+  if (dist < 0.01) { for (const w of BALLROOM_WALLS) w.visible = true; return; }
+  _camDir.normalize();
+  camRay.set(camera.position, _camDir);
+  camRay.far = dist;
+  const hits = camRay.intersectObjects(BALLROOM_WALLS, false);
+  const hit = new Set(hits.map(h => h.object));
+  for (const w of BALLROOM_WALLS) w.visible = !hit.has(w);
+}
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
@@ -1692,6 +1720,10 @@ function animate() {
     camera.position.set(player.position.x + back.x * 5, 2.6, player.position.z + back.z * 5);
     camera.lookAt(player.position.x - back.x * 3, 1.6, player.position.z - back.z * 3);
   }
+  // No wall between the camera and the player (orbit and follow alike).
+  // Never during a scripted cinematic — the cinematic camera is
+  // deliberate, and the cinematic branches below restore all walls.
+  if (!cinematic && !escapeCine) updateWallOcclusion();
   if (cinematic) {
     const c = cinematic, ph = Math.min(c.t / c.dur, 1);
     const ease = (x) => x * x * (3 - 2 * x);
@@ -1702,10 +1734,12 @@ function animate() {
     camera.position.lerpVectors(c.fromPos, c.toPos, k);
     const look = new THREE.Vector3().lerpVectors(c.fromLook, c.toLook, k);
     camera.lookAt(look);
+    for (const w of BALLROOM_WALLS) w.visible = true; // cinematic camera is deliberate: all walls show
   }
   if (escapeCine) {
     camera.position.copy(escapeCine.camPos);
     camera.lookAt(escapeCine.camLook);
+    for (const w of BALLROOM_WALLS) w.visible = true; // escape cinematic camera is deliberate: all walls show
   }
   // Camera flash decay (~200 ms): light burst + white overlay + flash face.
   if (flashT >= 0) {

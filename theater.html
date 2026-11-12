@@ -991,11 +991,26 @@ function updateEnemyCount() {
 // ---- Blood effects (katana cuts + enemy hits on Rochelle) ----
 // Two parts, both for the player and the enemies: a particle mist
 // (dark-red points that burst outward and fade) and, on top of it, a
-// small realistic blood-spatter sprite (blood_spatter.webp) that
-// stretches upward into the air a little and then fades away.
+// small realistic blood-spatter sprite that stretches upward into the
+// air a little and then fades away. Three spatter variants, picked at
+// random each time so it does not feel manufactured.
 const bloodFx = []; // active mists + spatter sprites
-let bloodSpatterTex = null;
-new THREE.TextureLoader().load('assets/textures/effects/blood_spatter.webp', (t) => { bloodSpatterTex = t; });
+const BLOOD_SPATTER_TEX = [
+  'assets/textures/effects/blood_spatter.webp',
+  'assets/textures/effects/blood_spatter_2.webp',
+  'assets/textures/effects/blood_spatter_3.webp',
+];
+const bloodSpatterTex = []; // { tex, aspect } per variant
+BLOOD_SPATTER_TEX.forEach((url) => {
+  new THREE.TextureLoader().load(url, (t) => {
+    const img = t.image;
+    bloodSpatterTex.push({ tex: t, aspect: img ? img.width / img.height : 1 });
+  });
+});
+function pickBloodSpatter() {
+  if (!bloodSpatterTex.length) return null;
+  return bloodSpatterTex[Math.floor(Math.random() * bloodSpatterTex.length)];
+}
 function spawnBlood(x, y, z) {
   // Particle mist: ~24 dark-red points bursting outward and up.
   const n = 24, pos = new Float32Array(n * 3), vel = [];
@@ -1010,13 +1025,17 @@ function spawnBlood(x, y, z) {
   const pts = new THREE.Points(g, m);
   scene.add(pts);
   bloodFx.push({ kind: 'mist', obj: pts, vel, t: 0, dur: 0.5 });
-  // Spatter sprite: a realistic splash that stretches upward a little
-  // and then fades away.
-  if (bloodSpatterTex) {
-    const sm = new THREE.SpriteMaterial({ map: bloodSpatterTex, transparent: true, opacity: 0.95, depthWrite: false });
+  // Spatter sprite: a realistic splash (random variant) that stretches
+  // upward a little and then fades away.
+  const pick = pickBloodSpatter();
+  if (pick) {
+    const sm = new THREE.SpriteMaterial({ map: pick.tex, transparent: true, opacity: 0.95, depthWrite: false });
     const spr = new THREE.Sprite(sm);
     spr.position.set(x, y, z);
-    spr.scale.set(0.5, 0.5, 1);
+    // Preserve the variant's aspect ratio (variant 2/3 are landscape).
+    const a = pick.aspect || 1;
+    spr.scale.set(0.5 * a, 0.5, 1);
+    spr.userData.baseW = 0.5 * a; spr.userData.baseH = 0.5;
     scene.add(spr);
     bloodFx.push({ kind: 'spatter', obj: spr, t: 0, dur: 0.6 });
   }
@@ -1046,7 +1065,8 @@ function updateBloodFx(dt) {
     } else {
       // Spatter: stretches upward into the air a little, then fades.
       const stretch = 1 + Math.min(k / 0.4, 1) * 0.7;
-      fx.obj.scale.set(0.5 * (1 + k * 0.4), 0.5 * stretch, 1);
+      const bw = fx.obj.userData.baseW || 0.5, bh = fx.obj.userData.baseH || 0.5;
+      fx.obj.scale.set(bw * (1 + k * 0.4), bh * stretch, 1);
       fx.obj.material.opacity = 0.95 * (1 - Math.max(0, (k - 0.35) / 0.65));
     }
   }
@@ -1376,12 +1396,30 @@ const SFX_FILES = {
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
   slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
 };
-let audioCtx = null, sfxBufs = {}, sfxMaster = null;
+let audioCtx = null, sfxBufs = {}, sfxMaster = null, sfxReverb = null;
+// Echoing reverb for the slash SFX: a ConvolverNode fed by a
+// procedurally generated impulse (decaying noise burst, ~1.8 s, a large
+// hard space — the theater's hall). Dry stays full; a copy is sent to
+// the convolver and mixed back wet (~0.3) so slashes echo without
+// muddying. No new audio files.
+function makeImpulse(ctx, dur, decay) {
+  const rate = ctx.sampleRate, len = Math.floor(rate * dur);
+  const buf = ctx.createBuffer(2, len, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  return buf;
+}
 function ensureAudio() {
   if (!audioCtx) {
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       sfxMaster = audioCtx.createGain(); sfxMaster.gain.value = 0.7; sfxMaster.connect(audioCtx.destination);
+      sfxReverb = audioCtx.createConvolver();
+      sfxReverb.buffer = makeImpulse(audioCtx, 1.8, 2.5);
+      const wet = audioCtx.createGain(); wet.gain.value = 0.3;
+      sfxMaster.connect(sfxReverb); sfxReverb.connect(wet); wet.connect(audioCtx.destination);
       const all = new Set();
       Object.values(SFX_FILES).flat().forEach((f) => all.add(f));
       all.forEach((f) => {

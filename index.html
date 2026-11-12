@@ -48,7 +48,7 @@
   #objectives .done{color:#7dff9a;text-decoration:line-through}
   #minimap{position:fixed;right:16px;top:16px;z-index:5;background:rgba(0,0,0,.6);border:1px solid #445}
   #msg{position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:6;background:rgba(0,0,0,.7);padding:10px 16px;border:1px solid #667;font-size:17px;display:none}
-  #cross{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;font-size:22px;pointer-events:none;opacity:.85;text-shadow:0 0 4px #000}
+  #cross{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;font-size:22px;pointer-events:none;opacity:.85;text-shadow:0 0 4px #000;transition:opacity .5s}
   #overlay{position:fixed;inset:0;z-index:10;background:rgba(5,10,8,.88);display:flex;align-items:center;justify-content:center;text-align:center}
   #overlay .box{max-width:720px;padding:24px}
   #overlay h1{margin:0 0 8px;font-size:38px;letter-spacing:1px}
@@ -503,6 +503,47 @@ function box(x,z,w,d,h,color,y,opts){
   const o = { mesh:m, cx:x, cz:z, ow:w, od:d, oh:h, minX:x-w/2, maxX:x+w/2, minZ:z-d/2, maxZ:z+d/2, h,
     material: opts.material || 'concrete', destructible: !!opts.destructible, hp: opts.hp || 0, maxHp: opts.hp || 0, baseColor: color, textured: !!opts.texture };
   obstacles.push(o); losMeshes.push(m); return o;
+}
+// Camera occlusion (same pattern as theater.html): a wall between the
+// camera and the player must not render, or it blocks the view of the
+// player. Each frame, raycast from the camera to the player's chest;
+// any large solid obstacle the ray hits is hidden until the ray no
+// longer hits it. Render-only: the meshes stay in the scene (collision
+// and LOS use the obstacles array, not visibility), and the raycaster
+// intersects meshes regardless of visibility.
+// The occluders are the solid obstacles tall enough to reach the
+// camera-to-chest ray (over-shoulder camera ~2.1 m, chest ~1.4 m,
+// orbit camera 1.5-3 m): the perimeter walls, brick/sandbag walls, the
+// blue/red/olive buildings, the security-office walls, the 2 m crates,
+// the chain-link fence. Low props (1.2 m crates, barrels, roadblocks,
+// desks, the dumpster, the Lambo base) never reach the ray and are not
+// occluders; bushes/trees/pallets are Groups, not meshes, and are
+// excluded too. The list is built lazily (all obstacles exist by the
+// first frame) and rebuilt if the obstacles array changes size (a
+// destructible being removed).
+const camRay = new THREE.Raycaster();
+const _camDir = new THREE.Vector3();
+const _chest = new THREE.Vector3();
+let _occWalls = null, _occCount = -1;
+function courtyardOccluders() {
+  if (!_occWalls || _occCount !== obstacles.length) {
+    _occWalls = obstacles.filter((o) => o.mesh && o.mesh.isMesh && (o.oh || 0) >= 2).map((o) => o.mesh);
+    _occCount = obstacles.length;
+  }
+  return _occWalls;
+}
+function updateWallOcclusion() {
+  const walls = courtyardOccluders();
+  _chest.set(player.position.x, player.position.y + 1.4, player.position.z);
+  _camDir.copy(_chest).sub(camera.position);
+  const dist = _camDir.length();
+  if (dist < 0.01) { for (const w of walls) w.visible = true; return; }
+  _camDir.normalize();
+  camRay.set(camera.position, _camDir);
+  camRay.far = dist;
+  const hits = camRay.intersectObjects(walls, false);
+  const hit = new Set(hits.map(h => h.object));
+  for (const w of walls) w.visible = !hit.has(w);
 }
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(90,90), texturedMat(0x6f7d5a, 'assets/textures/ground/ground_concrete_slab_1024.webp', 12, 12));
 ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
@@ -1039,6 +1080,17 @@ let health = 100, detection = 0, intel = 0, gameOver = false, won = false;
 let weapon = 'pistol'; // pistol | rifle
 const weapons = { pistol:{mag:12, max:12, dmg:34, rate:0.28}, rifle:{mag:30, max:30, dmg:50, rate:0.11} };
 let ammoInMag = 12, lastShot = 0, reloadUntil = 0, currentAnim = 'idle';
+// ---- Gun-battle + headshot slow motion ----
+// timeScale multiplies the gameplay dt in animate (1 = real time,
+// 0.4 = slow). It ramps smoothly toward timeScaleTarget (~0.5 s each
+// way, driven by real time), never snaps. Two triggers: a big gun
+// battle (2+ live guards within 25 m AND a shot fired in the last 3 s),
+// and a headshot (set at the moment Kyle's shot leaves, so time is
+// already slowing as the tracer flies; held ~1.5 s). Weather/sky and
+// the idle orbit keep real-time timing and are not scaled.
+let timeScale = 1, timeScaleTarget = 1, lastGunfireT = 0, headshotSlowT = 0;
+const SLOWMO_SCALE = 0.4, SLOWMO_RAMP = 5;
+const BATTLE_RANGE = 25, BATTLE_MIN_GUARDS = 2, BATTLE_SHOT_WINDOW = 3000, HEADSHOT_HOLD = 1.5;
 
 // ---------- Real player models (with capsule / box-gun fallbacks) ----------
 // WEAPON SPLIT (user-corrected, standing): unprefixed GLBs are ENEMY
@@ -1293,7 +1345,7 @@ function makeGuard(x,z,waypoints){
   const coneMat = new THREE.MeshBasicMaterial({color:0xffff00, transparent:true, opacity:0.13, side:THREE.DoubleSide, depthWrite:false});
   const cone = new THREE.Mesh(coneGeo, coneMat); cone.rotation.x = -Math.PI/2; cone.rotation.z = Math.PI/2; cone.position.set(0,1.2,5); g.add(cone);
   g.position.set(x, CHAR_LIFT, z); scene.add(g);
-  return { group:g, mesh:b, capsuleBody:b, capsuleHead:h, cone, coneMat, waypoints, wp:0, yaw:0, hp:100, state:'PATROL', meter:0, lastKnown:null, searchT:0, alertT:0, shotT:0, dead:false, realModel:null, enemyWeapon:null };
+  return { group:g, mesh:b, capsuleBody:b, capsuleHead:h, cone, coneMat, waypoints, wp:0, yaw:0, hp:100, state:'PATROL', meter:0, lastKnown:null, searchT:0, alertT:0, shotT:0, ammo:30, reloadUntil:0, dead:false, realModel:null, enemyWeapon:null };
 }
 const guards = [
   makeGuard(-10,0,[[-10,0],[-10,-20],[10,-20],[10,0]]),
@@ -1428,6 +1480,19 @@ function makeDecalTexture(kind){
   const t = new THREE.CanvasTexture(c); return t;
 }
 const holeTex = makeDecalTexture('hole'), bloodTex = makeDecalTexture('blood');
+// Real effect textures (RGBA WebP, transparent): blood spatter for the
+// hit sprite, bullet hole for wall-impact decals.
+const bloodSpatterTexs = [
+  'assets/textures/effects/blood_spatter.webp',
+  'assets/textures/effects/blood_spatter_2.webp',
+  'assets/textures/effects/blood_spatter_3.webp',
+].map((u) => { const t = texLoader.load(u); t.colorSpace = THREE.SRGBColorSpace; return t; });
+const bulletHoleTexs = [
+  'assets/textures/effects/bullet_hole.webp',
+  'assets/textures/effects/bullet_hole_2.webp',
+  'assets/textures/effects/bullet_hole_3.webp',
+].map((u) => { const t = texLoader.load(u); t.colorSpace = THREE.SRGBColorSpace; return t; });
+function pickTex(list) { return list[Math.floor(Math.random() * list.length)]; }
 const decals = []; const MAX_DECALS = 200;
 function addDecal(point, normal, kind){
   const size = kind === 'blood' ? 0.35 : 0.11;
@@ -1462,29 +1527,128 @@ function spawnParticles(point, color, count, speed, size, life, grav){
   }
   while (particles.length > 120){ const old = particles.shift(); scene.remove(old.mesh); }
 }
-function spawnSparkBurst(point){
-  spawnParticles(point, 0xffaa00, 8, 4, 0.03, 0.25, 6);
-  spawnParticles(point, 0xffcc55, 1, 0, 0.22, 0.08, 0); // quick flash
+// Blood mist: dark-red, slow, expanding cloud that hangs briefly and
+// fades over ~0.5 s. One helper for BOTH guard hits and Kyle being hit.
+function spawnBloodMist(point){
+  spawnParticles(point, 0x5a0a0a, 14, 2.0, 0.06, 0.5, 2.0);
+  spawnParticles(point, 0x8a1010, 6, 1.2, 0.05, 0.5, 2.0);
 }
-function spawnHitSpray(point){
-  // Brief red spray in the air on a guard hit: arcs out, falls, fades
-  // in under a second. No lingering cloud, no body parts.
-  spawnParticles(point, 0x8a1010, 10, 3.5, 0.05, 0.7, 9.8);
+// Blood-spatter sprite (real blood_spatter.webp): a billboard sprite at
+// the hit point that stretches upward over ~0.25 s, like the spatter is
+// thrown into the air, then fades away by ~0.6 s total.
+const spatters = [];
+function spawnBloodSpatter(point){
+  const mat = new THREE.SpriteMaterial({ map: pickTex(bloodSpatterTexs), transparent: true, depthWrite: false, opacity: 0.95 });
+  mat.rotation = Math.random() * Math.PI * 2;
+  const s = new THREE.Sprite(mat);
+  s.position.copy(point);
+  s.scale.set(0.55, 0.55, 1);
+  scene.add(s);
+  spatters.push({ sprite: s, t: 0 });
+  while (spatters.length > 24){ const old = spatters.shift(); scene.remove(old.sprite); old.sprite.material.dispose(); }
+}
+// Sparks for a bullet striking a wall or solid surface: bright
+// yellow-white, fast, gone in ~0.3 s. People get blood, never sparks.
+function spawnSparks(point){
+  spawnParticles(point, 0xfff6cc, 10, 5, 0.03, 0.3, 6);
+  spawnParticles(point, 0xffffff, 2, 0, 0.2, 0.08, 0); // quick flash
+}
+// Bullet-hole decals (real bullet_hole.webp): small flat planes on the
+// surface, persistent, newest 40 kept.
+const holeDecals = []; const MAX_HOLE_DECALS = 40;
+function spawnBulletHole(point, normal){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.15),
+    new THREE.MeshBasicMaterial({ map: pickTex(bulletHoleTexs), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  m.position.copy(point).addScaledVector(normal, 0.01);
+  m.lookAt(point.x + normal.x, point.y + normal.y, point.z + normal.z);
+  m.rotateZ(Math.random() * Math.PI * 2);
+  scene.add(m); holeDecals.push(m);
+  while (holeDecals.length > MAX_HOLE_DECALS){ const old = holeDecals.shift(); scene.remove(old); old.geometry.dispose(); old.material.dispose(); }
 }
 // Shell casings: small brass boxes, eject right + up, bounce once, rest
 // ~4 s, then fade. Capped at 30 so phones stay smooth.
 const casings = []; const MAX_CASINGS = 30;
-function ejectCasing(){
-  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
-  const start = player.position.clone().addScaledVector(right, 0.4).addScaledVector(fwd, 0.3);
-  start.y = player.position.y + (crouching ? 1.0 : 1.35);
+function ejectCasingAt(pos, fwd, height){
+  // fwd: the shooter's forward unit vector (x, z). The casing pops out
+  // to the shooter's right + up, arcing back slightly.
+  const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const start = pos.clone().addScaledVector(right, 0.4).addScaledVector(fwd, 0.3);
+  start.y = height;
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, 0.02),
     new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.7, roughness: 0.3, transparent: true }));
   mesh.position.copy(start); scene.add(mesh);
   const vel = right.clone().multiplyScalar(1.8 + Math.random()).add(new THREE.Vector3(0, 2.2 + Math.random(), 0)).addScaledVector(fwd, -0.4);
   casings.push({ mesh: mesh, vel: vel, bounced: false, restT: 0 });
   while (casings.length > MAX_CASINGS){ const old = casings.shift(); scene.remove(old.mesh); }
+}
+function ejectCasing(){
+  ejectCasingAt(player.position, new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)), player.position.y + (crouching ? 1.0 : 1.35));
+}
+// ---- Tracers + muzzle flash ----
+// Muzzle position: the real weapon pivot carries userData.muzzleZ
+// (barrel tip on local +Z); the box-gun fallback uses its front end
+// (local -Z, the facing direction).
+const _muzzleV = new THREE.Vector3();
+function getPlayerMuzzle(out){
+  const pivot = weaponPivots[playerLoadout] ? weaponPivots[playerLoadout][weaponVariant] : null;
+  if (pivot && pivot.visible && pivot.userData.handAttached){
+    const mz = pivot.userData.muzzleZ ?? weaponVariantInfo().len / 2;
+    return pivot.localToWorld(out.set(0, 0, mz));
+  }
+  return gun.localToWorld(out.set(0, 0, -0.45));
+}
+// Muzzle flash: one shared crossed-plane burst (additive), shown ~50 ms
+// at the muzzle on every shot, Kyle's and guards'.
+const flashMat = new THREE.MeshBasicMaterial({ color: 0xffdd88, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+const flashMesh = new THREE.Group();
+{
+  const p1 = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.28), flashMat);
+  const p2 = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 0.28), flashMat);
+  p2.rotation.z = Math.PI / 2;
+  flashMesh.add(p1); flashMesh.add(p2);
+  flashMesh.visible = false; scene.add(flashMesh);
+}
+let flashT = 0;
+function showMuzzleFlash(at, dir){
+  flashMesh.position.copy(at);
+  flashMesh.lookAt(at.x + dir.x, at.y + dir.y, at.z + dir.z);
+  flashMesh.visible = true; flashT = 0.05;
+  flashMat.opacity = 1;
+}
+// Tracers: thin additive cylinders that grow from the muzzle toward the
+// hit point over ~0.06 s (fast, visible travel), then fade by ~0.15 s.
+// Pooled (8) so rapid fire never leaks objects.
+const tracers = [];
+const TRACER_MAX = 8;
+const tracerGeo = new THREE.CylinderGeometry(0.012, 0.012, 1, 5, 1, true);
+for (let i = 0; i < TRACER_MAX; i++){
+  const m = new THREE.Mesh(tracerGeo, new THREE.MeshBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+  m.visible = false; scene.add(m);
+  tracers.push({ mesh: m, from: new THREE.Vector3(), to: new THREE.Vector3(), t: 0, life: 0.15 });
+}
+let tracerIdx = 0;
+const _trEnd = new THREE.Vector3(), _trMid = new THREE.Vector3(), _trDir = new THREE.Vector3(), _trUp = new THREE.Vector3(0, 1, 0);
+const _guardMuzzle = new THREE.Vector3(), _kyleChest = new THREE.Vector3(), _guardDir = new THREE.Vector3();
+function spawnTracer(from, to){
+  const tr = tracers[tracerIdx]; tracerIdx = (tracerIdx + 1) % TRACER_MAX;
+  tr.from.copy(from); tr.to.copy(to); tr.t = 0; tr.life = 0.15;
+  tr.mesh.visible = true; tr.mesh.material.opacity = 0.9;
+}
+function updateTracers(dt){
+  for (const tr of tracers){
+    if (!tr.mesh.visible) continue;
+    tr.t += dt;
+    const grow = Math.min(tr.t / 0.06, 1);
+    _trEnd.copy(tr.to).sub(tr.from).multiplyScalar(grow).add(tr.from);
+    _trDir.copy(_trEnd).sub(tr.from);
+    const len = _trDir.length();
+    if (len > 0.001){ _trDir.multiplyScalar(1 / len); tr.mesh.quaternion.setFromUnitVectors(_trUp, _trDir); }
+    _trMid.copy(tr.from).add(_trEnd).multiplyScalar(0.5);
+    tr.mesh.position.copy(_trMid);
+    tr.mesh.scale.set(1, Math.max(len, 0.001), 1);
+    if (tr.t > 0.06) tr.mesh.material.opacity = 0.9 * Math.max(0, 1 - (tr.t - 0.06) / 0.09);
+    if (tr.t >= tr.life) tr.mesh.visible = false;
+  }
 }
 function updateEffects(dt){
   for (let i = particles.length - 1; i >= 0; i--){
@@ -1511,6 +1675,17 @@ function updateEffects(dt){
       if (c.restT > 4.5){ scene.remove(c.mesh); casings.splice(i, 1); }
     }
   }
+  // Muzzle flash: ~50 ms, then off.
+  if (flashT > 0){ flashT -= dt; if (flashT <= 0){ flashMesh.visible = false; flashMat.opacity = 0; } }
+  // Blood-spatter sprites: stretch upward over ~0.25 s, fade by ~0.6 s.
+  for (let i = spatters.length - 1; i >= 0; i--){
+    const sp = spatters[i]; sp.t += dt;
+    const k = Math.min(sp.t / 0.25, 1);
+    sp.sprite.scale.set(0.55, 0.55 + 0.35 * k, 1);
+    if (sp.t > 0.25) sp.sprite.material.opacity = Math.max(0, 0.95 * (1 - (sp.t - 0.25) / 0.35));
+    if (sp.t >= 0.6){ scene.remove(sp.sprite); sp.sprite.material.dispose(); spatters.splice(i, 1); }
+  }
+  updateTracers(dt);
 }
 // Destructible damage: chip (darken + shrink + chips + hole), then break.
 function damageDestructible(o, dmg, point, normal){
@@ -1898,12 +2073,30 @@ const SFX_FILES = {
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
   slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
 };
-let audioCtx = null, sfxBufs = {}, sfxMaster = null;
+let audioCtx = null, sfxBufs = {}, sfxMaster = null, sfxReverb = null;
+// Echoing reverb for gunshots + SFX: a ConvolverNode fed by a
+// procedurally generated impulse (decaying noise burst, ~1.8 s, a large
+// hard space — the courtyard's walls and buildings). The dry signal
+// stays at full volume; a copy is sent to the convolver and mixed back
+// wet (~0.3) so shots echo without muddying. No new audio files.
+function makeImpulse(ctx, dur, decay) {
+  const rate = ctx.sampleRate, len = Math.floor(rate * dur);
+  const buf = ctx.createBuffer(2, len, rate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  return buf;
+}
 function ensureAudio(){
   if (!audioCtx){
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       sfxMaster = audioCtx.createGain(); sfxMaster.gain.value = 0.7; sfxMaster.connect(audioCtx.destination);
+      sfxReverb = audioCtx.createConvolver();
+      sfxReverb.buffer = makeImpulse(audioCtx, 1.8, 2.5);
+      const wet = audioCtx.createGain(); wet.gain.value = 0.3;
+      sfxMaster.connect(sfxReverb); sfxReverb.connect(wet); wet.connect(audioCtx.destination);
       // Preload + decode every sound file. Decoding works while the
       // context is suspended; it is resumed on user gestures below.
       const all = new Set();
@@ -2061,24 +2254,41 @@ function tryShoot(){
   const w = weapons[weapon];
   if (now-lastShot < w.rate*1000) return;
   if (ammoInMag<=0){ showMsg('Empty — press R to reload',1200); return; }
-  lastShot = now; ammoInMag--;
+  lastShot = now; ammoInMag--; lastGunfireT = now; // any shot feeds the battle slow-mo
   ejectCasing();
   playShotSound();
   playPlayerOneShot(weapon==='rifle' ? (crouching ? 'fireRifleCrouch' : 'fireRifle') : 'firePistol');
-  // Ray from camera centre.
+  // Ray from camera centre. Hitscan: the shot resolves instantly, so the
+  // tracer and the slow-mo carry the anticipation.
   const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
   ray.set(camera.position, dir); ray.far = 60;
   const targets = guards.filter(g=>!g.dead).map(g=>g.group);
   const hits = ray.intersectObjects(targets, true);
   let guardHit = false;
+  let endPoint = null;
   if (hits.length){
     // Walk up the parent chain: a hit on a real enemy FBX mesh or its
     // weapon is nested several levels below the guard group.
     let node = hits[0].object; let g = null;
     while (node){ g = guards.find(x=>x.group===node); if (g) break; node = node.parent; }
-    if (g){ guardHit = true; g.hp -= w.dmg; g.meter = 100; g.state='ALERT'; g.lastKnown = player.position.clone();
+    if (g){ guardHit = true; endPoint = hits[0].point.clone();
+      // HEADSHOT: the hit struck the guard's head — the top ~15% of the
+      // guard's height (local y >= 2.04 of a 2.4 m guard), or the head
+      // sphere itself (capsuleHead). For a real FBX guard model the head
+      // is a different mesh, so the height fraction is the fallback that
+      // covers it. The slow-mo starts NOW, at fire time, so time is
+      // already slowing as the tracer flies and the kill lands in slow-mo.
+      const _localY = g.group.worldToLocal(hits[0].point.clone()).y;
+      const isHeadshot = hits[0].object === g.capsuleHead || _localY >= 2.04;
+      // The slow-mo starts NOW, at fire time, so time is already slowing
+      // as the tracer flies and the kill lands in slow-mo. A headshot
+      // kill holds ~1.5 s; a headshot that does not kill dips briefly
+      // (~0.4 s) for the tracer flight and the hit, then ramps back out.
+      if (isHeadshot) headshotSlowT = (g.hp - w.dmg <= 0) ? HEADSHOT_HOLD : 0.4;
+      g.hp -= w.dmg; g.meter = 100; g.state='ALERT'; g.lastKnown = player.position.clone();
       playSfx(pickSfx(SFX_FILES.hit));
-      spawnHitSpray(hits[0].point.clone());
+      spawnBloodMist(hits[0].point.clone());
+      spawnBloodSpatter(hits[0].point.clone());
       addDecal(new THREE.Vector3(g.group.position.x, 0.02, g.group.position.z), new THREE.Vector3(0, 1, 0), 'blood');
       if (g.hp<=0){ g.dead=true; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g); showMsg('Guard down',1400); }
       else showMsg('Hit!',700);
@@ -2090,16 +2300,26 @@ function tryShoot(){
     const surf = ray.intersectObjects(losMeshes.concat([ground]), false);
     if (surf.length){
       const sh = surf[0];
-      const n = sh.object === ground ? new THREE.Vector3(0, 1, 0) : sh.face.normal.clone();
+      // World-space surface normal: the raycast face normal is object-
+      // local, so transform it by the object's matrix (ground is flat,
+      // up). Falls back to up if there is no face.
+      const n = sh.object === ground ? new THREE.Vector3(0, 1, 0) : (sh.face ? sh.face.normal.clone().transformDirection(sh.object.matrixWorld) : new THREE.Vector3(0, 1, 0));
       const o = obstacles.find(x=>x.mesh === sh.object);
       if (o && o.destructible) damageDestructible(o, w.dmg, sh.point, n);
       else {
-        addDecal(sh.point, n, 'hole');
-        if (o && o.material === 'metal') spawnSparkBurst(sh.point);
-        else spawnParticles(sh.point, o && o.material === 'wood' ? 0x8a6a3a : 0x888888, 5, 1.5, 0.05, 0.5, 9.8);
+        spawnBulletHole(sh.point, n);
+        spawnSparks(sh.point);
+        if (!(o && o.material === 'metal')) spawnParticles(sh.point, o && o.material === 'wood' ? 0x8a6a3a : 0x888888, 5, 1.5, 0.05, 0.5, 9.8);
       }
+      endPoint = sh.point.clone();
     }
   }
+  // Muzzle flash + tracer on EVERY shot — hit, wall, or clean miss
+  // (misses fly to max range). The flash sits at the gun's muzzle.
+  if (!endPoint) endPoint = camera.position.clone().addScaledVector(dir, 60);
+  const muzzle = getPlayerMuzzle(_muzzleV);
+  showMuzzleFlash(muzzle, dir);
+  spawnTracer(muzzle, endPoint);
   noiseAlert(26, true);
 }
 function tryTakedown(){
@@ -2175,8 +2395,24 @@ function updateGuard(g, dt, now){
   } else if (g.state==='SUSPICIOUS'){
     desiredYaw = Math.atan2(toP.x,toP.z); speed=0.5;
   } else if (g.state==='ALERT'){
+    // Guard ammo: MP5K, 30-round mag like the player's rifle. No
+    // infinite fire — when the mag runs dry the guard reloads for ~2 s
+    // (no shots) and then resumes with a full mag.
+    if (g.reloadUntil && now >= g.reloadUntil) { g.ammo = 30; g.reloadUntil = 0; }
     if (g.lastKnown){ const dx=g.lastKnown.x-gp.x, dz=g.lastKnown.z-gp.z; const d=Math.hypot(dx,dz); desiredYaw=Math.atan2(dx,dz); speed = d>2?4.5:0;
-      if (seen && dist<22 && now-g.shotT>900){ g.shotT=now; health-=6; playPlayerOneShot('hitReaction'); showMsg('Taking fire!',800); if (health<=0){ health=0; playPlayerOneShot(pickRandomDeath(), {hold:true}); endScreen('MISSION FAILED — you were taken down.'); } }
+      if (seen && dist<22 && !g.reloadUntil && now-g.shotT>900){ g.shotT=now; lastGunfireT = now; g.ammo--;
+        if (g.ammo <= 0) g.reloadUntil = now + 2000;
+        // Guard shot: tracer + flash + casing from the guard's muzzle,
+        // blood mist + spatter on Kyle at the hit point (his chest).
+        const gMuzzle = _guardMuzzle.set(gp.x + Math.sin(g.yaw)*0.5, gp.y + 1.45, gp.z + Math.cos(g.yaw)*0.5);
+        const kChest = _kyleChest.set(p.x, p.y + 1.4, p.z);
+        const gDir = _guardDir.copy(kChest).sub(gMuzzle).normalize();
+        showMuzzleFlash(gMuzzle, gDir);
+        spawnTracer(gMuzzle, kChest);
+        ejectCasingAt(gp, new THREE.Vector3(Math.sin(g.yaw), 0, Math.cos(g.yaw)), gp.y + 1.3);
+        spawnBloodMist(kChest.clone());
+        spawnBloodSpatter(kChest.clone());
+        health-=6; playPlayerOneShot('hitReaction'); showMsg('Taking fire!',800); if (health<=0){ health=0; playPlayerOneShot(pickRandomDeath(), {hold:true}); endScreen('MISSION FAILED — you were taken down.'); } }
     }
   } else if (g.state==='SEARCH'){
     g.searchT += dt;
@@ -2282,7 +2518,24 @@ function orbitCamPos(out) {
 
 function animate(){
   requestAnimationFrame(animate);
-  const dt = Math.min(0.05, clock.getDelta()); const now = performance.now();
+  const rawDt = Math.min(0.05, clock.getDelta()); const now = performance.now();
+  // Gun-battle / headshot slow motion: ramp the time scale smoothly
+  // toward its target (real-time ramp, ~0.5 s each way). The headshot
+  // hold wins; otherwise a live gun battle (2+ guards within 25 m AND
+  // a shot fired in the last 3 s) holds 0.4x; anything else returns to
+  // 1.0x. Only the gameplay dt is scaled — weather/sky and the idle
+  // orbit keep real-time timing.
+  if (headshotSlowT > 0) headshotSlowT -= rawDt;
+  let nearBattle = false;
+  if (now - lastGunfireT < BATTLE_SHOT_WINDOW){
+    let near = 0;
+    for (const g of guards){ if (!g.dead && g.group.position.distanceTo(player.position) <= BATTLE_RANGE) near++; }
+    nearBattle = near >= BATTLE_MIN_GUARDS;
+  }
+  timeScaleTarget = (headshotSlowT > 0 || nearBattle) ? SLOWMO_SCALE : 1;
+  timeScale += (timeScaleTarget - timeScale) * Math.min(1, rawDt * SLOWMO_RAMP);
+  if (Math.abs(timeScaleTarget - timeScale) < 0.002) timeScale = timeScaleTarget;
+  const dt = rawDt * timeScale;
   if (!gameOver && !won && (locked || touchMode)){
     const sprinting = ((keys['ShiftLeft']||keys['ShiftRight']) || touchSprint) && !crouching;
     let speed = crouching?2:(sprinting?7:(aiming?2.5:4.2));
@@ -2380,7 +2633,10 @@ function animate(){
   const back = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
   const right = new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
   const overlayHidden = document.getElementById('overlay').style.display === 'none';
-  const orbiting = idleOrbitActive(dt, (locked || touchMode) && !gameOver && !won && overlayHidden);
+  const orbiting = idleOrbitActive(rawDt, (locked || touchMode) && !gameOver && !won && overlayHidden);
+  // Crosshair fades out while the idle cinematic orbits (the CSS
+  // transition makes it a slow ~0.5 s fade), and back in for normal play.
+  document.getElementById('cross').style.opacity = orbiting ? '0' : '.85';
   let camPos;
   if (orbiting) {
     camPos = orbitCamPos(new THREE.Vector3());
@@ -2391,6 +2647,9 @@ function animate(){
   camera.position.lerp(camPos, 0.35);
   if (orbiting) camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
   else camera.lookAt(player.position.x - Math.sin(yaw)*8, player.position.y+1.5+Math.sin(pitch)*8, player.position.z - Math.cos(yaw)*8);
+  // No wall between the camera and the player: hide any large obstacle
+  // the camera-to-chest ray hits (over-shoulder and orbit alike).
+  updateWallOcclusion();
   // HUD.
   document.getElementById('healthBar').style.width = Math.max(0,health)+'%';
   document.getElementById('detectFill').style.width = Math.round(detection)+'%';
@@ -2403,7 +2662,7 @@ function animate(){
   const _ant=document.getElementById('animText'); if(_ant) _ant.textContent = 'Anim: '+_dispAnim+' ('+(fbxPlaying ? 'Agent_Kyle.fbx, FBX' : 'procedural capsule')+') — FBX: '+(ANIM_MAP[_dispAnim]||ANIM_MAP[currentAnim]||'—');
   const _pt=document.getElementById('posText'); if(_pt) _pt.textContent = 'Intel: '+intel+'/3  •  X '+player.position.x.toFixed(0)+' Z '+player.position.z.toFixed(0);
   drawMinimap();
-  updateSky(dt);
+  updateSky(rawDt); // weather runs on real time, never slowed by the battle slow-mo
   renderer.render(scene,camera);
 }
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
