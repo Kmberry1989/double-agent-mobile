@@ -654,7 +654,19 @@ function seedKatanaOffset(name, forLeft, meshNode, hand) {
     const handleWorld = meshNode.localToWorld(KATANA_HANDLE.clone());
     const handleHand = hand.worldToLocal(handleWorld.clone());
     const key = forLeft ? name + '|L' : name;
-    computedKatanaOffsets.set(key, { x: -handleHand.x, y: -handleHand.y, z: -handleHand.z });
+    // Rotation/scale come from the baked entry (0/0/0/1 for the katana)
+    // — the measurement only corrects the POSITION. Without these, the
+    // missing rx/ry/rz/s fall through to the rifle class default
+    // (-12/2/61/1.32), which rotates the blade 61 deg off the hand and
+    // scales it 1.32x. (That is what broke the first version of this
+    // fix: the position measured correctly — Rochelle's reproduced the
+    // baked +0.414/-0.412 exactly — but the 61-deg rotation swung both
+    // swords out of her palms.)
+    const baked = (forLeft ? BAKED_OFFSETS[name + '|L'] : null) || BAKED_OFFSETS[name] || {};
+    computedKatanaOffsets.set(key, {
+      x: -handleHand.x, y: -handleHand.y, z: -handleHand.z,
+      rx: baked.rx ?? 0, ry: baked.ry ?? 0, rz: baked.rz ?? 0, s: baked.s ?? 1,
+    });
     // Drop the cached offset so the next getOffset re-seeds from the
     // measured value (a stale entry would be the old character's
     // numbers, or the global baked entry).
