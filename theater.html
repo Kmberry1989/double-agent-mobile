@@ -7,8 +7,8 @@
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#120a08;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
   canvas{display:block}
-  #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
-  #win{display:none}
+  #overlay,#win,#lose{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
+  #win,#lose{display:none}
   button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
   a{color:#ffd97a}
   .levels{position:fixed;top:10px;right:10px;z-index:11;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:46vw}
@@ -18,6 +18,9 @@
   #mission b{color:#ffd97a}
   #meterWrap{width:120px;height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:6px;overflow:hidden}
   #meterFill{height:100%;width:0%;background:#c9a227;border-radius:3px;transition:width .2s}
+  #healthWrap{width:120px;height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:4px;overflow:hidden}
+  #healthFill{height:100%;width:100%;background:#c0392b;border-radius:3px;transition:width .2s}
+  #dmgFlash{position:fixed;inset:0;background:rgba(192,57,43,.35);z-index:8;pointer-events:none;opacity:0;transition:opacity .35s}
   #barTop,#barBottom{position:fixed;left:0;right:0;height:0;background:#000;z-index:9;transition:height .6s}
   #barTop{top:0} #barBottom{bottom:0}
 </style>
@@ -25,10 +28,12 @@
 </head>
 <body>
 <nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html" class="cur" aria-current="page">Theater</a></nav>
-<div id="mission"><b>Enemies:</b> <span id="enemyCount">0 / 8</span><div id="meterWrap"><div id="meterFill"></div></div></div>
+<div id="mission"><b>Enemies:</b> <span id="enemyCount">0 / 8</span><div id="meterWrap"><div id="meterFill"></div></div><div id="healthWrap"><div id="healthFill"></div></div></div>
+<div id="dmgFlash"></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>The Theater</h1><button id="startBtn">Enter the theater</button></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
+<div id="lose"><h1>Defeated</h1><p id="loseText"></p><button onclick="location.reload()">Try again</button></div>
 <script type="module">
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
@@ -401,7 +406,7 @@ function enemiesNearDrape(r) {
   // toppled drape's position, drapeState.z + 1). Distance is measured to
   // the closest point on the segment, not to the centre.
   return enemies.filter((e) => {
-    if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing')) return false;
+    if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking')) return false;
     const cx = Math.max(-DRAPE_HALF_W, Math.min(DRAPE_HALF_W, e.x));
     return Math.hypot(e.x - cx, e.z - (drapeState.z + 1)) < r;
   });
@@ -909,9 +914,10 @@ function attachEnemySword(enemy, swordFile) {
 function makeEnemy(i) {
   const slot = ENEMY_ROSTER[i];
   const enemy = {
-    i, state: 'waiting', // waiting -> rising -> walking -> chasing -> menacing -> falling -> gone
+    i, state: 'waiting', // waiting -> rising -> walking -> chasing -> menacing -> attacking -> falling -> gone
     x: ENEMY_SPAWNS[i][0], z: ENEMY_SPAWNS[i][1], y: -0.6,
     riseT: 0, fallT: 0, sway: Math.random() * 6.28,
+    atkCd: 0, atkT: 0, hitDone: false, // enemy attack: cooldown, swing timer, hit landed
     is3D: !!slot.is3D, mesh: null, model: null, mixer: null, _cur: null, sword: null,
   };
   if (slot.is3D) {
@@ -1032,7 +1038,7 @@ function updateEnemies(dt, t) {
       e.state = 'gone'; if (e.mesh) e.mesh.visible = false;
     }
   }
-  if (started && !won && !cine && !bowPhase && defeated < 8) {
+  if (started && !won && !lost && !cine && !bowPhase && defeated < 8) {
     // A 'falling' enemy is dying, not a live fighter — it must not block the
     // watchdog. (The normal flow already spawns the next enemy the moment
     // one falls, so the next one is 'rising' while this one tips over. If
@@ -1046,7 +1052,7 @@ function updateEnemies(dt, t) {
         e.state = 'gone'; if (e.mesh) e.mesh.visible = false;
       }
     }
-    const live = enemies.some((e) => e.state === 'rising' || e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing');
+    const live = enemies.some((e) => e.state === 'rising' || e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'attacking');
     if (!live) { console.warn('theater: no live enemy, watchdog spawning next'); spawnNextEnemy(); }
   }
 }
@@ -1140,13 +1146,36 @@ function updateOneEnemy(e, dt, t) {
         if (e.is3D) playEnemyAnim(e, 'walk');
       } else { e.state = 'menacing'; }
     } else if (e.state === 'menacing') {
-      // Crowd Rochelle and sway — no health/damage system exists in this
-      // level (none was specified), so they menace without hurting her.
-      // A 3D enemy faces her and plays the idle; the billboard faces the
-      // camera (as before).
+      // Crowd Rochelle and sway. When the attack cooldown has expired,
+      // swing at her: a heavy overhead chop (atkChop), slower than her
+      // attacks — the swing is 1.433 s with the damage landing mid-swing,
+      // then a ~2 s recovery before the next swing. She can kill them
+      // before it lands, or dash away; if she is still in range when
+      // the chop comes down, it hurts her.
+      if (e.atkCd > 0) e.atkCd -= dt;
+      if (e.atkCd <= 0 && !lost) {
+        e.state = 'attacking'; e.atkT = 0; e.hitDone = false;
+        if (e.is3D) playEnemyAnim(e, ENEMY_ATK_CLIP);
+        return;
+      }
       if (e.is3D) { faceEnemy3D(e, dx, dz); playEnemyAnim(e, 'idle'); }
       e.mesh.position.x = e.x + Math.sin(t * 2 + e.sway) * 0.05;
       if (d > 1.6) e.state = 'chasing';
+    } else if (e.state === 'attacking') {
+      // Committed to the swing: face her, stay planted, do not move.
+      // The damage lands mid-swing (ENEMY_ATK_HIT_T); if she is still
+      // within ENEMY_ATK_RANGE then, it connects. When the clip ends,
+      // recover (~2 s) back in menacing before the next swing.
+      e.atkT += dt;
+      if (e.is3D) faceEnemy3D(e, dx, dz);
+      if (!e.hitDone && e.atkT >= ENEMY_ATK_HIT_T) {
+        e.hitDone = true;
+        if (d <= ENEMY_ATK_RANGE) damagePlayer(ENEMY_HIT_DMG);
+      }
+      const atkDur = (mxClips[ENEMY_ATK_CLIP] ? mxClips[ENEMY_ATK_CLIP].duration : 1.433);
+      if (e.atkT >= atkDur) {
+        e.state = 'menacing'; e.atkCd = ENEMY_ATK_RECOVER; e.hitDone = false;
+      }
     }
     e.y = groundHeight(e.x, e.z) + CHAR_LIFT;
     if (e.is3D) {
@@ -1163,7 +1192,7 @@ function updateOneEnemy(e, dt, t) {
 
 // ---- Destructible triggers (all one-shot, all by slashing near them) ----
 function enemiesNear(x, z, r) {
-  return enemies.filter((e) => (e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing') && Math.hypot(e.x - x, e.z - z) < r);
+  return enemies.filter((e) => (e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking') && Math.hypot(e.x - x, e.z - z) < r);
 }
 function triggerSandbag(sb) {
   if (sb.used) return; sb.used = true; sb.cut = true; sb.falling = true; sb.vy = 0;
@@ -1304,6 +1333,21 @@ function playSlashMiss() { playSfx(pickSfx(SFX_FILES.slashMiss)); }
 // meter; when it is full the special auto-fires after the current slash.
 const LOCK_RANGE = 8, STRIKE_RANGE = 2.4, SPECIAL_RANGE = 3.5;
 const METER_HITS = 5; // connecting hits to charge the special
+// Enemy attacks: they fight back, but slower than her. An enemy that
+// reaches her (menacing) swings a heavy overhead chop (atkChop,
+// 1.433 s) with the damage landing mid-swing, then waits ~2 s before
+// it can swing again — roughly one attack every 3.5 s per enemy, while
+// she can strike about once a second. A connecting enemy hit deals
+// ENEMY_HIT_DMG to her health (PLAYER_MAX_HP); at 0 she is defeated
+// and the fight ends. The numbers are defaults — say the word and
+// they change.
+const PLAYER_MAX_HP = 100;
+const ENEMY_HIT_DMG = 10;
+const ENEMY_ATK_CLIP = 'atkChop';
+const ENEMY_ATK_HIT_T = 0.7; // the damage lands this far into the swing
+const ENEMY_ATK_RECOVER = 2.0; // wait after a swing before the next one
+const ENEMY_ATK_RANGE = 2.2; // she must still be this close when it lands
+let playerHealth = PLAYER_MAX_HP, lost = false;
 const DASH_SPEED = 14; // m/s; dash duration clamps to 0.25–0.5 s
 // ---- Cinematic slow-mo + fixed camera ----
 // The big moments play in slow motion from a fixed camera spot, movie
@@ -1330,7 +1374,7 @@ let slashCooldown = 0, slashTimer = 0;
 function nearestLockTarget() {
   let best = null, bestD = LOCK_RANGE;
   for (const e of enemies) {
-    if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing')) continue;
+    if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking')) continue;
     const d = Math.hypot(e.x - player.position.x, e.z - player.position.z);
     if (d < bestD) { bestD = d; best = e; }
   }
@@ -1358,7 +1402,7 @@ function hitCheck(range, dot) {
   };
   let kills = 0;
   for (const e of enemies) {
-    if ((e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing') && inFront(e.x, e.z)) { defeatEnemy(e); kills++; }
+    if ((e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking') && inFront(e.x, e.z)) { defeatEnemy(e); kills++; }
   }
   for (const sb of sandbags) if (!sb.used && inFront(sb.x, sb.z)) triggerSandbag(sb);
   if (!chandelier.used && inFront(chandelier.cleat.x, chandelier.cleat.z)) triggerChandelier();
@@ -1386,7 +1430,7 @@ function onConnect(kills) {
   }
 }
 function doChainAttack() {
-  if (!started || won || cine || bowPhase) return;
+  if (!started || won || lost || cine || bowPhase) return;
   if (slashCooldown > 0 || dash) return;
   const target = nearestLockTarget();
   if (!target) {
@@ -1575,6 +1619,37 @@ function updateBow(dt) {
     if (player.position.z <= -8.5) showWin();
   }
 }
+function updateHealth() {
+  const fill = document.getElementById('healthFill');
+  if (fill) fill.style.width = (Math.max(0, playerHealth) / PLAYER_MAX_HP * 100) + '%';
+}
+// An enemy hit lands on Rochelle. At 0 health she is defeated and the
+// fight ends (the lose screen, with a restart).
+function damagePlayer(amount) {
+  if (lost || won || !started) return;
+  playerHealth -= amount;
+  updateHealth();
+  // Brief red flash so the hit reads even if the player is not
+  // watching the health bar.
+  const flash = document.getElementById('dmgFlash');
+  if (flash) {
+    flash.style.transition = 'none'; flash.style.opacity = '1';
+    requestAnimationFrame(() => { flash.style.transition = 'opacity .35s'; flash.style.opacity = '0'; });
+  }
+  if (playerHealth <= 0) {
+    playerHealth = 0;
+    showLose();
+  }
+}
+function showLose() {
+  if (lost) return;
+  lost = true;
+  document.getElementById('barTop').style.height = '0';
+  document.getElementById('barBottom').style.height = '0';
+  document.getElementById('loseText').textContent = 'The masked enemies overwhelmed Rochelle. She falls, and the curtain closes.';
+  document.getElementById('lose').style.display = 'flex';
+  if (document.pointerLockElement) document.exitPointerLock();
+}
 function showWin() {
   if (winShown) return;
   winShown = true; won = true;
@@ -1657,12 +1732,12 @@ function animate() {
   if (slashCooldown > 0) slashCooldown -= dt;
   if (slashTimer > 0) slashTimer -= dt;
   // The meter special auto-fires the moment the current slash ends.
-  if (specialQueued && slashTimer <= 0 && !dash && started && !won && !cine && !bowPhase) fireSpecial();
+  if (specialQueued && slashTimer <= 0 && !dash && started && !won && !lost && !cine && !bowPhase) fireSpecial();
   updateCinematic(dt);
   if (bowPhase) updateBow(dt);
   updateEnemies(dt, t);
   updateDestructibles(dt);
-  if (started && !won && !cine && !bowPhase) {
+  if (started && !won && !lost && !cine && !bowPhase) {
     updateLockOn(dt);
     updateDash(dt);
     let ml = 0;
