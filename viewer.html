@@ -625,10 +625,48 @@ function classDefault(name) {
   if (n.includes('glock') || n.includes('makarov') || n.includes('walther')) return PISTOL_OFFSET;
   return DEFAULT_OFFSET;
 }
+// Katana handle centre in mesh-local coordinates (measured 2026-11-07).
+// The file's geometry is offset +0.744 m in mesh-local X from the node
+// origin, so the node origin is NOT the grip — the real handle is here.
+// The per-character offset (seedKatanaOffset, below) is measured from
+// this point, so each character's hand axes produce their own numbers.
+const KATANA_HANDLE = new THREE.Vector3(0.744, 0.018, 0.109);
+// Per-character katana position offsets, measured at load time (see
+// seedKatanaOffset). Keyed by weapon name + side ('katana', 'katana|L').
+// These override the global BAKED_OFFSETS katana entries, which are kept
+// only as a fallback if the measurement fails (no mesh node / no hand).
+// Cleared when the model changes, so each character gets a fresh
+// measurement. Rotation/scale still come from the baked entry (0/0/0/1).
+const computedKatanaOffsets = new Map();
+// Measure the katana's per-character position offset: after the grip
+// logic puts the node origin on the hand, the real handle sits off the
+// palm by an amount that depends on the character's hand axes (each
+// character's hand sits at a different angle, so one global offset
+// cannot fit them all — Rochelle's +0.414/-0.412 pushed the sword
+// sideways on everyone else). Measure where the handle actually is in
+// hand-local space and offset by the negative of that, so the handle
+// lands on the palm for THIS character. Call after the pivot is
+// attached and positioned at basePos, before applyWeaponOffset.
+function seedKatanaOffset(name, forLeft, meshNode, hand) {
+  if (name !== 'katana' || !meshNode || !hand) return;
+  try {
+    model.updateMatrixWorld(true);
+    const handleWorld = meshNode.localToWorld(KATANA_HANDLE.clone());
+    const handleHand = hand.worldToLocal(handleWorld.clone());
+    const key = forLeft ? name + '|L' : name;
+    computedKatanaOffsets.set(key, { x: -handleHand.x, y: -handleHand.y, z: -handleHand.z });
+    // Drop the cached offset so the next getOffset re-seeds from the
+    // measured value (a stale entry would be the old character's
+    // numbers, or the global baked entry).
+    weaponOffsets.delete(key);
+  } catch (e) { /* measurement failed — fall back to the baked entry */ }
+}
 // Baked weapon offsets, approved by Kyle in the viewer (hand-local metres /
 // degrees, optional scale factor). A weapon loads at its baked placement;
 // Reset returns to that baked placement (or the default), and reloading
-// re-seeds it.
+// re-seeds it. The katana entries below are FALLBACKS only — the katana's
+// position offset is measured per character at load time
+// (seedKatanaOffset), since one global value cannot fit every hand.
 const BAKED_OFFSETS = {
   'white aks74u': { x: -0.021, y: 0.014, z: 0.055, rx: -12, ry: 2, rz: 61, s: 1.32 },
   // Katana (Rochelle's dual-wield): the file's geometry is offset +0.744 m
@@ -699,10 +737,12 @@ const fmt3 = v => (v === 0 ? 0 : v).toFixed(3);
 function getOffset(name, forLeft) {
   const key = forLeft ? name + '|L' : name;
   if (!weaponOffsets.has(key)) {
-    // Priority: per-weapon baked entry first (side-specific, then shared),
-    // then the weapon's class default (pistol/rifle), then the universal
-    // default (the rifle numbers).
-    const b = (forLeft ? BAKED_OFFSETS[name + '|L'] : null) || BAKED_OFFSETS[name] || {};
+    // Priority: per-character measured katana offset first (when one was
+    // measured for this character), then the per-weapon baked entry
+    // (side-specific, then shared), then the weapon's class default
+    // (pistol/rifle), then the universal default (the rifle numbers).
+    const measured = (name === 'katana') ? computedKatanaOffsets.get(key) : null;
+    const b = measured || (forLeft ? BAKED_OFFSETS[name + '|L'] : null) || BAKED_OFFSETS[name] || {};
     const c = classDefault(name);
     weaponOffsets.set(key, {
       x: b.x ?? c.x,
@@ -951,6 +991,9 @@ function loadWeapon(name) {
       // Assign BEFORE the applies: they guard on weaponPivot, so calling
       // them first would silently skip the baked offset on load.
       weaponPivot = pivot;
+      // Katana: measure this character's own offset (the handle must land
+      // on THIS hand — the global baked value only fits Rochelle).
+      seedKatanaOffset(name, false, meshNode, hand);
       applyWeaponOffset();
       applyWeaponRotation();
       applyWeaponScale();
@@ -1020,6 +1063,8 @@ function loadWeaponL(name) {
       // Assign BEFORE the applies: they guard on the pivot, so calling them
       // first would silently skip the baked offset on load.
       weaponPivotL = pivot;
+      // Katana: measure this character's own left-hand offset.
+      seedKatanaOffset(name, true, meshNode, hand);
       applyWeaponOffset(pivot, name);
       applyWeaponRotation(pivot, name);
       applyWeaponScale(pivot, name);
@@ -1036,6 +1081,11 @@ function clearModel() {
   if (weaponPivot) { weaponPivot.removeFromParent(); weaponPivot = null; }
   if (weaponPivotL) { weaponPivotL.removeFromParent(); weaponPivotL = null; }
   handAxes = { R: null, L: null };
+  // Drop the per-character katana measurements (and their cached
+  // offsets) — the next character gets a fresh measurement, not the
+  // previous character's numbers.
+  computedKatanaOffsets.clear();
+  weaponOffsets.delete('katana'); weaponOffsets.delete('katana|L');
   if (model) { scene.remove(model); model = null; }
   if (mixer) { mixer.stopAllAction(); mixer = null; }
   action = null; clip = null; embeddedAnims = [];
