@@ -15,7 +15,6 @@
   .levels a{background:rgba(0,0,0,.55);border:1px solid #8a6b3a;color:#ffd97a;border-radius:8px;padding:6px 10px;font-size:13px;text-decoration:none}
   .levels a.cur{opacity:.45;pointer-events:none}
   #mission{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5;max-width:min(480px,92vw)}
-  #dbgEnemy{position:fixed;bottom:10px;left:10px;background:rgba(0,0,0,.7);padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.5;z-index:6;font-family:monospace;white-space:pre;display:none}
   #mission b{color:#ffd97a}
   #meterWrap{width:120px;height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:6px;overflow:hidden}
   #meterFill{height:100%;width:0%;background:#c9a227;border-radius:3px;transition:width .2s}
@@ -28,7 +27,6 @@
 <body>
 <nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html" class="cur" aria-current="page">Theater</a></nav>
 <div id="mission"><b>Enemies:</b> <span id="enemyCount">0 / 8</span><div id="meterWrap"><div id="meterFill"></div></div></div>
-<div id="dbgEnemy"></div>
 <div id="dmgFlash"></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>The Theater</h1><button id="startBtn">Enter the theater</button></div>
@@ -1929,18 +1927,6 @@ function animate() {
   updateEnemies(dt, t);
   updateDestructibles(dt);
   updateBloodFx(dt);
-  // Debug overlay (?debug=enemy): live enemy states + knockdown counters.
-  if (location.search.indexOf('debug=enemy') !== -1) {
-    const dbg = document.getElementById('dbgEnemy');
-    if (dbg) {
-      dbg.style.display = 'block';
-      const lines = enemies.filter((e) => e.state !== 'waiting' && e.state !== 'gone').map((e) => {
-        const d = Math.hypot(player.position.x - e.x, player.position.z - e.z).toFixed(2);
-        return 'e' + e.i + ' ' + e.state + ' d=' + d + ' atkCd=' + (e.atkCd || 0).toFixed(2) + ' atkT=' + (e.atkT || 0).toFixed(2);
-      });
-      dbg.textContent = 'hitsTaken=' + hitsTaken + ' knockedDown=' + knockedDown + ' downT=' + downT.toFixed(2) + ' defeated=' + defeated + '\n' + lines.join('\n');
-    }
-  }
   if (started && !won && !cine && !bowPhase) {
     // Knockdown recovery: while she is down the timer runs and the
     // fall clip plays; at RECOVER_TIME she gets back up and the fight
