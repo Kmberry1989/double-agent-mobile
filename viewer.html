@@ -354,12 +354,33 @@ target.position.set(0, 1.4, 5); target.visible = false; scene.add(target);
 
 function setStatus(s) { statusEl.textContent = s; }
 function findModel(name) { for (const g of MODELS) for (const it of g.items) if (it[0] === name) return it; return null; }
+// The loaded model's bind-pose Hips local Y (captured in afterModel,
+// before any animation plays). The shared Mixamo clips were authored
+// for a standard rig whose Hips sit at 0.538 (local units) — but
+// Rochelle's Hips sit higher in her own bind pose (0.603 undercover,
+// 0.608 combat) because her legs are longer relative to her height.
+// Playing the clip raw forces her Hips down to the clip's 0.538, so
+// she sinks ~0.12 m below the floor (Kyle's bind Hips are 0.537, so
+// he never sank and the bug went unnoticed). stripRootTravel re-bases
+// the clip's Hips Y to this value, so each character keeps their own
+// height and only the clip's relative vertical motion (crouch, bounce)
+// survives.
+let bindHipsY = null;
 function stripRootTravel(c) {
   const tracks = c.tracks.map(t => {
     const nt = t.clone(); const bone = t.name.split('.')[0].toLowerCase();
     if (bone.indexOf('hips') >= 0 && t.name.endsWith('.position') && nt.values && nt.values.length >= 3) {
       const x0 = nt.values[0], z0 = nt.values[2];
       for (let i = 0; i + 2 < nt.values.length; i += 3) { nt.values[i] = x0; nt.values[i + 2] = z0; }
+      // Re-base Y to the model's own bind-pose Hips height: the clip's
+      // Hips Y is absolute (authored for a 0.538 rig), so without this
+      // a long-legged character sinks by (bindHipsY - clipY0). The
+      // relative motion is preserved (each frame keeps its offset from
+      // the clip's first frame), only the anchor changes.
+      if (bindHipsY !== null) {
+        const y0 = nt.values[1];
+        for (let i = 1; i < nt.values.length; i += 3) nt.values[i] = nt.values[i] - y0 + bindHipsY;
+      }
     } return nt;
   });
   return new THREE.AnimationClip(c.name, c.duration, tracks);
@@ -1035,6 +1056,13 @@ function afterModel(obj, info) {
   const isCat = info[0] === 'Mabel' || info[0] === 'Margo' || info[0] === 'Moxie';
   const fit = fitModel(obj, isCat ? 0.35 : 1.8);
   collectBones(obj);
+  // Capture the bind-pose Hips local Y now (before any animation plays)
+  // — stripRootTravel re-bases each clip's Hips Y to this, so a
+  // long-legged character (Rochelle) doesn't sink to the clip's
+  // standard-rig height. Reset per model (a cat or a static prop has
+  // no Hips, so the re-base stays off for them).
+  bindHipsY = null;
+  obj.traverse(o => { if (bindHipsY === null && o.isBone && o.name.toLowerCase().indexOf('hips') >= 0) bindHipsY = o.position.y; });
   // Measure both hands' axes now, while the model is still in bind pose
   // (before any animation plays) — loadWeapon / loadWeaponL use these.
   handAxes = { R: measureHandAxes(obj, 'R'), L: measureHandAxes(obj, 'L') };
