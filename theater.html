@@ -1536,8 +1536,10 @@ function updateCinematic(dt) {
   if (t >= 2.5) { ambient.intensity = 0.6; houseLight.intensity = 60; }
   if (t >= 14) endCinematic();
 }
+let bowStartReal = 0;
 function startBow() {
   bowPhase = { t: 0, walked: false };
+  bowStartReal = performance.now();
   document.getElementById('barTop').style.height = '8vh';
   document.getElementById('barBottom').style.height = '8vh';
   if (mxClips.bow) playMxCharClipOnce(player, 'bow');
@@ -1549,6 +1551,11 @@ function startBow() {
 function updateBow(dt) {
   if (!bowPhase) return;
   bowPhase.t += dt;
+  // Real-time cap: the win screen appears at most ~10 s after the bow
+  // starts, even if the frame rate is low (game dt is clamped, so at
+  // a low fps the bow clip and the walk-out run slower than real time
+  // and the finale used to stall for minutes).
+  if (performance.now() - bowStartReal > 10000) { showWin(); return; }
   const bowDur = mxClips.bow ? mxClips.bow.duration : 2.0;
   if (bowPhase.procedural) {
     const k = Math.min(bowPhase.t / 2.0, 1);
@@ -1603,7 +1610,18 @@ addEventListener('mousemove', (e) => {
     yaw -= e.movementX * 0.003; pitch = Math.max(-0.4, Math.min(0.5, pitch - e.movementY * 0.003));
   }
 });
+let lastPointerAttack = 0;
 renderer.domElement.addEventListener('mousedown', (e) => {
+  lastPointerAttack = performance.now();
+  if (started && !cine && !won) doChainAttack();
+});
+// A click event as well as mousedown: some browsers / automation only
+// dispatch click, and a real click fires both — so a click within
+// 300 ms of a mousedown is the same press, not a second attack.
+renderer.domElement.addEventListener('click', (e) => {
+  const now = performance.now();
+  if (now - lastPointerAttack < 300) return;
+  lastPointerAttack = now;
   if (started && !cine && !won) doChainAttack();
 });
 let lookId = null, lastLX = 0, lastLY = 0, lookStartX = 0, lookStartY = 0, lookStartT = 0;
