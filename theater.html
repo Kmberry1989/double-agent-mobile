@@ -7,8 +7,8 @@
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#120a08;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
   canvas{display:block}
-  #overlay,#win,#lose{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
-  #win,#lose{display:none}
+  #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
+  #win{display:none}
   button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
   a{color:#ffd97a}
   .levels{position:fixed;top:10px;right:10px;z-index:11;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:46vw}
@@ -18,8 +18,6 @@
   #mission b{color:#ffd97a}
   #meterWrap{width:120px;height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:6px;overflow:hidden}
   #meterFill{height:100%;width:0%;background:#c9a227;border-radius:3px;transition:width .2s}
-  #healthWrap{width:120px;height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:4px;overflow:hidden}
-  #healthFill{height:100%;width:100%;background:#c0392b;border-radius:3px;transition:width .2s}
   #dmgFlash{position:fixed;inset:0;background:rgba(192,57,43,.35);z-index:8;pointer-events:none;opacity:0;transition:opacity .35s}
   #barTop,#barBottom{position:fixed;left:0;right:0;height:0;background:#000;z-index:9;transition:height .6s}
   #barTop{top:0} #barBottom{bottom:0}
@@ -28,12 +26,11 @@
 </head>
 <body>
 <nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html" class="cur" aria-current="page">Theater</a></nav>
-<div id="mission"><b>Enemies:</b> <span id="enemyCount">0 / 8</span><div id="meterWrap"><div id="meterFill"></div></div><div id="healthWrap"><div id="healthFill"></div></div></div>
+<div id="mission"><b>Enemies:</b> <span id="enemyCount">0 / 8</span><div id="meterWrap"><div id="meterFill"></div></div></div>
 <div id="dmgFlash"></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>The Theater</h1><button id="startBtn">Enter the theater</button></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
-<div id="lose"><h1>Defeated</h1><p id="loseText"></p><button onclick="location.reload()">Try again</button></div>
 <script type="module">
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
@@ -406,7 +403,7 @@ function enemiesNearDrape(r) {
   // toppled drape's position, drapeState.z + 1). Distance is measured to
   // the closest point on the segment, not to the centre.
   return enemies.filter((e) => {
-    if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking')) return false;
+    if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting')) return false;
     const cx = Math.max(-DRAPE_HALF_W, Math.min(DRAPE_HALF_W, e.x));
     return Math.hypot(e.x - cx, e.z - (drapeState.z + 1)) < r;
   });
@@ -671,6 +668,19 @@ function playMxCharClipOnce(char, key) {
     const base = stripRootTravel(raw);
     mxClips[key] = base;
     mxClips[key + 'L'] = mirrorClip(base);
+  }, undefined, () => {});
+});
+// Knockdown + recovery + taunt (no health system — she is knocked down
+// after too many hits, always gets back up, and the enemies taunt her
+// while she recovers). All Mixamo, metre-scale, stripRootTravel.
+// knockedOut = her fall; standingUp = her getting back up; beingCocky
+// = the enemies' taunt (a cocky lean-back gesture, 2.9 s, from Drive).
+[['knockedOut', 'Knocked_Out.fbx'],
+ ['standingUp', 'Standing_Up.fbx'],
+ ['beingCocky', 'Being_Cocky.fbx']].forEach(([key, file]) => {
+  fbxLoader.load('assets/animations/' + file, (obj) => {
+    const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+    if (raw) mxClips[key] = stripRootTravel(raw);
   }, undefined, () => {});
 });
 function playClip(key) { if (!player.mixer) return; playMxCharClip(player, key); mixer = player.mixer; }
@@ -1038,7 +1048,7 @@ function updateEnemies(dt, t) {
       e.state = 'gone'; if (e.mesh) e.mesh.visible = false;
     }
   }
-  if (started && !won && !lost && !cine && !bowPhase && defeated < 8) {
+  if (started && !won && !cine && !bowPhase && defeated < 8) {
     // A 'falling' enemy is dying, not a live fighter — it must not block the
     // watchdog. (The normal flow already spawns the next enemy the moment
     // one falls, so the next one is 'rising' while this one tips over. If
@@ -1052,7 +1062,7 @@ function updateEnemies(dt, t) {
         e.state = 'gone'; if (e.mesh) e.mesh.visible = false;
       }
     }
-    const live = enemies.some((e) => e.state === 'rising' || e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'attacking');
+    const live = enemies.some((e) => e.state === 'rising' || e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting' || e.state === 'taunting' || e.state === 'attacking');
     if (!live) { console.warn('theater: no live enemy, watchdog spawning next'); spawnNextEnemy(); }
   }
 }
@@ -1111,10 +1121,22 @@ function updateOneEnemy(e, dt, t) {
       if (k >= 1) { e.state = 'gone'; e.mesh.visible = false; }
       return;
     }
-    // walking / chasing / menacing.
+    // walking / chasing / menacing / attacking / taunting.
     const dx = player.position.x - e.x, dz = player.position.z - e.z;
     const d = Math.hypot(dx, dz);
-    if (e.state === 'walking') {
+    if (knockedDown && (e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting')) {
+      // She is down: stop fighting and taunt her (the cocky lean-back
+      // gesture) instead. This is what gives her time to get back up —
+      // they mock her instead of finishing her. When she gets up they
+      // go back to menacing.
+      if (e.state !== 'taunting') e.state = 'taunting';
+      if (e.is3D) { faceEnemy3D(e, dx, dz); playEnemyAnim(e, 'beingCocky'); }
+      e.mesh.position.x = e.x + Math.sin(t * 2 + e.sway) * 0.05;
+    } else if (e.state === 'taunting') {
+      // She got back up: back to menacing, with a 1 s grace period
+      // before the next swing (she just got up — no instant hit).
+      e.state = 'menacing'; e.atkCd = Math.max(e.atkCd, 1.0);
+    } else if (e.state === 'walking') {
       // Walk to the centre aisle, down it, up the steps, onto the stage.
       let tx = e.x, tz = e.z;
       if (Math.abs(e.x) > 0.4) { tx = 0; tz = e.z; }
@@ -1153,7 +1175,7 @@ function updateOneEnemy(e, dt, t) {
       // before it lands, or dash away; if she is still in range when
       // the chop comes down, it hurts her.
       if (e.atkCd > 0) e.atkCd -= dt;
-      if (e.atkCd <= 0 && !lost) {
+      if (e.atkCd <= 0 && !knockedDown) {
         e.state = 'attacking'; e.atkT = 0; e.hitDone = false;
         if (e.is3D) playEnemyAnim(e, ENEMY_ATK_CLIP);
         return;
@@ -1170,7 +1192,7 @@ function updateOneEnemy(e, dt, t) {
       if (e.is3D) faceEnemy3D(e, dx, dz);
       if (!e.hitDone && e.atkT >= ENEMY_ATK_HIT_T) {
         e.hitDone = true;
-        if (d <= ENEMY_ATK_RANGE) damagePlayer(ENEMY_HIT_DMG);
+        if (d <= ENEMY_ATK_RANGE) onEnemyHit();
       }
       const atkDur = (mxClips[ENEMY_ATK_CLIP] ? mxClips[ENEMY_ATK_CLIP].duration : 1.433);
       if (e.atkT >= atkDur) {
@@ -1192,7 +1214,7 @@ function updateOneEnemy(e, dt, t) {
 
 // ---- Destructible triggers (all one-shot, all by slashing near them) ----
 function enemiesNear(x, z, r) {
-  return enemies.filter((e) => (e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking') && Math.hypot(e.x - x, e.z - z) < r);
+  return enemies.filter((e) => (e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting') && Math.hypot(e.x - x, e.z - z) < r);
 }
 function triggerSandbag(sb) {
   if (sb.used) return; sb.used = true; sb.cut = true; sb.falling = true; sb.vy = 0;
@@ -1337,17 +1359,22 @@ const METER_HITS = 5; // connecting hits to charge the special
 // reaches her (menacing) swings a heavy overhead chop (atkChop,
 // 1.433 s) with the damage landing mid-swing, then waits ~2 s before
 // it can swing again — roughly one attack every 3.5 s per enemy, while
-// she can strike about once a second. A connecting enemy hit deals
-// ENEMY_HIT_DMG to her health (PLAYER_MAX_HP); at 0 she is defeated
-// and the fight ends. The numbers are defaults — say the word and
-// they change.
-const PLAYER_MAX_HP = 100;
-const ENEMY_HIT_DMG = 10;
+// she can strike about once a second.
+// No health system: instead, too many hits in a row knock her down,
+// and she always gets back up. KNOCKDOWN_HITS consecutive hits (within
+// KNOCKDOWN_WINDOW seconds — hits further apart do not count, and
+// killing an enemy resets the count) put her on the floor; while she
+// is down the enemies stop attacking and taunt her (the cocky
+// lean-back gesture), which gives her RECOVER_TIME seconds to get back
+// up. The numbers are defaults — say the word and they change.
 const ENEMY_ATK_CLIP = 'atkChop';
-const ENEMY_ATK_HIT_T = 0.7; // the damage lands this far into the swing
+const ENEMY_ATK_HIT_T = 0.7; // the hit lands this far into the swing
 const ENEMY_ATK_RECOVER = 2.0; // wait after a swing before the next one
 const ENEMY_ATK_RANGE = 2.2; // she must still be this close when it lands
-let playerHealth = PLAYER_MAX_HP, lost = false;
+const KNOCKDOWN_HITS = 3; // hits in a row that knock her down
+const KNOCKDOWN_WINDOW = 5; // seconds — hits further apart do not count
+const RECOVER_TIME = 3; // seconds down before she gets back up
+let hitsTaken = 0, lastHitT = 0, knockedDown = false, downT = 0;
 const DASH_SPEED = 14; // m/s; dash duration clamps to 0.25–0.5 s
 // ---- Cinematic slow-mo + fixed camera ----
 // The big moments play in slow motion from a fixed camera spot, movie
@@ -1374,7 +1401,7 @@ let slashCooldown = 0, slashTimer = 0;
 function nearestLockTarget() {
   let best = null, bestD = LOCK_RANGE;
   for (const e of enemies) {
-    if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking')) continue;
+    if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting')) continue;
     const d = Math.hypot(e.x - player.position.x, e.z - player.position.z);
     if (d < bestD) { bestD = d; best = e; }
   }
@@ -1402,7 +1429,7 @@ function hitCheck(range, dot) {
   };
   let kills = 0;
   for (const e of enemies) {
-    if ((e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking') && inFront(e.x, e.z)) { defeatEnemy(e); kills++; }
+    if ((e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting') && inFront(e.x, e.z)) { defeatEnemy(e); kills++; }
   }
   for (const sb of sandbags) if (!sb.used && inFront(sb.x, sb.z)) triggerSandbag(sb);
   if (!chandelier.used && inFront(chandelier.cleat.x, chandelier.cleat.z)) triggerChandelier();
@@ -1422,6 +1449,7 @@ function hitCheck(range, dot) {
 function onConnect(kills) {
   if (kills > 0) {
     combo += kills; meter += kills;
+    hitsTaken = 0; // she is fighting back — the knockdown count resets
     playSlashHit();
     if (meter >= METER_HITS) { meter = 0; specialQueued = true; }
     updateMeter();
@@ -1431,7 +1459,7 @@ function onConnect(kills) {
 }
 function doChainAttack() {
   noteActivity(); // an attack ends any idle orbit
-  if (!started || won || lost || cine || bowPhase) return;
+  if (!started || won || knockedDown || cine || bowPhase) return;
   if (slashCooldown > 0 || dash) return;
   const target = nearestLockTarget();
   if (!target) {
@@ -1620,38 +1648,37 @@ function updateBow(dt) {
     if (player.position.z <= -8.5) showWin();
   }
 }
-function updateHealth() {
-  const fill = document.getElementById('healthFill');
-  if (fill) fill.style.width = (Math.max(0, playerHealth) / PLAYER_MAX_HP * 100) + '%';
-}
-// An enemy hit lands on Rochelle. At 0 health she is defeated and the
-// fight ends (the lose screen, with a restart).
-function damagePlayer(amount) {
-  if (lost || won || !started) return;
-  playerHealth -= amount;
-  updateHealth();
-  // Being hit is not idle: it ends any orbit and restarts the timer.
-  noteActivity();
-  // Brief red flash so the hit reads even if the player is not
-  // watching the health bar.
+// An enemy hit lands on Rochelle. Hits count toward a knockdown only
+// if they come in a row (within KNOCKDOWN_WINDOW seconds); killing an
+// enemy resets the count. At KNOCKDOWN_HITS she goes down — and she
+// always gets back up.
+function onEnemyHit() {
+  if (knockedDown || won || !started) return;
+  const now = performance.now() / 1000;
+  if (now - lastHitT > KNOCKDOWN_WINDOW) hitsTaken = 0;
+  hitsTaken++;
+  lastHitT = now;
+  // Brief red flash so the hit reads.
   const flash = document.getElementById('dmgFlash');
   if (flash) {
     flash.style.transition = 'none'; flash.style.opacity = '1';
     requestAnimationFrame(() => { flash.style.transition = 'opacity .35s'; flash.style.opacity = '0'; });
   }
-  if (playerHealth <= 0) {
-    playerHealth = 0;
-    showLose();
-  }
+  // Being hit is not idle: it ends any orbit and restarts the timer.
+  noteActivity();
+  if (hitsTaken >= KNOCKDOWN_HITS) startKnockdown();
 }
-function showLose() {
-  if (lost) return;
-  lost = true;
-  document.getElementById('barTop').style.height = '0';
-  document.getElementById('barBottom').style.height = '0';
-  document.getElementById('loseText').textContent = 'The masked enemies overwhelmed Rochelle. She falls, and the curtain closes.';
-  document.getElementById('lose').style.display = 'flex';
-  if (document.pointerLockElement) document.exitPointerLock();
+// She goes down: the fall clip plays, she cannot move or attack, and
+// the enemies stop fighting and taunt her instead. She always gets
+// back up after RECOVER_TIME seconds.
+function startKnockdown() {
+  knockedDown = true; downT = 0; hitsTaken = 0;
+  if (mxClips.knockedOut) playMxCharClipOnce(player, 'knockedOut');
+}
+// She gets back up and the fight resumes.
+function endKnockdown() {
+  knockedDown = false; hitsTaken = 0;
+  if (mxClips.standingUp) playMxCharClipOnce(player, 'standingUp');
 }
 function showWin() {
   if (winShown) return;
@@ -1736,9 +1763,9 @@ let idleLastX = null, idleLastZ = null;
 function noteActivity() { idleT = 0; orbitActive = false; }
 function idleOrbitActive(dt, canOrbit) {
   // True when the orbit camera should drive this frame. canOrbit is the
-  // page's normal-gameplay guard (started, not won/lost, not in a
-  // cinematic or the bow); when false the timer resets and it returns
-  // false.
+  // page's normal-gameplay guard (started, not won, not knocked down,
+  // not in a cinematic or the bow); when false the timer resets and it
+  // returns false.
   if (!canOrbit) { idleT = 0; orbitActive = false; return false; }
   const px = player.position.x, pz = player.position.z;
   if (idleLastX === null) { idleLastX = px; idleLastZ = pz; }
@@ -1781,12 +1808,20 @@ function animate() {
   if (slashCooldown > 0) slashCooldown -= dt;
   if (slashTimer > 0) slashTimer -= dt;
   // The meter special auto-fires the moment the current slash ends.
-  if (specialQueued && slashTimer <= 0 && !dash && started && !won && !lost && !cine && !bowPhase) fireSpecial();
+  if (specialQueued && slashTimer <= 0 && !dash && started && !won && !knockedDown && !cine && !bowPhase) fireSpecial();
   updateCinematic(dt);
   if (bowPhase) updateBow(dt);
   updateEnemies(dt, t);
   updateDestructibles(dt);
-  if (started && !won && !lost && !cine && !bowPhase) {
+  if (started && !won && !cine && !bowPhase) {
+    // Knockdown recovery: while she is down the timer runs and the
+    // fall clip plays; at RECOVER_TIME she gets back up and the fight
+    // resumes. She cannot move or attack while down.
+    if (knockedDown) {
+      downT += dt;
+      if (mixer) mixer.update(dt);
+      if (downT >= RECOVER_TIME) endKnockdown();
+    } else {
     updateLockOn(dt);
     updateDash(dt);
     let ml = 0;
@@ -1820,6 +1855,7 @@ function animate() {
       mixer.update(dt);
       if (slashTimer <= 0 && !dash) playClip(ml > 0.1 ? 'walk' : 'idle');
     }
+    }
     if (defeated >= 8 && !bowPhase && !won && !slowMo) startBow();
   } else if (mixer && (cine || bowPhase)) {
     mixer.update(dt);
@@ -1831,7 +1867,7 @@ function animate() {
     updateWallOcclusion();
   } else if (!cine) {
     const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-    if (idleOrbitActive(dt, started && !won && !lost && !bowPhase)) {
+    if (idleOrbitActive(dt, started && !won && !knockedDown && !bowPhase)) {
       const op = orbitCamPos(new THREE.Vector3());
       camera.position.lerp(op, Math.min(1, dt * 3));
       camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
