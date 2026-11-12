@@ -1622,6 +1622,7 @@ renderer.domElement.addEventListener('touchstart', (e)=>{ const tt=e.changedTouc
 renderer.domElement.addEventListener('touchend', (e)=>{ if(!started) return; for(const tt of e.changedTouches){ if(Math.hypot(tt.clientX-tapSX, tt.clientY-tapSY)<15 && Date.now()-tapST<500) nearestTalk(); } }, {passive:true});
 
 function nearestTalk() {
+  noteActivity(); // talking / advancing dialogue ends any idle orbit
   if (missionStage === 'outside') return; // doors open automatically; handoff is inside, with Rochelle
   if (handoffCine) { advanceHandoffLine(); return; }
   if (missionStage === 'handoff') {
@@ -1710,6 +1711,52 @@ function stairBalconyY(pos) {
 
 // ---- Loop ----
 const clock = new THREE.Clock();
+// ---- Idle-orbit cinematic camera ----
+// When the player stands still for 2 s, the camera slowly orbits them
+// (one full turn every ~24 s), breathing in and out (4-6 m) and drifting
+// in height (1.5-3 m), to show the character model from the front and
+// sides. Any move or action returns the normal camera immediately.
+// Mouse look alone does not reset it (the character is still standing).
+const IDLE_ORBIT_DELAY = 2.0;
+const IDLE_ORBIT_PERIOD = 24;
+let idleT = 0, orbitActive = false, orbitT = 0, orbitAngle = 0;
+let idleLastX = null, idleLastZ = null;
+function noteActivity() { idleT = 0; orbitActive = false; }
+function idleOrbitActive(dt, canOrbit) {
+  // True when the orbit camera should drive this frame. canOrbit is the
+  // page's normal-gameplay guard (started, not won, not in a cinematic
+  // or the rendezvous cinematic); when false the timer resets and it
+  // returns false.
+  if (!canOrbit) { idleT = 0; orbitActive = false; return false; }
+  const px = player.position.x, pz = player.position.z;
+  if (idleLastX === null) { idleLastX = px; idleLastZ = pz; }
+  if (Math.hypot(px - idleLastX, pz - idleLastZ) > 0.001) {
+    idleT = 0; orbitActive = false; idleLastX = px; idleLastZ = pz;
+    return false;
+  }
+  idleLastX = px; idleLastZ = pz;
+  idleT += dt;
+  if (idleT < IDLE_ORBIT_DELAY) return false;
+  if (!orbitActive) {
+    orbitActive = true; orbitT = 0;
+    // Start from the current camera direction so there is no snap.
+    orbitAngle = Math.atan2(camera.position.x - px, camera.position.z - pz);
+  }
+  orbitT += dt;
+  return true;
+}
+function orbitCamPos(out) {
+  const ang = orbitAngle + orbitT * (Math.PI * 2 / IDLE_ORBIT_PERIOD);
+  const dist = 5 + Math.sin(orbitT * 0.5);
+  const h = 2.25 + Math.sin(orbitT * 0.33) * 0.75;
+  out.set(
+    player.position.x + Math.sin(ang) * dist,
+    player.position.y + h,
+    player.position.z + Math.cos(ang) * dist
+  );
+  return out;
+}
+
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
@@ -1927,8 +1974,14 @@ function animate() {
   }
   updateDoors(dt);
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  camera.position.set(player.position.x + back.x * 5, player.position.y + 2.6, player.position.z + back.z * 5);
-  camera.lookAt(player.position.x - back.x * 3, player.position.y + 1.6, player.position.z - back.z * 3);
+  if (idleOrbitActive(dt, started && !won && !cinematic && !handoffCine)) {
+    const op = orbitCamPos(new THREE.Vector3());
+    camera.position.lerp(op, Math.min(1, dt * 3));
+    camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
+  } else {
+    camera.position.set(player.position.x + back.x * 5, player.position.y + 2.6, player.position.z + back.z * 5);
+    camera.lookAt(player.position.x - back.x * 3, player.position.y + 1.6, player.position.z - back.z * 3);
+  }
   if (handoffCine) {
     const c = handoffCine, ph = Math.min(c.t / c.dur, 1);
     const ease = (x) => x * x * (3 - 2 * x);

@@ -2054,6 +2054,7 @@ function playFootstep(){
 // Footstep distance accumulator (one soft step per ~0.7 m while moving).
 let stepAccum = 0, stepPrevX = null, stepPrevZ = null;
 function tryShoot(){
+  noteActivity(); // shooting ends any idle orbit
   const now = performance.now();
   if (gameOver || won) return;
   if (now<reloadUntil){ showMsg('Reloading…',800); return; }
@@ -2102,6 +2103,7 @@ function tryShoot(){
   noiseAlert(26, true);
 }
 function tryTakedown(){
+  noteActivity(); // a takedown ends any idle orbit
   if (gameOver || won) return;
   for (const g of guards){
     if (g.dead) continue;
@@ -2232,6 +2234,52 @@ function animStateName(moving, sprinting){
   return 'idle';
 }
 let wasGrounded = true;
+// ---- Idle-orbit cinematic camera ----
+// When the player stands still for 2 s, the camera slowly orbits them
+// (one full turn every ~24 s), breathing in and out (4-6 m) and drifting
+// in height (1.5-3 m), to show the character model from the front and
+// sides. Any move or action returns the normal camera immediately.
+// Mouse look alone does not reset it (the character is still standing).
+const IDLE_ORBIT_DELAY = 2.0;
+const IDLE_ORBIT_PERIOD = 24;
+let idleT = 0, orbitActive = false, orbitT = 0, orbitAngle = 0;
+let idleLastX = null, idleLastZ = null;
+function noteActivity() { idleT = 0; orbitActive = false; }
+function idleOrbitActive(dt, canOrbit) {
+  // True when the orbit camera should drive this frame. canOrbit is the
+  // page's normal-gameplay guard (locked/touch playing, not won, not
+  // game over, no menu overlay up); when false the timer resets and it
+  // returns false.
+  if (!canOrbit) { idleT = 0; orbitActive = false; return false; }
+  const px = player.position.x, pz = player.position.z;
+  if (idleLastX === null) { idleLastX = px; idleLastZ = pz; }
+  if (Math.hypot(px - idleLastX, pz - idleLastZ) > 0.001) {
+    idleT = 0; orbitActive = false; idleLastX = px; idleLastZ = pz;
+    return false;
+  }
+  idleLastX = px; idleLastZ = pz;
+  idleT += dt;
+  if (idleT < IDLE_ORBIT_DELAY) return false;
+  if (!orbitActive) {
+    orbitActive = true; orbitT = 0;
+    // Start from the current camera direction so there is no snap.
+    orbitAngle = Math.atan2(camera.position.x - px, camera.position.z - pz);
+  }
+  orbitT += dt;
+  return true;
+}
+function orbitCamPos(out) {
+  const ang = orbitAngle + orbitT * (Math.PI * 2 / IDLE_ORBIT_PERIOD);
+  const dist = 5 + Math.sin(orbitT * 0.5);
+  const h = 2.25 + Math.sin(orbitT * 0.33) * 0.75;
+  out.set(
+    player.position.x + Math.sin(ang) * dist,
+    player.position.y + h,
+    player.position.z + Math.cos(ang) * dist
+  );
+  return out;
+}
+
 function animate(){
   requestAnimationFrame(animate);
   const dt = Math.min(0.05, clock.getDelta()); const now = performance.now();
@@ -2325,13 +2373,24 @@ function animate(){
   // in their own mixers; player mixer runs even on the menu so idle plays).
   if (playerMixer && fbxPlaying){ try { playerMixer.update(dt); } catch (e) {} }
   updateEffects(dt);
-  // Over-the-shoulder camera.
+  // Over-the-shoulder camera. While idle the orbit takes over the view
+  // (lerped, like the over-shoulder position, so the transition is
+  // smooth); the moment the player moves or shoots, the over-shoulder
+  // camera returns.
   const back = new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));
   const right = new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
-  const camPos = player.position.clone().addScaledVector(back, aiming?2.2:3.4).addScaledVector(right, aiming?0.9:1.1);
-  camPos.y = player.position.y + (crouching?1.6:2.1) + Math.sin(pitch)*1.2;
+  const overlayHidden = document.getElementById('overlay').style.display === 'none';
+  const orbiting = idleOrbitActive(dt, (locked || touchMode) && !gameOver && !won && overlayHidden);
+  let camPos;
+  if (orbiting) {
+    camPos = orbitCamPos(new THREE.Vector3());
+  } else {
+    camPos = player.position.clone().addScaledVector(back, aiming?2.2:3.4).addScaledVector(right, aiming?0.9:1.1);
+    camPos.y = player.position.y + (crouching?1.6:2.1) + Math.sin(pitch)*1.2;
+  }
   camera.position.lerp(camPos, 0.35);
-  camera.lookAt(player.position.x - Math.sin(yaw)*8, player.position.y+1.5+Math.sin(pitch)*8, player.position.z - Math.cos(yaw)*8);
+  if (orbiting) camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
+  else camera.lookAt(player.position.x - Math.sin(yaw)*8, player.position.y+1.5+Math.sin(pitch)*8, player.position.z - Math.cos(yaw)*8);
   // HUD.
   document.getElementById('healthBar').style.width = Math.max(0,health)+'%';
   document.getElementById('detectFill').style.width = Math.round(detection)+'%';
