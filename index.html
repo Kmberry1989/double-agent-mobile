@@ -2585,6 +2585,16 @@ function animate(){
     }
     stepPrevX = player.position.x; stepPrevZ = player.position.z;
     if (now>reloadUntil && reloadUntil!==0){ ammoInMag=weapons[weapon].max; reloadUntil=0; }
+    // Tactical top-off: when no enemy is aiming at the player (no guard
+    // in ALERT, the state that shoots) and the mag is not completely
+    // full, reload on its own to top it off. It never interrupts active
+    // shooting — no shot in the last 2 s — and never fires while a
+    // reload is already running. The empty-mag auto-reload in tryShoot
+    // covers the dry case; this covers the half-full case when it is safe.
+    if (!gameOver && !won && now > reloadUntil && ammoInMag < weapons[weapon].max && now - lastShot > 2000) {
+      const anyAiming = guards.some((g) => !g.dead && g.state === 'ALERT');
+      if (!anyAiming) startReload();
+    }
     // FBX playback replaces procedural capsule animation whenever a rig
     // is playing. Procedural bob/arm-swing/squash runs ONLY as fallback,
     // and must never squash the real Agent_Kyle model (player.scale.y).
