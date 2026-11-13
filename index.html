@@ -2486,11 +2486,16 @@ let wasGrounded = true;
 // in height (1.5-3 m), to show the character model from the front and
 // sides. Any move or action returns the normal camera immediately.
 // Mouse look alone does not reset it (the character is still standing).
-const IDLE_ORBIT_DELAY = 2.0;
+const IDLE_ORBIT_DELAY = 25;
 const IDLE_ORBIT_PERIOD = 24;
 let idleT = 0, orbitActive = false, orbitT = 0, orbitAngle = 0;
 let idleLastX = null, idleLastZ = null;
 function noteActivity() { idleT = 0; orbitActive = false; }
+// Any input resets the idle timer — not just game actions. Touchscreen
+// (touch/pointer), keyboard, and mouse (pointer/wheel) all count, so the
+// orbit only starts after IDLE_ORBIT_DELAY of no input of any kind.
+['pointerdown', 'pointermove', 'wheel', 'touchstart', 'touchmove', 'keydown'].forEach(ev =>
+  addEventListener(ev, noteActivity, { passive: true }));
 function idleOrbitActive(dt, canOrbit) {
   // True when the orbit camera should drive this frame. canOrbit is the
   // page's normal-gameplay guard (locked/touch playing, not won, not
