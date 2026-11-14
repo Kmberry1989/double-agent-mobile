@@ -2252,7 +2252,7 @@ function playFootstep(){
   src.connect(f); f.connect(g); g.connect(sfxMaster);
   src.start(t); src.stop(t + cfg.dur + 0.05);
 }
-// Footstep distance accumulator (one soft step per ~0.7 m while moving).
+// Footstep distance accumulator (one soft step per ~1.1 m while moving).
 let stepAccum = 0, stepPrevX = null, stepPrevZ = null;
 function tryShoot(){
   noteActivity(); // shooting ends any idle orbit
@@ -2579,14 +2579,14 @@ function animate(){
     if (player.position.y<=CHAR_LIFT){ player.position.y=CHAR_LIFT; vy=0; if(!grounded){ grounded=true; } }
     else grounded=false;
     if (!wasGrounded && grounded) playPlayerOneShot('land');
-    // Footsteps: distance-based, one soft step per ~0.7 m while moving on
+    // Footsteps: distance-based, one soft step per ~1.1 m while moving on
     // the ground. Not when idle, not airborne, not on the menu (this whole
     // block only runs while locked/touchMode and not gameOver/won).
     if (stepPrevX === null){ stepPrevX = player.position.x; stepPrevZ = player.position.z; }
     if (moving && grounded){
       const sdx = player.position.x - stepPrevX, sdz = player.position.z - stepPrevZ;
       stepAccum += Math.hypot(sdx, sdz);
-      if (stepAccum >= 0.7){ stepAccum -= 0.7; playFootstep(); }
+      if (stepAccum >= 1.1){ stepAccum -= 1.1; playFootstep(); }
     }
     stepPrevX = player.position.x; stepPrevZ = player.position.z;
     if (now>reloadUntil && reloadUntil!==0){ ammoInMag=weapons[weapon].max; reloadUntil=0; }

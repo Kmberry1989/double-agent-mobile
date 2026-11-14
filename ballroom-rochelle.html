@@ -949,12 +949,12 @@ function loadCatGLB(cat) {
     // guest). The geometry bbox is the true 0.25 m bind-pose height.
     // (Measured in three 0.160.0, 2026-11-11: setFromObject 0.059 m,
     // geometry bbox 0.250 m.) Collar/tag positions below assume this
-    // correct 0.198 m fit.
+    // correct 0.40 m fit.
     let gbb = new THREE.Box3();
     obj.traverse((o) => { if (o.isMesh) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); gbb.union(o.geometry.boundingBox); } });
     const gs = new THREE.Vector3(); gbb.getSize(gs);
     const gc = new THREE.Vector3(); gbb.getCenter(gc);
-    const cs = 0.198 / gs.y;
+    const cs = 0.40 / gs.y;
     obj.scale.setScalar(cs);
     obj.position.set(-gc.x * cs, -gbb.min.y * cs, -gc.z * cs);
     cat.group.add(obj); cat.model = obj;
@@ -962,10 +962,10 @@ function loadCatGLB(cat) {
     cat.group.children.forEach((child) => {
       if (child.isMesh && child.geometry.type !== 'TorusGeometry' && !(child.material && child.material.emissiveIntensity === 1.4)) child.visible = false;
     });
-    // Shrink the procedural collar/tag to match the 0.198 m GLB cat (they were sized for the 0.5 m procedural cat).
+    // Shrink the procedural collar/tag to match the 0.40 m GLB cat (they were sized for the 0.5 m procedural cat).
     cat.group.children.forEach((child) => {
-      if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.396); child.position.set(0, 0.14, 0.06); }
-      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.396); child.position.set(0, 0.09, 0.09); }
+      if (child.isMesh && child.geometry.type === 'TorusGeometry') { child.scale.setScalar(0.80); child.position.set(0, 0.283, 0.121); }
+      else if (child.isMesh && child.material && child.material.emissiveIntensity === 1.4) { child.scale.setScalar(0.80); child.position.set(0, 0.182, 0.182); }
     });
     const src = {};
     (gltf.animations || []).forEach((clip) => {
@@ -1097,7 +1097,7 @@ function updatePlayFight(dt) {
 gltfLoader.load('assets/props/cat_collar.glb', (gltf)=>{
   CATS.forEach((cat)=>{
     const g = fitPropGroup(gltf.scene.clone(), 0.10, 0.03, 0.10); if (!g) return;
-    g.position.set(0, 0.14, 0.06); g.rotation.x = 0.5; cat.group.add(g);
+    g.position.set(0, 0.283, 0.121); g.rotation.x = 0.5; cat.group.add(g);
     if (cat.collarMesh) cat.collarMesh.visible = false;
   });
 }, undefined, ()=>{});
