@@ -37,6 +37,7 @@
     body.touch-on #hud{bottom:184px}
   }
   #btnWeather{position:absolute;right:16px;top:216px;width:52px;height:52px;pointer-events:auto}
+  #moveGrid{position:absolute;right:16px;bottom:200px;display:grid;grid-template-columns:repeat(4,52px);gap:8px;pointer-events:auto}
   #hud{position:fixed;left:16px;bottom:16px;z-index:5;pointer-events:none}
   .bar{width:260px;height:14px;background:rgba(0,0,0,.55);border:1px solid #556; margin:4px 0}
   .bar>i{display:block;height:100%;background:#57d977}
@@ -86,6 +87,12 @@
     <button class="tbtn" id="btnWeapon" type="button">WEAPON</button>
     <button class="tbtn" id="btnLoadout" type="button">SET</button>
   </div>
+  <div id="moveGrid">
+    <button class="tbtn" id="btnLeanL" type="button">&#9664;</button>
+    <button class="tbtn" id="btnLeanR" type="button">&#9654;</button>
+    <button class="tbtn" id="btnRoll" type="button">ROLL</button>
+    <button class="tbtn" id="btnSneak" type="button">SNEAK</button>
+  </div>
   <button class="tbtn" id="btnWeather" type="button">WX</button>
 </div>
 <div id="overlay"><div class="box">
@@ -111,7 +118,9 @@ const ANIM_MAP = {
   aimWalk:'Walking_While_Aiming_Rifle.fbx', aimPistol:'Pistol_Aim.fbx', fireRifle:'Firing_Rifle.fbx',
   fireRifleCrouch:'Firing_Rifle_Crouch_Walking.fbx', reloadRifle:'Reloading_Rifle.fbx',
   firePistol:'Pistol_Fire_Recoil.fbx', reloadPistol:'Reloading_Walking.fbx', sneak:'Sneaking_Forward.fbx',
-  crawl:'Crawling.fbx', cover:'Taking_Cover_Idle.fbx', punch:'Punching.fbx', kick:'Side_Kick.fbx',
+  crawl:'Low_Crawl.fbx', crawlBack:'Moving Backward In Crawl Position.fbx', crawlIdle:'Prone Firing Rifle.fbx',
+  roll:'Run To Rolling.fbx',
+  cover:'Taking_Cover_Idle.fbx', punch:'Punching.fbx', kick:'Side_Kick.fbx',
   hitReaction:'Hit_Reaction.fbx', death:'Death.fbx', deathRifle:'Rifle_Death.fbx', deathFallBack:'Falling_Back_Death.fbx',
   deathForward:'Standing_React_Death_Forward.fbx', deathHeadshot:'Death_From_Front_Headshot.fbx', deathBack:'Dying_Backwards.fbx', deathCrouch:'Crouch_Death.fbx',
   knockedOut:'Knocked_Out.fbx', jump:'Jump.fbx', fall:'Falling.fbx', land:'Landing.fbx',
@@ -148,11 +157,11 @@ let riggedModel = null;
 const fbxLoader = new FBXLoader();
 const fbxClips = {};        // action -> processed THREE.AnimationClip
 const fbxClipLoading = {};  // action -> Promise<clip|null>
-const ANIM_LOOPS = new Set(['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','cover','strafeLeft','strafeRight','turnLeft','turnRight',
+const ANIM_LOOPS = new Set(['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','crawlBack','crawlIdle','cover','strafeLeft','strafeRight','turnLeft','turnRight',
   'aimIdle','aimWalk','aimPistol','fall','drive','pistolIdle','pistolWalk','pistolRun','pistolWalkArc',
   'pistolKneelingIdle','rifleIdle','rifleWalk','rifleRun','rifleSprint','rifleCrouchWalk','idleCrouchingRifle',
   'sittingIdle','typing']);
-const ANIM_ONESHOTS = new Set(['fireRifle','fireRifleCrouch','reloadRifle','firePistol','reloadPistol','jump','land',
+const ANIM_ONESHOTS = new Set(['fireRifle','fireRifleCrouch','reloadRifle','firePistol','reloadPistol','jump','land','roll',
   'punch','kick','hitReaction','death','deathRifle','deathFallBack','deathForward','deathHeadshot','deathBack','deathCrouch','knockedOut','climb','vault','enterCar','exitCar',
   'toRun','turn','wave','talk','talkPhone','pickingUp','grabPistol','headNodYes','honkingHorn','lookingAround',
   'openingDoor','pointingForward','shakingHeadNo','shrugging','standingUp']);
@@ -197,7 +206,7 @@ function playGuardDeath(g, action){
   });
   return 'pending';
 }
-const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak'];
+const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','crawlBack','crawlIdle'];
 let playerMixer = null, playerActions = {}, playerCurrentLoop = null, playerOneShot = null, playerOneShotName = null,
     playerOneShotHold = false, playerHeldPose = null, playerDesiredLoop = 'idle',
     playerRigOk = false, playerRigChecked = false, fbxPlaying = false;
@@ -1077,6 +1086,22 @@ const armL = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.7,0.16), mat(0x2a3a4a))
 const armR = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.7,0.16), mat(0x2a3a4a)); armR.position.set(0.55,1.35,0.3); player.add(armR);
 player.position.set(-38, CHAR_LIFT, 38);
 let yaw = -Math.PI/4, pitch = 0.12, vy = 0, grounded = true, crouching = false, aiming = false;
+// ---------- Movement stream (2026-11-14): lean / crawl / roll / sneak ----------
+// crawling = prone (third C stance); sneaking = quiet-mode flag (composes
+// with crouch, shares the Sneaking_Forward clip with crouch-walk — no
+// duplicate crouch system); rolling = dodge-roll in progress; leanAmt is
+// the smoothed lean (-1 left .. +1 right, applied as a body tilt + camera
+// shift in animate()); touchLean is the touch lean-button state (-1/0/+1).
+let crawling = false, sneaking = false, rolling = false, leanAmt = 0, touchLean = 0;
+let rollT = 0, rollDirX = 0, rollDirZ = 1;
+const ROLL_MOVE_T = 1.0, ROLL_SPEED = 5.5; // roll travels ~5.5 m over 1 s
+function cycleStance(){
+  // C cycles stand -> crouch -> crawl (prone) -> stand. crouching stays
+  // true while crawling, so every existing crouching check still holds.
+  if (!crouching && !crawling) crouching = true;
+  else if (crouching && !crawling) crawling = true;
+  else { const wasCrawl = crawling; crawling = false; crouching = false; if (wasCrawl) playPlayerOneShot('standingUp'); }
+}
 let prevYawTurn = -Math.PI/4; // previous frame's yaw, for turn-clip detection
 let modelYaw = yaw; // smoothed model yaw (animate lerps this toward camera yaw; never snap)
 let health = 100, detection = 0, intel = 0, gameOver = false, won = false;
@@ -1934,23 +1959,33 @@ let touchFx = 0, touchFz = 0, touchSprint = false;
 const isTouchDevice = (typeof window !== 'undefined') && (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0);
 addEventListener('keydown', e=>{
   keys[e.code]=true;
-  if (e.code==='KeyC') crouching = !crouching;
+  if (e.code==='KeyC') cycleStance();
   if (e.code==='KeyY') cycleWeather();
   if (e.code==='Digit1'){ setWeaponVariant('Glock'); }
   if (e.code==='Digit2'){ setWeaponVariant('MP5K'); }
   if (e.code==='KeyL'){ playerLoadout = playerLoadout==='white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
   if (e.code==='KeyR') startReload();
   if (e.code==='KeyF') tryTakedown();
-  if (e.code==='KeyE') tryInteract();
-  // New animation-only keys — no existing key is changed or remapped.
-  if (e.code==='KeyQ') playPlayerOneShot('punch');
-  if (e.code==='KeyX') playPlayerOneShot('kick');
+  // ---- Movement stream (2026-11-14): lean / roll / sneak ----
+  // Lean is hold-Q/E while AIMING (read from keys[] in animate(), so no
+  // keydown state is needed here); outside aim Q still punches and E still
+  // interacts — see the !aiming guards on those lines below.
+  // Roll is X (dodge roll, tryRoll); kick moved Q->H / X->K (below) because
+  // Q/E/X were the free-adjacent keys and the emotes are the displaceable
+  // bindings. Sneak is Z (quiet-mode toggle). Crawl is the third C stance.
+  if (e.code==='KeyX') tryRoll();
+  if (e.code==='KeyZ'){ sneaking = !sneaking; noteActivity(); }
+  if (e.code==='KeyE' && !aiming) tryInteract();
+  // Animation-only keys (movement-stream remaps 2026-11-14: punch Q->H,
+  // kick X->K; Q/E lean while aiming, X rolls).
+  if (e.code==='KeyH') playPlayerOneShot('punch');
+  if (e.code==='KeyK') playPlayerOneShot('kick');
   if (e.code==='KeyG') playPlayerOneShot('wave');
   if (e.code==='KeyT') playPlayerOneShot('talk');
   if (e.code==='KeyN') playPlayerOneShot('talkPhone');
   if (e.code==='KeyV') playPlayerPose('maleCrouchPose');
   if (e.code==='KeyB') playPlayerPose('femaleCrouchPose');
-  if (e.code==='Space'){ e.preventDefault(); if (grounded){ vy=7.5; grounded=false; playPlayerOneShot('jump'); } }
+  if (e.code==='Space'){ e.preventDefault(); if (grounded && !crawling && !rolling){ vy=7.5; grounded=false; playPlayerOneShot('jump'); } }
 });
 addEventListener('keyup', e=>{ keys[e.code]=false; });
 addEventListener('mousemove', e=>{ if (!locked) return; yaw -= e.movementX*0.0022; pitch = Math.max(-0.9, Math.min(0.9, pitch - e.movementY*0.0022)); });
@@ -2029,7 +2064,7 @@ document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLo
     el.addEventListener('click', (e)=>{ e.preventDefault(); if (Date.now() - lastTouchBtn < 600) return; onDown && onDown(); onUp && onUp(); });
   }
   function doReload(){ startReload(); }
-  function doJump(){ if (grounded){ vy = 7.5; grounded = false; playPlayerOneShot('jump'); } }
+  function doJump(){ if (grounded && !crawling && !rolling){ vy = 7.5; grounded = false; playPlayerOneShot('jump'); } }
   function doWeapon(){ cycleWeapon(); }
   function doLoadout(){ playerLoadout = playerLoadout === 'white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
   bindBtn('btnFire', ()=>{
@@ -2041,13 +2076,17 @@ document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLo
     aiming = !aiming;
     document.getElementById('btnAim').classList.toggle('on', aiming);
   });
-  bindBtn('btnCrouch', ()=>{ crouching = !crouching; document.getElementById('btnCrouch').classList.toggle('on', crouching); });
+  bindBtn('btnCrouch', ()=>{ cycleStance(); document.getElementById('btnCrouch').classList.toggle('on', crouching); });
   bindBtn('btnJump', doJump);
   bindBtn('btnReload', doReload);
   bindBtn('btnInteract', tryInteract);
   bindBtn('btnTakedown', tryTakedown);
   bindBtn('btnWeapon', doWeapon);
   bindBtn('btnLoadout', doLoadout);
+  bindBtn('btnRoll', tryRoll);
+  bindBtn('btnSneak', ()=>{ sneaking = !sneaking; noteActivity(); document.getElementById('btnSneak').classList.toggle('on', sneaking); });
+  bindBtn('btnLeanL', ()=>{ touchLean = -1; }, ()=>{ if (touchLean === -1) touchLean = 0; });
+  bindBtn('btnLeanR', ()=>{ touchLean = 1; }, ()=>{ if (touchLean === 1) touchLean = 0; });
   bindBtn('btnWeather', cycleWeather);
   // Prevent iOS double-tap zoom / page scroll while playing on touch.
   document.addEventListener('touchmove', (e)=>{
@@ -2356,6 +2395,28 @@ function tryTakedown(){
   }
   showMsg('No guard in takedown range',1000);
 }
+let rollCooldownUntil = 0;
+function tryRoll(){
+  // Dodge roll (movement stream 2026-11-14): X on keyboard, ROLL on touch.
+  // Rolls in the current move direction, else straight ahead (camera
+  // forward). One-shot clip is Run To Rolling (1.9 s); the movement burst
+  // is the first ROLL_MOVE_T seconds, then the recover plays in place.
+  noteActivity(); // a roll ends any idle orbit
+  if (gameOver || won || rolling || crawling || !grounded) return;
+  const now = performance.now();
+  if (now < rollCooldownUntil) return;
+  rollCooldownUntil = now + 1200;
+  let fx = 0, fz = 0;
+  if (keys['KeyW']) fz += 1; if (keys['KeyS']) fz -= 1;
+  if (keys['KeyA']) fx -= 1; if (keys['KeyD']) fx += 1;
+  if (touchMode && (touchFx !== 0 || touchFz !== 0)){ fx = touchFx; fz = touchFz; }
+  if (fx === 0 && fz === 0) fz = 1;
+  const len = Math.hypot(fx, fz); fx /= len; fz /= len;
+  const sin = Math.sin(yaw), cos = Math.cos(yaw);
+  rollDirX = fx * cos - fz * sin; rollDirZ = -fx * sin - fz * cos;
+  rolling = true; rollT = ROLL_MOVE_T;
+  playPlayerOneShot('roll');
+}
 function tryInteract(){
   if (gameOver || won) return;
   for (const o of intelObjs){
@@ -2378,6 +2439,17 @@ function endScreen(text){
 }
 
 // ---------- Guard AI ----------
+// Single player stealth multiplier for guard vision (movement stream
+// 2026-11-14): crawl 0.4, sneak 0.5 (0.35 crouched + sneaking), crouch
+// 0.55 (unchanged), standing 1.0. Wired into the guard meter gain below —
+// the one vision-rate call site. (Security cameras still use their own
+// inline 0.55 crouch factor; see report.)
+function playerStealthFactor(){
+  if (crawling) return 0.4;
+  if (sneaking) return crouching ? 0.35 : 0.5;
+  if (crouching) return 0.55;
+  return 1.0;
+}
 function updateGuard(g, dt, now){
   if (g.dead){ if (g.deathPlaying && g.mixer){ try { g.mixer.update(dt); } catch (e) {} return; } if (g.mixer && !g.mixerStopped){ try { g.mixer.stopAllAction(); } catch (e) {} g.mixerStopped = true; } return; }
   const p = player.position, gp = g.group.position;
@@ -2386,8 +2458,8 @@ function updateGuard(g, dt, now){
   const angle = Math.acos(Math.max(-1,Math.min(1,fwd.dot(toP))));
   const eye = new THREE.Vector3(gp.x,1.6,gp.z), target = new THREE.Vector3(p.x,1.4,p.z);
   const seen = dist<19 && angle<0.65 && hasLOS(eye,target);
-  const crouchFactor = crouching ? 0.55 : 1;
-  const sprinting = keys['ShiftLeft'] || keys['ShiftRight'] || touchSprint;
+  const crouchFactor = playerStealthFactor();
+  const sprinting = (keys['ShiftLeft'] || keys['ShiftRight'] || touchSprint) && !sneaking && !crouching;
   if (seen){
     const gain = (dist<8?55:30) * crouchFactor * dt;
     g.meter = Math.min(100, g.meter + gain);
@@ -2476,7 +2548,13 @@ function drawMinimap(){
 }
 function animStateName(moving, sprinting, fx, fz, turnDir){
   if (!grounded) return vy>0?'jump':'fall';
+  // Prone beats aim: a crawling player stays prone even while aiming.
+  if (crawling) return moving?(fz<0?'crawlBack':'crawl'):'crawlIdle';
   if (aiming) return moving?'aimWalk':'aimIdle';
+  // Sneak mode (Z): the quiet walk. It shares the Sneaking_Forward clip
+  // with crouch-walk (resolveLoopClip maps crouchWalk -> 'sneak'), so
+  // sneak composes with crouch instead of duplicating it.
+  if (sneaking && moving) return 'sneak';
   if (crouching) return moving?'crouchWalk':'crouchIdle';
   if (sprinting && moving) return 'sprint';
   // Turning in place (or while strafing/backing up): the Turn Left/Right
@@ -2564,14 +2642,21 @@ function animate(){
   if (Math.abs(timeScaleTarget - timeScale) < 0.002) timeScale = timeScaleTarget;
   const dt = rawDt * timeScale;
   if (!gameOver && !won && (locked || touchMode)){
-    const sprinting = ((keys['ShiftLeft']||keys['ShiftRight']) || touchSprint) && !crouching;
-    let speed = crouching?2:(sprinting?7:(aiming?2.5:4.2));
+    const sprinting = ((keys['ShiftLeft']||keys['ShiftRight']) || touchSprint) && !crouching && !sneaking && !rolling;
+    let speed = crawling?1.2:(sneaking?1.5:(crouching?2:(sprinting?7:(aiming?2.5:4.2))));
     let fx=0, fz=0;
     if (keys['KeyW']) fz+=1; if (keys['KeyS']) fz-=1; if (keys['KeyA']) fx-=1; if (keys['KeyD']) fx+=1;
     // Touch joystick overrides/adds to keys when active (analog vector).
     if (touchMode && (touchFx !== 0 || touchFz !== 0)){ fx = touchFx; fz = touchFz; }
     const moving = fx!==0 || fz!==0;
-    if (moving){ const len=Math.hypot(fx,fz); fx/=len; fz/=len;
+    if (rolling){
+      // Dodge roll: fixed-direction burst, steering locked, collision kept.
+      rollT -= dt;
+      const nx = player.position.x + rollDirX*ROLL_SPEED*dt, nz = player.position.z + rollDirZ*ROLL_SPEED*dt;
+      if (!collides(nx,player.position.z)) player.position.x=nx;
+      if (!collides(player.position.x,nz)) player.position.z=nz;
+      if (rollT <= 0) rolling = false;
+    } else if (moving){ const len=Math.hypot(fx,fz); fx/=len; fz/=len;
       const sin=Math.sin(yaw), cos=Math.cos(yaw);
       // REVERSED-FORWARD FIX (playtest): camera forward is (-sin,-cos)
       // (camera sits at +back and looks toward -back), camera right is
@@ -2593,9 +2678,10 @@ function animate(){
     if (!wasGrounded && grounded) playPlayerOneShot('land');
     // Footsteps: distance-based, one soft step per ~1.1 m while moving on
     // the ground. Not when idle, not airborne, not on the menu (this whole
-    // block only runs while locked/touchMode and not gameOver/won).
+    // block only runs while locked/touchMode and not gameOver/won). Silent
+    // while sneaking, crawling, or rolling — quiet movement is the point.
     if (stepPrevX === null){ stepPrevX = player.position.x; stepPrevZ = player.position.z; }
-    if (moving && grounded){
+    if (moving && grounded && !sneaking && !crawling && !rolling){
       const sdx = player.position.x - stepPrevX, sdz = player.position.z - stepPrevZ;
       stepAccum += Math.hypot(sdx, sdz);
       if (stepAccum >= 1.1){ stepAccum -= 1.1; playFootstep(); }
@@ -2617,8 +2703,8 @@ function animate(){
     // and must never squash the real Agent_Kyle model (player.scale.y).
     if (!fbxPlaying){
       const t = now*0.001; const bob = moving?Math.abs(Math.sin(t*(sprinting?11:7)))*0.08:0;
-      torso.position.y = (crouching?0.95:1.25)+bob; head.position.y = (crouching?1.75:2.15)+bob;
-      player.scale.y = crouching?0.82:1;
+      torso.position.y = (crawling?0.55:(crouching?0.95:1.25))+bob; head.position.y = (crawling?0.9:(crouching?1.75:2.15))+bob;
+      player.scale.y = crawling?0.45:(crouching?0.82:1);
       armL.rotation.x = moving?Math.sin(t*7)*0.6:0; armR.rotation.x = aiming?-1.2:(moving?-Math.sin(t*7)*0.6:0);
     } else {
       player.scale.y = 1;
@@ -2653,6 +2739,22 @@ function animate(){
     { let dyaw = yaw - modelYaw; while (dyaw>Math.PI) dyaw-=Math.PI*2; while (dyaw<-Math.PI) dyaw+=Math.PI*2;
       modelYaw += dyaw * Math.min(1, dt*10); }
     player.rotation.y = modelYaw;
+    // Lean / peek (movement stream): hold Q/E while aiming to lean the
+    // body sideways and shift the camera around a corner. Touch lean
+    // buttons set touchLean (-1/0/+1); keyboard reads keys[] directly.
+    // Procedural tilt + camera shift, no clip: the repo peek clips
+    // (Female Peek And Aim, Femme Peek Around Corner) are single-sided,
+    // so a clip lean could not mirror to both sides. Lean never changes
+    // collision or the loop clip — the current loop keeps playing.
+    let leanTarget = 0;
+    if (aiming && !crawling && !rolling){
+      if (touchLean !== 0) leanTarget = touchLean;
+      else if (keys['KeyQ'] && !keys['KeyE']) leanTarget = -1;
+      else if (keys['KeyE'] && !keys['KeyQ']) leanTarget = 1;
+    }
+    leanAmt += (leanTarget - leanAmt) * Math.min(1, dt * 10);
+    if (Math.abs(leanAmt) < 0.01) leanAmt = 0;
+    player.rotation.z = -leanAmt * 0.16;
     currentAnim = animStateName(moving, sprinting, fx, fz, turnDir);
     // Drive the FBX state machine from game state. Jump is a one-shot
     // (triggered on Space), not a loop — fall is the airborne loop.
@@ -2685,7 +2787,8 @@ function animate(){
     camPos = orbitCamPos(new THREE.Vector3());
   } else {
     camPos = player.position.clone().addScaledVector(back, aiming?2.2:3.4).addScaledVector(right, aiming?0.9:1.1);
-    camPos.y = player.position.y + (crouching?1.6:2.1) + Math.sin(pitch)*1.2;
+    camPos.addScaledVector(right, leanAmt * 0.5); // lean shifts the view sideways to peek
+    camPos.y = player.position.y + (crawling?0.9:(crouching?1.6:2.1)) + Math.sin(pitch)*1.2;
   }
   camera.position.lerp(camPos, 0.35);
   if (orbiting) camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
