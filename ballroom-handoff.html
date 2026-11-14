@@ -663,7 +663,10 @@ function bush(x, z, r) {
 for (let a = 0; a < 360; a += 20) { if (a === 260 || a === 280) continue; // these two land on the front steps — removed at Kyle's direction
   const rad = a * Math.PI / 180; bush(13.5 * Math.cos(rad), 32 + 13.5 * Math.sin(rad), 0.9); }
 for (let x = -18; x <= 18; x += 3) { if (Math.abs(x) < 3) continue; bush(x, 16.5, 0.8); }
-for (let a = 0; a < 360; a += 60) { const rad = a * Math.PI / 180; bush(3.5 * Math.cos(rad), 32 + 3.5 * Math.sin(rad), 0.7); }
+// Island ring moved out to the drive edge (2026-11-14, Kyle's pick): the 2x
+// fountain grew into it. Same 6 bushes, now at r 13.5 offset 45 deg so they
+// sit between the existing drive-edge ring bushes, clear of the cars and steps.
+for (let a = 45; a < 405; a += 60) { const rad = a * Math.PI / 180; bush(13.5 * Math.cos(rad), 32 + 13.5 * Math.sin(rad), 0.7); }
 // Mansion wings + portico columns + roof
 const wingL = box(-28.4, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingL, 'assets/textures/exterior/exterior_mansion_facade_windows_1024.webp', 2, 1);
 const wingR = box(28.4, 2.5, 14, 16, 8, 12, 0xd8c8a8); applyTex(wingR, 'assets/textures/exterior/exterior_mansion_facade_windows_1024.webp', 2, 1);
