@@ -21,6 +21,13 @@
   #dmgFlash{position:fixed;inset:0;background:rgba(192,57,43,.35);z-index:8;pointer-events:none;opacity:0;transition:opacity .35s}
   #barTop,#barBottom{position:fixed;left:0;right:0;height:0;background:#000;z-index:9;transition:height .6s}
   #barTop{top:0} #barBottom{bottom:0}
+  /* Touch joystick (2026-11-14): Rochelle moves on a phone. Same pattern
+     as the ballroom — a bottom-left stick, shown only on touch devices.
+     Tap-to-attack stays on the canvas; the stick is a separate element,
+     so a thumb on it never also turns the camera or attacks. */
+  #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5;touch-action:none}
+  #knob{position:absolute;left:37px;top:37px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.45)}
+  body.touch #joy{display:block}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
@@ -28,6 +35,7 @@
 <nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html" class="cur" aria-current="page">Theater</a></nav>
 <div id="mission"><b>Enemies:</b> <span id="enemyCount">0 / 8</span><div id="meterWrap"><div id="meterFill"></div></div></div>
 <div id="dmgFlash"></div>
+<div id="joy"><div id="knob"></div></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>The Theater</h1><button id="startBtn">Enter the theater</button></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
@@ -1904,6 +1912,32 @@ renderer.domElement.addEventListener('click', (e) => {
   if (started && !cine && !won) doChainAttack();
 });
 let lookId = null, lastLX = 0, lastLY = 0, lookStartX = 0, lookStartY = 0, lookStartT = 0;
+// ---- Touch joystick (2026-11-14): Rochelle moves on a phone. ----
+// Same pattern as the ballroom. The stick is a separate element above
+// the canvas, so a thumb on it never also turns the camera or attacks.
+// joyX/joyY is the stick vector (-1..1); the movement code adds it to
+// the keyboard fx/fz.
+let joyId = null, joyX = 0, joyY = 0;
+const joy = document.getElementById('joy'), knob = document.getElementById('knob');
+function moveJoy(t){
+  const r = joy.getBoundingClientRect();
+  const dx = (t.clientX - (r.left + 65)) / 50, dy = (t.clientY - (r.top + 65)) / 50;
+  const m = Math.min(1, Math.hypot(dx, dy)) || 1;
+  joyX = dx / Math.max(1, Math.hypot(dx, dy)) * m;
+  joyY = dy / Math.max(1, Math.hypot(dx, dy)) * m;
+  knob.style.left = (37 + joyX * 35) + 'px';
+  knob.style.top = (37 + joyY * 35) + 'px';
+}
+function endJoy(e){
+  for (const t of e.changedTouches) if (t.identifier === joyId){
+    joyId = null; joyX = joyY = 0;
+    knob.style.left = '37px'; knob.style.top = '37px';
+  }
+}
+joy.addEventListener('touchstart', (e)=>{ if (!started) return; const t = e.changedTouches[0]; joyId = t.identifier; moveJoy(t); e.preventDefault(); }, { passive: false });
+joy.addEventListener('touchmove', (e)=>{ for (const t of e.changedTouches) if (t.identifier === joyId) moveJoy(t); e.preventDefault(); }, { passive: false });
+joy.addEventListener('touchend', endJoy);
+joy.addEventListener('touchcancel', endJoy);
 renderer.domElement.addEventListener('touchstart', (e) => {
   if (!started) return;
   for (const t of e.changedTouches) { lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY; lookStartX = t.clientX; lookStartY = t.clientY; lookStartT = performance.now(); }
@@ -2009,6 +2043,9 @@ function animate() {
     if (!dash) {
     fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
     fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
+    // Touch joystick (2026-11-14): stick up = forward, stick right =
+    // strafe right. The ml>1 normalize below keeps the diagonal honest.
+    if (joyId !== null) { fx += joyX; fz += -joyY; }
     ml = Math.hypot(fx, fz);
     if (ml > 1) { fx /= ml; fz /= ml; }
     const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);

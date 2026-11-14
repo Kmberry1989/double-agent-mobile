@@ -12,8 +12,10 @@
   body.touch-on #touchUI{display:block}
   #joyBase{position:absolute;left:20px;bottom:20px;width:140px;height:140px;border-radius:50%;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none}
   #joyKnob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.55);border:2px solid rgba(0,0,0,.4)}
-  #joyLabel{position:absolute;left:20px;bottom:168px;font-size:12px;color:#c8d2cc;text-shadow:0 1px 2px #000}
-  #actionGrid{position:absolute;right:16px;bottom:20px;display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:8px;pointer-events:auto}
+  /* Movement cluster (left, with the joystick): crouch / sneak / sprint. */
+  #moveGrid{position:absolute;left:20px;bottom:172px;display:grid;grid-template-columns:repeat(3,52px);gap:8px;pointer-events:auto}
+  /* Action cluster (right): melee / aim / fire / use / carry. */
+  #actionGrid{position:absolute;right:16px;bottom:20px;display:grid;grid-template-columns:repeat(2,52px);grid-template-rows:repeat(3,52px);gap:8px;pointer-events:auto}
   .tbtn{width:52px;height:52px;border-radius:12px;border:2px solid rgba(255,255,255,.4);background:rgba(0,0,0,.55);color:#fff;font-size:13px;font-weight:700;cursor:pointer;touch-action:none;padding:0}
   .tbtn:active,.tbtn.on{background:rgba(87,217,119,.55)}
   #btnFire{background:rgba(180,40,40,.65);width:60px;height:60px;font-size:15px}
@@ -36,8 +38,6 @@
     #objectives p{font-size:11px}
     body.touch-on #hud{bottom:184px}
   }
-  #btnWeather{position:absolute;right:16px;top:216px;width:52px;height:52px;pointer-events:auto}
-  #moveGrid{position:absolute;right:16px;bottom:200px;display:grid;grid-template-columns:repeat(4,52px);gap:8px;pointer-events:auto}
   #hud{position:fixed;left:16px;bottom:16px;z-index:5;pointer-events:none}
   .bar{width:260px;height:14px;background:rgba(0,0,0,.55);border:1px solid #556; margin:4px 0}
   .bar>i{display:block;height:100%;background:#57d977}
@@ -76,25 +76,18 @@
 </div>
 <div id="touchUI" aria-label="Touch controls">
   <div id="joyBase"><div id="joyKnob"></div></div>
+  <div id="moveGrid">
+    <button class="tbtn" id="btnCrouch" type="button">CROUCH</button>
+    <button class="tbtn" id="btnSneak" type="button">SNEAK</button>
+    <button class="tbtn" id="btnSprint" type="button">SPRINT</button>
+  </div>
   <div id="actionGrid">
+    <button class="tbtn" id="btnMelee" type="button">MELEE</button>
     <button class="tbtn" id="btnAim" type="button">AIM</button>
     <button class="tbtn" id="btnFire" type="button">FIRE</button>
-    <button class="tbtn" id="btnJump" type="button">JUMP</button>
-    <button class="tbtn" id="btnCrouch" type="button">CROUCH</button>
-    <button class="tbtn" id="btnReload" type="button">RELOAD</button>
     <button class="tbtn" id="btnInteract" type="button">USE</button>
-    <button class="tbtn" id="btnTakedown" type="button">TAKE<br>DOWN</button>
     <button class="tbtn" id="btnCarry" type="button">CARRY</button>
-    <button class="tbtn" id="btnWeapon" type="button">WEAPON</button>
-    <button class="tbtn" id="btnLoadout" type="button">SET</button>
   </div>
-  <div id="moveGrid">
-    <button class="tbtn" id="btnLeanL" type="button">&#9664;</button>
-    <button class="tbtn" id="btnLeanR" type="button">&#9654;</button>
-    <button class="tbtn" id="btnRoll" type="button">ROLL</button>
-    <button class="tbtn" id="btnSneak" type="button">SNEAK</button>
-  </div>
-  <button class="tbtn" id="btnWeather" type="button">WX</button>
 </div>
 <div id="overlay"><div class="box">
   <h1>DOUBLE AGENT</h1>
@@ -1999,7 +1992,6 @@ function setWeather(name, announce){
   boltNext = name === 'Storm' ? 3 + Math.random() * 3 : 5 + Math.random() * 8;
   applyFlash();
   const el = document.getElementById('weatherText'); if (el) el.textContent = 'Weather: ' + name;
-  const btn = document.getElementById('btnWeather'); if (btn) btn.textContent = 'WX';
   if (announce) showMsg('Weather: ' + name, 1400);
 }
 // ---------- Lightning (Storm only) ----------
@@ -2062,7 +2054,7 @@ let locked = false;
 // pointer lock; touchFx/touchFz are the joystick vector (-1..1), touchSprint
 // is set when the stick is pushed to its edge. Desktop keys are untouched.
 let touchMode = false, touchForced = false;
-let touchFx = 0, touchFz = 0, touchSprint = false;
+let touchFx = 0, touchFz = 0, touchSprint = false, touchSprintToggle = false; // touchSprint = stick pushed to its edge; touchSprintToggle = SPRINT button held on
 const isTouchDevice = (typeof window !== 'undefined') && (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0);
 addEventListener('keydown', e=>{
   keys[e.code]=true;
@@ -2169,10 +2161,13 @@ document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLo
     // cannot double-toggle Aim/Crouch or double-fire.
     el.addEventListener('click', (e)=>{ e.preventDefault(); if (Date.now() - lastTouchBtn < 600) return; onDown && onDown(); onUp && onUp(); });
   }
-  function doReload(){ startReload(); }
-  function doJump(){ if (grounded && !crawling && !rolling){ vy = 7.5; grounded = false; playPlayerOneShot('jump'); } }
-  function doWeapon(){ cycleWeapon(); }
-  function doLoadout(){ playerLoadout = playerLoadout === 'white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
+  // Melee (2026-11-14): the takedown when one is available (behind an
+  // unaware guard, in range — plays melee_hook), else a plain hook punch.
+  function doMelee(){
+    if (takedownAvailable()){ tryTakedown(); return; }
+    noteActivity();
+    playPlayerOneShot('punch');
+  }
   bindBtn('btnFire', ()=>{
     tryShoot();
     if (fireTimer) clearInterval(fireTimer);
@@ -2182,19 +2177,12 @@ document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLo
     aiming = !aiming;
     document.getElementById('btnAim').classList.toggle('on', aiming);
   });
-  bindBtn('btnCrouch', ()=>{ cycleStance(); document.getElementById('btnCrouch').classList.toggle('on', crouching); });
-  bindBtn('btnJump', doJump);
-  bindBtn('btnReload', doReload);
+  bindBtn('btnMelee', doMelee);
   bindBtn('btnInteract', tryInteract);
-  bindBtn('btnTakedown', tryTakedown);
   bindBtn('btnCarry', toggleCarryDrop);
-  bindBtn('btnWeapon', doWeapon);
-  bindBtn('btnLoadout', doLoadout);
-  bindBtn('btnRoll', tryRoll);
+  bindBtn('btnCrouch', ()=>{ cycleStance(); document.getElementById('btnCrouch').classList.toggle('on', crouching); });
   bindBtn('btnSneak', ()=>{ sneaking = !sneaking; noteActivity(); document.getElementById('btnSneak').classList.toggle('on', sneaking); });
-  bindBtn('btnLeanL', ()=>{ touchLean = -1; }, ()=>{ if (touchLean === -1) touchLean = 0; });
-  bindBtn('btnLeanR', ()=>{ touchLean = 1; }, ()=>{ if (touchLean === 1) touchLean = 0; });
-  bindBtn('btnWeather', cycleWeather);
+  bindBtn('btnSprint', ()=>{ touchSprintToggle = !touchSprintToggle; noteActivity(); document.getElementById('btnSprint').classList.toggle('on', touchSprintToggle); });
   // Prevent iOS double-tap zoom / page scroll while playing on touch.
   document.addEventListener('touchmove', (e)=>{
     if (touchMode && !gameOver && !won && document.getElementById('overlay').style.display === 'none') e.preventDefault();
@@ -2230,6 +2218,18 @@ const SFX_FILES = {
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
   slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
 };
+// Footstep recordings (Kyle, 2026-11-14): real steps per surface. The
+// courtyard has no water surface, so step-water is loaded and ready for
+// a water area — it does not play yet. Gravel has no recording; it uses
+// the dirt step (both are loose surfaces).
+const STEP_FILES = {
+  dirt: 'assets/audio/step-dirt.m4a',
+  grass: 'assets/audio/step-grass.m4a',
+  concrete: 'assets/audio/step-floor.m4a',
+  asphalt: 'assets/audio/step-floor.m4a',
+  gravel: 'assets/audio/step-dirt.m4a',
+  water: 'assets/audio/step-water.m4a',
+};
 let audioCtx = null, sfxBufs = {}, sfxMaster = null, sfxReverb = null;
 // Echoing reverb for gunshots + SFX: a ConvolverNode fed by a
 // procedurally generated impulse (decaying noise burst, ~1.8 s, a large
@@ -2258,6 +2258,7 @@ function ensureAudio(){
       // context is suspended; it is resumed on user gestures below.
       const all = new Set();
       Object.values(SFX_FILES).flat().forEach(f=>all.add(f));
+      Object.values(STEP_FILES).forEach(f=>all.add(f));
       all.forEach(f=>{
         fetch(f).then(r=>r.arrayBuffer()).then(ab=>audioCtx.decodeAudioData(ab)).then(buf=>{ sfxBufs[f]=buf; }).catch(e=>console.warn('[double-agent] sfx failed to load:', f, e));
       });
@@ -2377,21 +2378,35 @@ function surfaceAt(x, z){
   if (x >= 0 && x <= 16 && z >= -20 && z <= -8) return 'asphalt';
   return 'concrete';
 }
-// Footstep: one short filtered noise burst, SOFT (gains 0.09–0.14 through
-// the 0.7 master), with a different filter per surface and slight random
-// pitch/gain variation so steps never sound identical.
+// Footstep: Kyle's real step recordings per surface (2026-11-14), SOFT
+// (gain ~0.12 through the 0.7 master), with slight random pitch/gain
+// variation so steps never sound identical. If a recording has not
+// decoded yet, it falls back to the old filtered-noise step so footsteps
+// never go silent.
 function playFootstep(){
   const ctx = audioCtx; if (!ctx || !sfxMaster) return;
-  const buf = getNoiseBuf(); if (!buf) return;
+  const surface = surfaceAt(player.position.x, player.position.z);
+  const file = STEP_FILES[surface];
+  const buf = file && sfxBufs[file];
+  const t = ctx.currentTime;
+  if (buf){
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    src.playbackRate.value = 0.92 + Math.random() * 0.16; // ±8% pitch
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.12 * (0.85 + Math.random() * 0.3), t); // ±15% gain
+    src.connect(g); g.connect(sfxMaster);
+    src.start(t);
+    return;
+  }
+  const nbuf = getNoiseBuf(); if (!nbuf) return;
   const cfg = {
     concrete: { type: 'bandpass', freq: 800,  q: 1.0, gain: 0.14, dur: 0.09 },
     grass:    { type: 'lowpass',  freq: 400,  q: 0.7, gain: 0.09, dur: 0.08 },
     gravel:   { type: 'bandpass', freq: 2000, q: 0.9, gain: 0.13, dur: 0.11 },
     asphalt:  { type: 'lowpass',  freq: 600,  q: 0.8, gain: 0.12, dur: 0.09 },
     dirt:     { type: 'lowpass',  freq: 500,  q: 0.8, gain: 0.11, dur: 0.09 },
-  }[surfaceAt(player.position.x, player.position.z)] || { type: 'bandpass', freq: 800, q: 1.0, gain: 0.14, dur: 0.09 };
-  const t = ctx.currentTime;
-  const src = ctx.createBufferSource(); src.buffer = buf;
+  }[surface] || { type: 'bandpass', freq: 800, q: 1.0, gain: 0.14, dur: 0.09 };
+  const src = ctx.createBufferSource(); src.buffer = nbuf;
   src.playbackRate.value = 0.9 + Math.random() * 0.2; // ±10% pitch
   const f = ctx.createBiquadFilter(); f.type = cfg.type;
   f.frequency.value = cfg.freq * (0.9 + Math.random() * 0.2); f.Q.value = cfg.q;
@@ -2657,7 +2672,8 @@ function checkBodyDiscovery(g, eye, fwd){
   }
 }
 function updateStealthButtons(){
-  const td = document.getElementById('btnTakedown');
+  // MELEE lights up when a takedown is available (behind an unaware guard).
+  const td = document.getElementById('btnMelee');
   if (td) td.classList.toggle('on', !!takedownAvailable());
   const cb = document.getElementById('btnCarry');
   if (!cb) return;
@@ -2707,7 +2723,7 @@ function updateGuard(g, dt, now){
   const eye = new THREE.Vector3(gp.x,1.6,gp.z), target = new THREE.Vector3(p.x,1.4,p.z);
   const seen = dist<19 && angle<0.65 && hasLOS(eye,target);
   const crouchFactor = playerStealthFactor();
-  const sprinting = (keys['ShiftLeft'] || keys['ShiftRight'] || touchSprint) && !sneaking && !crouching;
+  const sprinting = (keys['ShiftLeft'] || keys['ShiftRight'] || touchSprint || touchSprintToggle) && !sneaking && !crouching;
   if (seen){
     const gain = (dist<8?55:30) * crouchFactor * dt;
     g.meter = Math.min(100, g.meter + gain);
@@ -2895,7 +2911,7 @@ function animate(){
   if (Math.abs(timeScaleTarget - timeScale) < 0.002) timeScale = timeScaleTarget;
   const dt = rawDt * timeScale;
   if (!gameOver && !won && (locked || touchMode)){
-    const sprinting = ((keys['ShiftLeft']||keys['ShiftRight']) || touchSprint) && !crouching && !sneaking && !rolling;
+    const sprinting = ((keys['ShiftLeft']||keys['ShiftRight']) || touchSprint || touchSprintToggle) && !crouching && !sneaking && !rolling;
     let speed = crawling?1.2:(sneaking?1.5:(crouching?2:(sprinting?7:(aiming?2.5:4.2))));
     let fx=0, fz=0;
     if (keys['KeyW']) fz+=1; if (keys['KeyS']) fz-=1; if (keys['KeyA']) fx-=1; if (keys['KeyD']) fx+=1;
