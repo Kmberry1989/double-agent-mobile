@@ -774,6 +774,25 @@ gltfLoader.load('assets/vehicles/white_lambo.glb', (gltf) => {
   g.position.set(-11, -0.9, 32); g.rotation.y = Math.PI; scene.add(g); // facing north, like the red sedan it replaces
   colliders.push({ x: -11, z: 32, r: 2.8 });
 }, undefined, () => {});
+// Grey sedan, NE diagonal of the round drive — the real repo GLB from the
+// 2026-11-14 intake (was object_0-4.glb). Nose at +Z, verified in Blender
+// (front = -Y in Blender = +Z in glTF, same as the Lambo). Same single-
+// material baseColorTexture-only structure as the white Lambo, so the same
+// metalness fix applies or the silver paint reads black (no env map here).
+gltfLoader.load('assets/vehicles/car_sedan_grey.glb', (gltf) => {
+  const g = fitPropGroup(gltf.scene, 2.0, 1.2, 4.5); if (!g) return;
+  g.traverse((o) => { if (o.isMesh) { o.material.metalness = 0; o.material.roughness = 0.55; } });
+  g.position.set(7.78, -0.9, 24.22); g.rotation.y = Math.PI / 4; scene.add(g); // nose SE, tangent to the drive ring
+  colliders.push({ x: 7.78, z: 24.22, r: 2.8 });
+}, undefined, () => {});
+// Navy SUV, NW diagonal of the round drive — the real repo GLB from the
+// 2026-11-14 intake (was object_0-5.glb). Nose at +Z, same Blender check.
+gltfLoader.load('assets/vehicles/car_suv_navy.glb', (gltf) => {
+  const g = fitPropGroup(gltf.scene, 2.0, 1.2, 4.5); if (!g) return;
+  g.traverse((o) => { if (o.isMesh) { o.material.metalness = 0; o.material.roughness = 0.55; } });
+  g.position.set(-7.78, -0.9, 24.22); g.rotation.y = 3 * Math.PI / 4; scene.add(g); // nose NE, tangent to the drive ring
+  colliders.push({ x: -7.78, z: 24.22, r: 2.8 });
+}, undefined, () => {});
 
 
 // ---- ActionForge characters: real GLB models + baked clips ----
