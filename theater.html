@@ -103,9 +103,10 @@ function cyl(x, y, z, rTop, rBot, h, color, seg) {
 const TEX = 'assets/textures/theater/';
 
 // ---- Theater environment ----
-// House floor (dark) + centre aisle carpet + side floor.
+// House floor (dark) + side floor. (The centre-aisle red carpet was
+// removed 2026-11-14 — the carpet texture did not tile cleanly, so the
+// aisle is the dark house floor now.)
 flatPlane(0, 0, 18, 28, 24, 0x241812, null, 0, 0); // house floor slab
-flatPlane(0, 0.02, 18, 3, 22, 0x7a1a1a, TEX + 'theater_red_carpet_1024.webp', 1, 8); // centre aisle carpet
 // Stage top (wood) + front apron face (gold trim strip along the top edge).
 flatPlane(0, STAGE_TOP, 0, 24, 12, 0x6b4a26, TEX + 'theater_stage_wood_floor_1024.webp', 6, 3);
 box(0, STAGE_TOP / 2, 6.05, 24, STAGE_TOP, 0.3, 0x3a2410); // stage front face
