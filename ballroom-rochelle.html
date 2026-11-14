@@ -94,9 +94,10 @@ scene.add(new THREE.HemisphereLight(0xffe6b0, 0x3a2410, 0.6));
 // Ballroom textures (user uploads, assets/textures/): flat colour stays
 // until the texture arrives, and stays forever if it fails to load.
 const texLoader = new THREE.TextureLoader();
-function applyTex(mesh, path, rx, ry){
+function applyTex(mesh, path, rx, ry, rot){
   texLoader.load(path, (tex)=>{
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(rx, ry); tex.colorSpace = THREE.SRGBColorSpace;
+    if (rot) { tex.center.set(0.5, 0.5); tex.rotation = rot; }
     mesh.material.map = tex; mesh.material.color.setHex(0xffffff); mesh.material.needsUpdate = true;
   }, undefined, ()=>{});
 }
@@ -106,10 +107,10 @@ function applyTexToGroup(group, path){
     group.traverse((o)=>{ if (o.isMesh){ o.material.map = tex; o.material.color.setHex(0xffffff); o.material.needsUpdate = true; } });
   }, undefined, ()=>{});
 }
-function flatPlane(x, y, z, w, d, color, path, rx, ry, rotX){
+function flatPlane(x, y, z, w, d, color, path, rx, ry, rotX, rot){
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color }));
   m.rotation.x = rotX === undefined ? -Math.PI / 2 : rotX; m.position.set(x, y, z); m.receiveShadow = true; scene.add(m);
-  if (path) applyTex(m, path, rx, ry); return m;
+  if (path) applyTex(m, path, rx, ry, rot); return m;
 }
 
 // ---- Ballroom ----
@@ -332,7 +333,7 @@ balcGlass.position.set(0, 8.25, 14.7); balcGlass.rotation.y = Math.PI; scene.add
 // wide at y=0.03 (above the dance floor at y=0.02, no z-fight), plus a
 // branch runner east to the bar rug so the bar rug joins the main run.
 flatPlane(0, 0.03, 0, 2.5, 26, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 9);
-flatPlane(6.125, 0.03, 6, 9.75, 2.5, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 4, 1);
+flatPlane(6.125, 0.03, 6, 9.75, 2.5, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4, undefined, Math.PI / 2); // runner texture rotated 90 deg so the gold borders run along the branch's long edges, not across it as stripes
 flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom/ballroom_rug_medallion_large_1024.webp', 1, 1);
 // Spiral staircase + second-story balcony, NE corner (2026-11-06, walkable,
 // ported from ballroom-handoff.html — one room, same in all three pages).
