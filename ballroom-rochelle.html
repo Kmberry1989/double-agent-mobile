@@ -261,6 +261,51 @@ addWindow(-9, 13.96, Math.PI); addWindow(9, 13.96, Math.PI);
 // West / east (bar sits at x 17.5, z 4..8 — no window there).
 addWindow(-19.96, -7, Math.PI / 2); addWindow(-19.96, 0, Math.PI / 2); addWindow(-19.96, 7, Math.PI / 2);
 addWindow(19.96, -7, -Math.PI / 2); addWindow(19.96, 0, -Math.PI / 2); addWindow(19.96, 11, -Math.PI / 2);
+
+// ---- Gilded paintings (AI-generated, 2026-11-13) ----
+// Real AI-generated oil paintings replace the procedural canvas portraits
+// (2026-11-07). Five images, one per painting; the frames, sizes and
+// placements below are unchanged.
+function loadPainting(path) {
+  const tex = texLoader.load(path);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const PAINTING_TEXTURES = [
+  loadPainting('assets/textures/ballroom/ballroom_painting_lady_gold_1024.webp'),       // Lady in gold — portrait
+  loadPainting('assets/textures/ballroom/ballroom_painting_gentleman_1024.webp'),       // Gentleman with moustache — portrait
+  loadPainting('assets/textures/ballroom/ballroom_painting_moonlit_garden_1024.webp'),  // Moonlit garden — landscape
+  loadPainting('assets/textures/ballroom/ballroom_painting_roses_1024.webp'),           // Roses still life
+  loadPainting('assets/textures/ballroom/ballroom_painting_dancers_1024.webp'),         // Dancers at a ball
+];
+function addPainting(x, z, rotY, w, h, tex) {
+  // Gilded frame: gold rim, darker inner bevel, canvas slightly proud.
+  const g = new THREE.Group();
+  const gold = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.7, roughness: 0.35 });
+  const darkGold = new THREE.MeshStandardMaterial({ color: 0x8a6b2f, metalness: 0.7, roughness: 0.4 });
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.12, h + 0.12, 0.05), gold);
+  frame.castShadow = true; g.add(frame);
+  const inner = new THREE.Mesh(new THREE.BoxGeometry(w + 0.02, h + 0.02, 0.055), darkGold);
+  inner.position.z = 0.004; g.add(inner);
+  const canvas = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 }));
+  canvas.position.z = 0.032; g.add(canvas);
+  g.position.set(x, 1.6, z); g.rotation.y = rotY; scene.add(g);
+  return g;
+}
+// North (between the velvet drapes) / south (between door and windows).
+addPainting(-16.5, -13.96, 0, 1.5, 1.9, PAINTING_TEXTURES[0]);
+addPainting(16.5, -13.96, 0, 1.5, 1.9, PAINTING_TEXTURES[1]);
+addPainting(-15, 13.96, Math.PI, 1.4, 1.8, PAINTING_TEXTURES[2]);
+addPainting(-4.5, 13.96, Math.PI, 1.3, 1.7, PAINTING_TEXTURES[3]);
+addPainting(4.5, 13.96, Math.PI, 1.3, 1.7, PAINTING_TEXTURES[4]);
+addPainting(15, 13.96, Math.PI, 1.4, 1.8, PAINTING_TEXTURES[0]);
+// West / east (bar zone on the east wall left clear).
+addPainting(-19.96, -11, Math.PI / 2, 1.4, 1.8, PAINTING_TEXTURES[1]);
+addPainting(-19.96, 3.5, Math.PI / 2, 1.2, 1.6, PAINTING_TEXTURES[4]);
+addPainting(-19.96, 11, Math.PI / 2, 1.4, 1.8, PAINTING_TEXTURES[2]);
+addPainting(19.96, -11, -Math.PI / 2, 1.4, 1.8, PAINTING_TEXTURES[0]);
+addPainting(19.96, -3.5, -Math.PI / 2, 1.2, 1.6, PAINTING_TEXTURES[2]);
+addPainting(19.96, 7, -Math.PI / 2, 1.2, 1.6, PAINTING_TEXTURES[3]); // was west wall z=-3.5: the new west door covers that spot, so it moved here (clear of the east door at z=3.5 and the windows at z=0 and z=11)
 // South balcony window glass + curtains (2026-11-11, ported from
 // ballroom-handoff.html): the 4 m wide balcony window (x -2..2, y 7..9.5,
 // south wall). Handoff shows the exterior facade through this opening;

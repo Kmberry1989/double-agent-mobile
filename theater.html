@@ -1075,7 +1075,13 @@ function defeatEnemy(enemy, silent) {
   spawnBlood(enemy.x, (enemy.y || 0) + 1.3, enemy.z);
   enemy.state = 'falling'; enemy.fallT = 0;
   defeated++; updateEnemyCount();
+  // Cinematic moment on EVERY kill: the final blow gets the long 2.0 s
+  // slow-mo (and overrides any active slow-mo, regular or special);
+  // regular kills get a short 0.8 s one, but only if no slow-mo is
+  // already running — a regular kill never cuts short the special's
+  // 1.2 s or the final kill's 2.0 s.
   if (defeated >= 8) startSlowMo(2.0, SLOWMO_SCALE); // the final blow, in slow motion
+  else if (!slowMo) startSlowMo(0.8, SLOWMO_SCALE); // every other kill, in slow motion
   if (!silent) spawnNextEnemy();
 }
 function spawnNextEnemy() {
@@ -1483,22 +1489,40 @@ let gameT = 0; // game time (accumulated dt) — the hit window uses this,
 // runs slower than real time, and a real-time window would reset the
 // count between swings that are only ~3.4 game-seconds apart.
 const DASH_SPEED = 14; // m/s; dash duration clamps to 0.25–0.5 s
-// ---- Cinematic slow-mo + fixed camera ----
-// The big moments play in slow motion from a fixed camera spot, movie
-// style — since she locks on anyway, the camera does not need to follow
-// her facing. Triggers: the meter special, and the final (8th) kill.
-// Slow-mo is a real-time window at 0.4x speed; the fixed camera cycles
-// through three set spots in the house.
+// ---- Cinematic slow-mo + close camera ----
+// The big moments play in slow motion from a close camera, movie style —
+// since she locks on anyway, the camera does not need to follow her
+// facing. Triggers: EVERY kill (regular kills get a short 0.8 s moment),
+// the meter special (1.2 s), and the final (8th) kill (2.0 s). Slow-mo
+// is a real-time window at 0.4x speed; the camera is placed 3–4 m from
+// the player at the moment the slow-mo starts, on a dramatic angle that
+// cycles low right → low left → high front → front-right.
 const SLOWMO_SCALE = 0.4;
-const CINE_CAMS = [
-  { x: 0, y: 1.6, z: 20 },   // front of house, low, up the aisle
-  { x: 11, y: 3.0, z: 0 },   // stage right, side angle
-  { x: 0, y: 7.5, z: 27 },   // high back, wide down at the action
+// Player-relative close offsets (right, up, forward) in metres, rotated
+// by the player's yaw at the moment the slow-mo starts. All 3–4 m from
+// the player — the old fixed house spots were 11–27 m away.
+const CINE_OFFSETS = [
+  { r: 3.2, u: 0.9, f: 1.2 },   // low right, waist height — ~3.5 m
+  { r: -3.2, u: 0.9, f: 1.2 },  // low left, waist height — ~3.5 m
+  { r: 0, u: 3.2, f: 2.0 },     // high front, looking down at her — ~3.8 m
+  { r: 2.4, u: 1.6, f: 2.4 },   // front-right, just above eye level — ~3.8 m
 ];
 let slowMo = null, cineCamIndex = 0;
 function startSlowMo(dur, scale) {
-  slowMo = { t: 0, dur, scale, cam: CINE_CAMS[cineCamIndex % CINE_CAMS.length] };
+  // Close camera, computed now from her position and yaw at the kill:
+  // the offset is rotated into world space (forward = -sin/-cos yaw,
+  // right = cos/-sin yaw) so the camera sits 3–4 m away on the chosen
+  // angle and stays put for the slow-mo window; the animate loop keeps
+  // it looking at her chest (player.position + 1.6).
+  const off = CINE_OFFSETS[cineCamIndex % CINE_OFFSETS.length];
   cineCamIndex++;
+  const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+  const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  const cam = player.position.clone()
+    .addScaledVector(right, off.r)
+    .addScaledVector(fwd, off.f);
+  cam.y = player.position.y + off.u;
+  slowMo = { t: 0, dur, scale, cam };
 }
 let combo = 0, meter = 0, specialQueued = false;
 let dash = null;

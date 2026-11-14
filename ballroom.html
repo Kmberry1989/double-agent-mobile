@@ -283,77 +283,21 @@ balcGlass.position.set(0, 8.25, 14.7); balcGlass.rotation.y = Math.PI; scene.add
   });
 }
 
-// ---- Gilded paintings (2026-11-07) ----
-// No portrait/painting image exists under assets/ — these canvases are
-// painted procedurally (classical portraits, a moonlit garden, roses, a
-// ball scene) in a muted burgundy/gold/cream palette. If the user sends
-// real paintings, swap the canvas textures for them.
-function paintCanvas(draw) {
-  const c = document.createElement('canvas'); c.width = 256; c.height = 320;
-  const g = c.getContext('2d'); draw(g);
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; return tex;
+// ---- Gilded paintings (AI-generated, 2026-11-13) ----
+// Real AI-generated oil paintings replace the procedural canvas portraits
+// (2026-11-07). Five images, one per painting; the frames, sizes and
+// placements below are unchanged.
+function loadPainting(path) {
+  const tex = texLoader.load(path);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 const PAINTING_TEXTURES = [
-  paintCanvas((g) => { // Lady in gold — portrait
-    g.fillStyle = '#2a1a12'; g.fillRect(0, 0, 256, 320);
-    g.fillStyle = '#6a4a1a'; g.beginPath(); g.ellipse(128, 150, 90, 120, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#3a2418'; g.beginPath(); g.ellipse(128, 150, 80, 110, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#7a1a2a'; g.beginPath(); g.moveTo(128, 190); g.lineTo(60, 320); g.lineTo(196, 320); g.closePath(); g.fill();
-    g.fillStyle = '#c9a227'; g.fillRect(118, 200, 20, 6);
-    g.fillStyle = '#d9a06b'; g.fillRect(120, 150, 16, 40);
-    g.beginPath(); g.ellipse(128, 120, 30, 38, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#1a1210'; g.beginPath(); g.ellipse(128, 92, 32, 22, 0, Math.PI, 0); g.fill();
-    g.beginPath(); g.arc(128, 82, 12, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#1a1210'; g.fillRect(112, 116, 8, 3); g.fillRect(136, 116, 8, 3);
-    g.fillStyle = '#8a3a3a'; g.fillRect(120, 142, 16, 3);
-  }),
-  paintCanvas((g) => { // Gentleman with moustache — portrait
-    g.fillStyle = '#14202a'; g.fillRect(0, 0, 256, 320);
-    g.fillStyle = '#3a4a5a'; g.beginPath(); g.ellipse(128, 150, 88, 118, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#1a1a1a'; g.beginPath(); g.moveTo(128, 185); g.lineTo(58, 320); g.lineTo(198, 320); g.closePath(); g.fill();
-    g.fillStyle = '#f0ead8'; g.beginPath(); g.moveTo(128, 185); g.lineTo(112, 205); g.lineTo(128, 225); g.lineTo(144, 205); g.closePath(); g.fill();
-    g.fillStyle = '#c98a5a'; g.fillRect(120, 150, 16, 38);
-    g.beginPath(); g.ellipse(128, 120, 30, 38, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#8a8a8a'; g.beginPath(); g.ellipse(128, 90, 31, 18, 0, Math.PI, 0); g.fill();
-    g.fillStyle = '#2a2a2a'; g.fillRect(112, 116, 8, 3); g.fillRect(136, 116, 8, 3);
-    g.fillRect(118, 136, 20, 4);
-    g.fillStyle = '#8a3a3a'; g.fillRect(121, 144, 14, 3);
-  }),
-  paintCanvas((g) => { // Moonlit garden — landscape
-    const grad = g.createLinearGradient(0, 0, 0, 320);
-    grad.addColorStop(0, '#060a24'); grad.addColorStop(1, '#0e2a22');
-    g.fillStyle = grad; g.fillRect(0, 0, 256, 320);
-    g.fillStyle = '#fdf6d8'; g.beginPath(); g.arc(196, 62, 18, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#0a2018';
-    g.beginPath(); g.moveTo(30, 320); g.lineTo(30, 180); g.lineTo(70, 130); g.lineTo(110, 180); g.lineTo(110, 320); g.closePath(); g.fill();
-    g.beginPath(); g.moveTo(150, 320); g.lineTo(150, 200); g.lineTo(185, 150); g.lineTo(220, 200); g.lineTo(220, 320); g.closePath(); g.fill();
-    g.fillStyle = '#1a3a2a'; g.fillRect(0, 280, 256, 40);
-    g.fillStyle = '#c9b078'; g.beginPath(); g.moveTo(108, 320); g.lineTo(128, 240); g.lineTo(148, 320); g.closePath(); g.fill();
-  }),
-  paintCanvas((g) => { // Roses still life
-    g.fillStyle = '#241a1a'; g.fillRect(0, 0, 256, 320);
-    g.fillStyle = '#3a2a1a'; g.fillRect(0, 240, 256, 80);
-    g.fillStyle = '#2a4a6a'; g.beginPath(); g.moveTo(108, 240); g.lineTo(148, 240); g.lineTo(140, 300); g.lineTo(116, 300); g.closePath(); g.fill();
-    g.strokeStyle = '#1a3a1a'; g.lineWidth = 4;
-    [[128, 150], [100, 170], [156, 170], [114, 130], [142, 130]].forEach(([x, y]) => {
-      g.beginPath(); g.moveTo(128, 240); g.lineTo(x, y + 20); g.stroke();
-    });
-    [[128, 150, '#a01830'], [100, 170, '#c03040'], [156, 170, '#801826'], [114, 130, '#d04050'], [142, 130, '#a01830']].forEach(([x, y, col]) => {
-      g.fillStyle = col; g.beginPath(); g.arc(x, y, 20, 0, Math.PI * 2); g.fill();
-      g.fillStyle = 'rgba(255,120,140,0.5)'; g.beginPath(); g.arc(x - 5, y - 5, 8, 0, Math.PI * 2); g.fill();
-    });
-  }),
-  paintCanvas((g) => { // Dancers at a ball
-    g.fillStyle = '#3a2410'; g.fillRect(0, 0, 256, 320);
-    g.fillStyle = '#ffd97a';
-    for (let i = 0; i < 24; i++) { g.fillRect(40 + Math.random() * 176, 20 + Math.random() * 40, 3, 3); }
-    g.fillStyle = '#7a1a2a'; g.beginPath(); g.moveTo(100, 150); g.lineTo(60, 300); g.lineTo(140, 300); g.closePath(); g.fill();
-    g.fillStyle = '#1a2a4a'; g.beginPath(); g.moveTo(170, 150); g.lineTo(140, 300); g.lineTo(205, 300); g.closePath(); g.fill();
-    g.fillStyle = '#d9a06b';
-    g.beginPath(); g.arc(100, 125, 14, 0, Math.PI * 2); g.fill();
-    g.beginPath(); g.arc(172, 125, 14, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#c9a227'; g.fillRect(30, 290, 196, 6);
-  }),
+  loadPainting('assets/textures/ballroom/ballroom_painting_lady_gold_1024.webp'),       // Lady in gold — portrait
+  loadPainting('assets/textures/ballroom/ballroom_painting_gentleman_1024.webp'),       // Gentleman with moustache — portrait
+  loadPainting('assets/textures/ballroom/ballroom_painting_moonlit_garden_1024.webp'),  // Moonlit garden — landscape
+  loadPainting('assets/textures/ballroom/ballroom_painting_roses_1024.webp'),           // Roses still life
+  loadPainting('assets/textures/ballroom/ballroom_painting_dancers_1024.webp'),         // Dancers at a ball
 ];
 function addPainting(x, z, rotY, w, h, tex) {
   // Gilded frame: gold rim, darker inner bevel, canvas slightly proud.
