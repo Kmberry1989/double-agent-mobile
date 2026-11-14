@@ -940,6 +940,7 @@ function attachEnemySword(enemy, swordFile) {
     } catch (err) { pivot.removeFromParent(); }
   }, undefined, () => {});
 }
+const ENEMY_HITS_TO_KILL = 3; // sword hits to drop one enemy (was 1 — a one-hit kill every time). Defined here (before makeEnemy runs at load) so the const is initialized before any enemy reads it; a const declared after the creation loop sits in the temporal dead zone and the whole module dies (black screen, dead start button — the 2026-11-14 theater outage).
 function makeEnemy(i) {
   const slot = ENEMY_ROSTER[i];
   const enemy = {
@@ -1482,7 +1483,6 @@ function playSlashMiss() { playSfx(pickSfx(SFX_FILES.slashMiss)); }
 // the clips are mirrored for variety. Every connecting hit fills the
 // meter; when it is full the special auto-fires after the current slash.
 const LOCK_RANGE = 8, STRIKE_RANGE = 2.4, SPECIAL_RANGE = 3.5;
-const ENEMY_HITS_TO_KILL = 3; // sword hits to drop one enemy (was 1 — a one-hit kill every time)
 const METER_HITS = 5; // connecting hits to charge the special
 // Enemy attacks: they fight back, but slower than her. An enemy that
 // reaches her (menacing) swings a heavy overhead chop (atkChop,

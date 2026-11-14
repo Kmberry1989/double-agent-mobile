@@ -812,6 +812,15 @@ function tryAttachDonaldDrink(npc) {
     npc.group.updateMatrixWorld(true);
     const hp = new THREE.Vector3();
     hand.getWorldPosition(hp);
+    // Offset from the wrist into the palm: the hand bone's origin is the
+    // wrist joint, so a glass centred there sits on the wrist above the
+    // open hand (the browser saw it as a disc at his wrist, fingers
+    // empty). Push it ~6 cm along the hand toward the fingers (the hand
+    // bone's local +Y) so it sits in the palm, where the fingers read as
+    // wrapped around it.
+    const hq = new THREE.Quaternion();
+    hand.getWorldQuaternion(hq);
+    hp.addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(hq), 0.06);
     scene.attach(npc.glass); // preserve world transform while re-parenting
     npc.glass.position.copy(hp); // glass centre at the hand, in the palm
     npc.glass.quaternion.set(0, 0, 0, 1); // upright in the hand
