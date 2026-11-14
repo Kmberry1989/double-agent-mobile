@@ -168,19 +168,24 @@ const archTop = box(0, 8.2, 6, 25.6, 0.8, 0.8, 0xc9a227); applyTex(archTop, TEX 
 const footlightsGroup = new THREE.Group();
 footlightsGroup.position.set(0, STAGE_TOP + 0.09, 5.85); scene.add(footlightsGroup);
 const footlightsParts = [];
+// The glowing lamp sphere is a CHILD of each strip (not a separate scene
+// mesh): when a slash smashes the footlights and the strips tip over, the
+// bulb tips with its strip instead of floating where the strip used to be
+// (the 2026-11-14 browser check saw detached glowing bulbs).
+const lampGeo = new THREE.SphereGeometry(0.09, 10, 8);
+const lampMat = new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.6 });
 gltfLoader.load('assets/theater/models/footlights.glb', (gltf) => {
   for (let i = 0; i < 10; i++) {
     const c = gltf.scene.clone();
     c.position.set(-9.9 + i * 2.2, 0, 0);
+    const lamp = new THREE.Mesh(lampGeo, lampMat);
+    lamp.position.set(0, 0.21, 0); // sits above the strip, same world height as before
+    c.add(lamp);
     footlightsGroup.add(c);
     footlightsParts.push(c);
   }
 }, undefined, () => {});
 const footlightsState = { x: 0, z: 5.85, used: false, smashed: false, parts: footlightsParts };
-for (let x = -10; x <= 10; x += 2.5) {
-  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.6 }));
-  lamp.position.set(x, STAGE_TOP + 0.3, 5.85); scene.add(lamp);
-}
 const footLight = new THREE.PointLight(0xffc94d, 30, 18); footLight.position.set(0, 2, 8); scene.add(footLight);
 
 // Main curtain (opens in the cinematic): two halves, red velvet, hanging
