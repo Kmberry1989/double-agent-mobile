@@ -122,6 +122,12 @@ const ANIM_MAP = {
   crawl:'Low_Crawl.fbx', crawlBack:'Moving Backward In Crawl Position.fbx', crawlIdle:'Prone Firing Rifle.fbx',
   roll:'Run To Rolling.fbx',
   cover:'Taking_Cover_Idle.fbx', punch:'Punching.fbx', kick:'Side_Kick.fbx',
+  // Takedown hook (Kyle's pick 2026-11-14): Drive melee_hook (0.47 s hook
+  // punch). No real rear-chokehold clip exists, so the F takedown plays
+  // this hook instead of the instant silent kill. The file is a raw
+  // Mixamo export in cm (UnitScaleFactor 1.0); processClip scales its
+  // position tracks to the model's units at load (see the unit fix there).
+  meleeHook:'Melee_Hook.fbx',
   hitReaction:'Hit_Reaction.fbx', death:'Death.fbx', deathRifle:'Rifle_Death.fbx', deathFallBack:'Falling_Back_Death.fbx',
   deathForward:'Standing_React_Death_Forward.fbx', deathHeadshot:'Death_From_Front_Headshot.fbx', deathBack:'Dying_Backwards.fbx', deathCrouch:'Crouch_Death.fbx',
   knockedOut:'Knocked_Out.fbx', jump:'Jump.fbx', fall:'Falling.fbx', land:'Landing.fbx',
@@ -223,7 +229,7 @@ function playGuardDeath(g, action){
   });
   return 'pending';
 }
-const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','crawlBack','crawlIdle'];
+const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','crawlBack','crawlIdle','meleeHook'];
 let playerMixer = null, playerActions = {}, playerCurrentLoop = null, playerOneShot = null, playerOneShotName = null,
     playerOneShotHold = false, playerHeldPose = null, playerDesiredLoop = 'idle',
     playerRigOk = false, playerRigChecked = false, fbxPlaying = false;
@@ -254,8 +260,29 @@ function processClip(clip, model){
   clip.tracks.forEach((t)=>{ const b = boneKey(t.name); if (!b) return; total++; if (bones.has(b)) matched++; });
   if (total && matched / total < 0.5) { console.warn('[double-agent] clip rejected, rig mismatch:', clip.name, matched + '/' + total); return null; }
   const root = modelRootBone(model);
+  // Unit fix (2026-11-14, melee_hook): some Drive clips are authored in
+  // centimetres (UnitScaleFactor 1.0) while the repo's clips + models use
+  // the model's local units (Hips ~0.5). The loader does not convert, so
+  // such a clip would place the player tens of metres up. Detect it by
+  // the root bone's rest height: if the clip's first Hips Y is far above
+  // the model's bind Hips Y, scale every position track so the clip's
+  // standing Hips lands on the model's bind Hips. Repo clips (rest ~bind)
+  // are untouched.
+  let unitScale = 1;
+  if (root) {
+    let bindHipsY = 0;
+    model.traverse((o)=>{ if (o.isBone && boneKey(o.name) === root) bindHipsY = o.position.y; });
+    const hipsTrack = clip.tracks.find((t)=> boneKey(t.name) === root && t.name.endsWith('.position'));
+    if (bindHipsY > 0 && hipsTrack && hipsTrack.values && hipsTrack.values.length >= 3) {
+      const restY = hipsTrack.values[1];
+      if (restY > 0 && restY / bindHipsY > 5) unitScale = bindHipsY / restY;
+    }
+  }
   const tracks = clip.tracks.map((t)=>{
     const nt = t.clone();
+    if (unitScale !== 1 && t.name.endsWith('.position') && nt.values) {
+      for (let i = 0; i < nt.values.length; i++) nt.values[i] *= unitScale;
+    }
     if (root && boneKey(t.name) === root && t.name.endsWith('.position') && nt.values && nt.values.length >= 3){
       const x0 = nt.values[0], z0 = nt.values[2];
       for (let i = 0; i + 2 < nt.values.length; i += 3){ nt.values[i] = x0; nt.values[i + 2] = z0; }
@@ -2465,6 +2492,11 @@ function tryTakedown(){
     // Behind check: guard forward vs direction from guard to player.
     const behind = isBehindGuard(g);
     if (behind && g.state!=='ALERT' && g.meter<80){
+      // Takedown (Kyle's pick 2026-11-14): the player throws the melee_hook
+      // hook punch (0.47 s) instead of the instant silent kill. No real
+      // rear-chokehold clip exists, so the hook is the takedown. The guard
+      // still drops — the hook is the kill.
+      playPlayerOneShot('meleeHook');
       g.dead=true; g.hp=0; if (g.cone) g.cone.visible=false; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g);
       playSfx(pickSfx(SFX_FILES.slashHit));
       showMsg('Silent takedown — no alarm',1800); return;
@@ -2497,14 +2529,14 @@ function tryRoll(){
   playPlayerOneShot('roll');
 }
 // ---------- Stealth: takedown affordance, carry/drop, hiding bodies ----------
-// No chokehold clip exists in the repo or on Drive (see the 2026-11-14
-// stealth handoff: 'Superhuman Choke Lift' is an 8 s standing pose, arms
-// never reach a neck; 'Double Leg Takedown - Attacker' is a 7 s shoot
-// ending prone), so the takedown keeps its instant silent kill — no
-// takedown animation is faked from an unrelated clip. Closest real
-// alternative, proposed not wired: Drive melee_hook (0.47 s hook punch).
-// The takedown prompt is the TAKE DOWN button's state only (highlighted
-// when a takedown is available) — no text anywhere.
+// Takedown (Kyle's pick 2026-11-14): the F takedown plays melee_hook (the
+// Drive 0.47 s hook punch) on the player. No real rear-chokehold clip
+// exists — 'Superhuman Choke Lift' is an 8 s standing pose, arms never
+// reach a neck; 'Double Leg Takedown - Attacker' is a 7 s shoot ending
+// prone — so the hook is the takedown, not a chokehold. The chokehold
+// clips (Takedown_Chokehold_Attacker/Victim) stay registered but are not
+// triggered. The takedown prompt is the TAKE DOWN button's state only
+// (highlighted when a takedown is available) — no text anywhere.
 function isBehindGuard(g){
   const toPlayer = new THREE.Vector3().subVectors(player.position, g.group.position).normalize();
   const fwd = new THREE.Vector3(Math.sin(g.yaw),0,Math.cos(g.yaw));
