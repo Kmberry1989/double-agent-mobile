@@ -83,6 +83,7 @@
     <button class="tbtn" id="btnReload" type="button">RELOAD</button>
     <button class="tbtn" id="btnInteract" type="button">USE</button>
     <button class="tbtn" id="btnTakedown" type="button">TAKE<br>DOWN</button>
+    <button class="tbtn" id="btnCarry" type="button">CARRY</button>
     <button class="tbtn" id="btnWeapon" type="button">WEAPON</button>
     <button class="tbtn" id="btnLoadout" type="button">SET</button>
   </div>
@@ -122,6 +123,11 @@ const ANIM_MAP = {
   turnLeft:'Turn Left.fbx', turnRight:'Turn Right.fbx',
   // Held poses (played once and held at the last frame, never looped as a walk cycle)
   maleCrouchPose:'Male_Crouch_Pose.fbx', femaleCrouchPose:'Female_Crouch_Pose.fbx',
+  // Carry hold (2026-11-14, stealth): Mixamo 'Carrying' hold pose, fixed to
+  // the repo clip convention (Hips track ~(0, 0.5, 0) at the seam) and
+  // transferred onto Agent_Kyle's armature. Static two-handed front hold;
+  // it stays up while a body is carried and releases on drop.
+  carryHold:'Carrying.fbx',
   // Extra weapon-specific loops / actions (already on disk, now bound in the resolver)
   pistolIdle:'Pistol_Idle.fbx', pistolWalk:'Pistol_Walk.fbx', pistolRun:'Pistol_Run.fbx',
   pistolWalkArc:'Pistol_Walk_Arc.fbx', pistolKneelingIdle:'Pistol_Kneeling_Idle.fbx',
@@ -156,7 +162,7 @@ const ANIM_ONESHOTS = new Set(['fireRifle','fireRifleCrouch','reloadRifle','fire
   'punch','kick','hitReaction','death','deathRifle','deathFallBack','deathForward','deathHeadshot','deathBack','deathCrouch','knockedOut','climb','vault','enterCar','exitCar',
   'toRun','turn','wave','talk','talkPhone','pickingUp','grabPistol','headNodYes','honkingHorn','lookingAround',
   'openingDoor','pointingForward','shakingHeadNo','shrugging','standingUp']);
-const ANIM_HELD = new Set(['maleCrouchPose','femaleCrouchPose']);
+const ANIM_HELD = new Set(['maleCrouchPose','femaleCrouchPose','carryHold']);
 // ---------- Random death pick (7-clip pool, guards + player) ----------
 // Existing: Death, Rifle_Death, Falling_Back_Death. New (2026-10-29):
 // Standing_React_Death_Forward, Death_From_Front_Headshot,
@@ -1358,7 +1364,12 @@ function makeGuard(x,z,waypoints){
   const coneMat = new THREE.MeshBasicMaterial({color:0xffff00, transparent:true, opacity:0.13, side:THREE.DoubleSide, depthWrite:false});
   const cone = new THREE.Mesh(coneGeo, coneMat); cone.rotation.x = -Math.PI/2; cone.rotation.z = Math.PI/2; cone.position.set(0,1.2,5); g.add(cone);
   g.position.set(x, CHAR_LIFT, z); scene.add(g);
-  return { group:g, mesh:b, capsuleBody:b, capsuleHead:h, cone, coneMat, waypoints, wp:0, yaw:0, hp:100, state:'PATROL', meter:0, lastKnown:null, searchT:0, alertT:0, shotT:0, ammo:30, reloadUntil:0, dead:false, realModel:null, enemyWeapon:null };
+  return { group:g, mesh:b, capsuleBody:b, capsuleHead:h, cone, coneMat, waypoints, wp:0, yaw:0, hp:100, state:'PATROL', meter:0, lastKnown:null, searchT:0, alertT:0, shotT:0, ammo:30, reloadUntil:0, dead:false, realModel:null, enemyWeapon:null,
+    // Body-hiding (stealth): hidden = dropped where no live guard could see
+    // the spot and the spot is a stash zone or near cover (see
+    // isHiddenDropSpot); carried = the player is carrying this body now;
+    // discovered = a live guard already raised the alarm on this body once.
+    hidden:false, carried:false, discovered:false };
 }
 const guards = [
   makeGuard(-10,0,[[-10,0],[-10,-20],[10,-20],[10,0]]),
@@ -1940,12 +1951,15 @@ addEventListener('keydown', e=>{
   if (e.code==='Digit2'){ setWeaponVariant('MP5K'); }
   if (e.code==='KeyL'){ playerLoadout = playerLoadout==='white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
   if (e.code==='KeyR') startReload();
+  if (e.code==='KeyG') toggleCarryDrop();
   if (e.code==='KeyF') tryTakedown();
   if (e.code==='KeyE') tryInteract();
-  // New animation-only keys — no existing key is changed or remapped.
+  // New animation-only keys — no existing key is changed or remapped,
+  // except KeyG: it was the wave emote and is now carry/drop (stealth),
+  // so wave moves to KeyH.
   if (e.code==='KeyQ') playPlayerOneShot('punch');
   if (e.code==='KeyX') playPlayerOneShot('kick');
-  if (e.code==='KeyG') playPlayerOneShot('wave');
+  if (e.code==='KeyH') playPlayerOneShot('wave');
   if (e.code==='KeyT') playPlayerOneShot('talk');
   if (e.code==='KeyN') playPlayerOneShot('talkPhone');
   if (e.code==='KeyV') playPlayerPose('maleCrouchPose');
@@ -2046,6 +2060,7 @@ document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLo
   bindBtn('btnReload', doReload);
   bindBtn('btnInteract', tryInteract);
   bindBtn('btnTakedown', tryTakedown);
+  bindBtn('btnCarry', toggleCarryDrop);
   bindBtn('btnWeapon', doWeapon);
   bindBtn('btnLoadout', doLoadout);
   bindBtn('btnWeather', cycleWeather);
@@ -2303,7 +2318,7 @@ function tryShoot(){
       spawnBloodMist(hits[0].point.clone());
       spawnBloodSpatter(hits[0].point.clone());
       addDecal(new THREE.Vector3(g.group.position.x, 0.02, g.group.position.z), new THREE.Vector3(0, 1, 0), 'blood');
-      if (g.hp<=0){ g.dead=true; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g); showMsg('Guard down',1400); }
+      if (g.hp<=0){ g.dead=true; if (g.cone) g.cone.visible=false; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g); showMsg('Guard down',1400); }
       else showMsg('Hit!',700);
     }
   }
@@ -2338,16 +2353,15 @@ function tryShoot(){
 function tryTakedown(){
   noteActivity(); // a takedown ends any idle orbit
   if (gameOver || won) return;
+  if (carriedBody) return; // carrying a body: drop it first (KeyG / CARRY)
   for (const g of guards){
     if (g.dead) continue;
     const d = g.group.position.distanceTo(player.position);
     if (d>2.8) continue;
     // Behind check: guard forward vs direction from guard to player.
-    const toPlayer = new THREE.Vector3().subVectors(player.position, g.group.position).normalize();
-    const fwd = new THREE.Vector3(Math.sin(g.yaw),0,Math.cos(g.yaw));
-    const behind = fwd.dot(toPlayer) < -0.6;
+    const behind = isBehindGuard(g);
     if (behind && g.state!=='ALERT' && g.meter<80){
-      g.dead=true; g.hp=0; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g);
+      g.dead=true; g.hp=0; if (g.cone) g.cone.visible=false; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g);
       playSfx(pickSfx(SFX_FILES.slashHit));
       showMsg('Silent takedown — no alarm',1800); return;
     }
@@ -2355,6 +2369,143 @@ function tryTakedown(){
     return;
   }
   showMsg('No guard in takedown range',1000);
+}
+// ---------- Stealth: takedown affordance, carry/drop, hiding bodies ----------
+// No chokehold clip exists in the repo or on Drive (see the 2026-11-14
+// stealth handoff: 'Superhuman Choke Lift' is an 8 s standing pose, arms
+// never reach a neck; 'Double Leg Takedown - Attacker' is a 7 s shoot
+// ending prone), so the takedown keeps its instant silent kill — no
+// takedown animation is faked from an unrelated clip. Closest real
+// alternative, proposed not wired: Drive melee_hook (0.47 s hook punch).
+// The takedown prompt is the TAKE DOWN button's state only (highlighted
+// when a takedown is available) — no text anywhere.
+function isBehindGuard(g){
+  const toPlayer = new THREE.Vector3().subVectors(player.position, g.group.position).normalize();
+  const fwd = new THREE.Vector3(Math.sin(g.yaw),0,Math.cos(g.yaw));
+  return fwd.dot(toPlayer) < -0.6;
+}
+function takedownAvailable(){
+  if (gameOver || won || carriedBody) return null;
+  for (const g of guards){
+    if (g.dead) continue;
+    if (g.group.position.distanceTo(player.position) > 2.8) continue;
+    if (isBehindGuard(g) && g.state !== 'ALERT' && g.meter < 80) return g;
+  }
+  return null;
+}
+let carriedBody = null; // guard being carried, or null
+function nearestDeadGuard(maxD){
+  let best = null, bestD = maxD;
+  for (const g of guards){
+    if (!g.dead || g.carried) continue;
+    const d = g.group.position.distanceTo(player.position);
+    if (d < bestD){ bestD = d; best = g; }
+  }
+  return best;
+}
+function toggleCarryDrop(){
+  noteActivity(); // picking up / dropping a body ends any idle orbit
+  if (gameOver || won) return;
+  if (carriedBody){ dropCarriedBody(); return; }
+  const g = nearestDeadGuard(2.0);
+  if (!g) return;
+  carriedBody = g; g.carried = true;
+  // Stop the death clip (if any) so the model returns to its bind pose,
+  // then lay the rigid body flat: it is held in front of the player.
+  // updateCarriedBody re-asserts this every frame, so a death clip that
+  // finishes loading after the pickup cannot take the body back.
+  if (g.deathAction){ try { g.deathAction.stop(); } catch (e) {} g.deathAction = null; }
+  g.deathPlaying = false;
+  if (g.cone) g.cone.visible = false;
+  g.group.rotation.x = -Math.PI/2;
+  playPlayerPose('carryHold');
+}
+function dropCarriedBody(){
+  const g = carriedBody; if (!g) return;
+  carriedBody = null; g.carried = false;
+  // Place the body flat on the ground 1 m in front of the player (or at
+  // the player's feet if that spot is inside a wall/crate).
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  let dx = player.position.x + fx*1.0, dz = player.position.z + fz*1.0;
+  if (collides(dx, dz)){ dx = player.position.x; dz = player.position.z; }
+  g.group.position.set(dx, 0.4 + CHAR_LIFT, dz);
+  g.group.rotation.x = -Math.PI/2;
+  g.hidden = isHiddenDropSpot(new THREE.Vector3(dx, 0, dz));
+  if (playerHeldPose === 'carryHold') playPlayerPose('carryHold'); // toggle off
+}
+function updateCarriedBody(){
+  if (!carriedBody) return;
+  const g = carriedBody;
+  if (g.deathPlaying){ if (g.deathAction){ try { g.deathAction.stop(); } catch (e) {} g.deathAction = null; } g.deathPlaying = false; }
+  // Held flat in front of the player at chest height, on the forearms
+  // of the carry hold (hands sit ~1.44 m; body centre 1.15 m + 0.05 lift).
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  g.group.position.set(player.position.x + fx*0.9, player.position.y + 1.15, player.position.z + fz*0.9);
+  g.group.rotation.x = -Math.PI/2;
+}
+// Hidden-body rule, stated plainly: a dropped body is hidden when NO live
+// guard can see the drop spot at the moment it is dropped (same vision
+// cone as spotting the player: 19 m, 0.65 rad, clear line of sight) AND
+// the spot is either inside the SILENT START alcove (x -41..-32,
+// z 33..41) or the security office interior (x 10.5..17.5, z -30.5..-25.5),
+// or within 1.5 m of a wall, crate, or other obstacle. A hidden body is
+// never discovered. Any other dropped body stays discoverable: the first
+// live guard who sees it goes ALERT on the body's position (see
+// checkBodyDiscovery, called from updateGuard).
+function guardSeesBody(g, pos){
+  const gp = g.group.position;
+  const dx = pos.x - gp.x, dz = pos.z - gp.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist > 19 || dist < 0.01) return false;
+  const dot = (dx*Math.sin(g.yaw) + dz*Math.cos(g.yaw)) / dist;
+  if (dot < Math.cos(0.65)) return false;
+  return hasLOS(new THREE.Vector3(gp.x, 1.6, gp.z), new THREE.Vector3(pos.x, 0.6, pos.z));
+}
+function isHiddenDropSpot(pos){
+  const inAlcove = pos.x >= -41 && pos.x <= -32 && pos.z >= 33 && pos.z <= 41;
+  const inOffice = pos.x >= 10.5 && pos.x <= 17.5 && pos.z >= -30.5 && pos.z <= -25.5;
+  let nearCover = false;
+  if (!inAlcove && !inOffice){
+    for (const o of obstacles){
+      const dx = Math.max(o.minX - pos.x, 0, pos.x - o.maxX);
+      const dz = Math.max(o.minZ - pos.z, 0, pos.z - o.maxZ);
+      if (Math.hypot(dx, dz) < 1.5){ nearCover = true; break; }
+    }
+    if (!nearCover) return false;
+  }
+  for (const g of guards){
+    if (g.dead) continue;
+    if (guardSeesBody(g, pos)) return false;
+  }
+  return true;
+}
+// Body discovery: a live guard who sees a dead, unhidden, uncarried body
+// raises the alarm on the body's position. One alarm per body (a body
+// already discovered does not re-trigger). The guard's own vision cone
+// and the existing ALERT machinery are reused; the player-detection
+// rates above are untouched.
+function checkBodyDiscovery(g, eye, fwd){
+  for (const b of guards){
+    if (!b.dead || b.hidden || b.carried || b.discovered) continue;
+    const bp = b.group.position;
+    const toB = new THREE.Vector3().subVectors(new THREE.Vector3(bp.x, 0, bp.z), new THREE.Vector3(g.group.position.x, 0, g.group.position.z));
+    const dist = toB.length();
+    if (dist > 19 || dist < 0.01) continue;
+    toB.normalize();
+    if (fwd.dot(toB) < Math.cos(0.65)) continue;
+    if (!hasLOS(eye, new THREE.Vector3(bp.x, 0.6, bp.z))) continue;
+    b.discovered = true; g.state = 'ALERT'; g.meter = 100; g.alertT = 0; g.lastKnown = new THREE.Vector3(bp.x, 0, bp.z);
+    return;
+  }
+}
+function updateStealthButtons(){
+  const td = document.getElementById('btnTakedown');
+  if (td) td.classList.toggle('on', !!takedownAvailable());
+  const cb = document.getElementById('btnCarry');
+  if (!cb) return;
+  cb.classList.toggle('on', !!carriedBody);
+  const label = carriedBody ? 'DROP' : 'CARRY';
+  if (cb.textContent !== label) cb.textContent = label;
 }
 function tryInteract(){
   if (gameOver || won) return;
@@ -2399,6 +2550,10 @@ function updateGuard(g, dt, now){
     if (g.state==='ALERT'){ g.alertT += dt; if (g.alertT>4){ g.state='SEARCH'; g.alertT=0; g.searchT=0; } }
     else if (g.state==='SUSPICIOUS' && g.meter<=5) g.state='PATROL';
   }
+  // Body discovery (stealth): a guard who cannot see the player may still
+  // spot a dead, unhidden body and raise the alarm on it. ALERT guards
+  // are already chasing the player and are not diverted.
+  if (!seen && g.state !== 'ALERT') checkBodyDiscovery(g, eye, fwd);
   // Hearing: sprinting nearby, or gunfire already handled by noiseAlert.
   if (sprinting && dist<12 && !seen){ g.meter = Math.min(100, g.meter + 20*dt); if (g.meter>=60){ g.state='SEARCH'; g.lastKnown=p.clone(); } }
   let speed = 0, desiredYaw = g.yaw;
@@ -2659,6 +2814,8 @@ function animate(){
     if (currentAnim !== 'jump') updatePlayerAnimation(currentAnim, weapon, aiming, crouching);
     guards.forEach(g=>updateGuard(g,dt,now));
     guards.forEach(g=>updateGuardAnimation(g,dt));
+    updateCarriedBody();
+    updateStealthButtons();
     updateCameras(dt);
     // Global detection is the worst guard meter (cameras add on top).
     let worst = detection; guards.forEach(g=>{ worst=Math.max(worst,g.meter); });
