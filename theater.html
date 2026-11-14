@@ -232,7 +232,12 @@ gltfLoader.load('assets/theater/models/audience_seats.glb', (gltf) => {
   for (const g of seatGroups) {
     for (let i = 0; i < 6; i++) {
       const c = src.clone();
-      c.position.set(-3.75 + i * 1.5, 0.22, 0);
+      // The seat GLB is only 0.40 m tall (a low bench next to a 1.8 m
+      // person); stretch it vertically to a real chair height (~0.90 m)
+      // and lift it so its base sits on the floor. Width/depth stay
+      // 1.50 m, so the 1.50 m spacing is unchanged.
+      c.scale.set(1, 2.25, 1);
+      c.position.set(-3.75 + i * 1.5, 0.54, 0);
       // The GLB's backrest is at local -Z, so unrotated the seats face
       // +Z (the back wall). Turn each seat 180 deg so it faces -Z,
       // toward the stage.
@@ -938,6 +943,7 @@ function makeEnemy(i) {
   const slot = ENEMY_ROSTER[i];
   const enemy = {
     i, state: 'waiting', // waiting -> rising -> walking -> chasing -> menacing -> attacking -> falling -> gone
+    hp: ENEMY_HITS_TO_KILL, // sword hits left (3); environmental kills bypass hp
     x: ENEMY_SPAWNS[i][0], z: ENEMY_SPAWNS[i][1], y: -0.6,
     riseT: 0, fallT: 0, sway: Math.random() * 6.28,
     atkCd: 0, atkT: 0, hitDone: false, // enemy attack: cooldown, swing timer, hit landed
@@ -1088,13 +1094,12 @@ function defeatEnemy(enemy, silent) {
   spawnBlood(enemy.x, (enemy.y || 0) + 1.3, enemy.z);
   enemy.state = 'falling'; enemy.fallT = 0;
   defeated++; updateEnemyCount();
-  // Cinematic moment on EVERY kill: the final blow gets the long 2.0 s
-  // slow-mo (and overrides any active slow-mo, regular or special);
-  // regular kills get a short 0.8 s one, but only if no slow-mo is
-  // already running — a regular kill never cuts short the special's
-  // 1.2 s or the final kill's 2.0 s.
+  // Cinematic moment ONLY on the final (8th) kill: a 0.8 s slow-mo +
+  // camera cut on every regular kill made the camera jump after every
+  // single kill, which read as changing way too often. Regular kills
+  // now just fall with no camera move; the special keeps its 1.2 s
+  // moment (fireSpecial) and the final blow keeps the long 2.0 s one.
   if (defeated >= 8) startSlowMo(2.0, SLOWMO_SCALE); // the final blow, in slow motion
-  else if (!slowMo) startSlowMo(0.8, SLOWMO_SCALE); // every other kill, in slow motion
   if (!silent) spawnNextEnemy();
 }
 function spawnNextEnemy() {
@@ -1476,6 +1481,7 @@ function playSlashMiss() { playSfx(pickSfx(SFX_FILES.slashMiss)); }
 // the clips are mirrored for variety. Every connecting hit fills the
 // meter; when it is full the special auto-fires after the current slash.
 const LOCK_RANGE = 8, STRIKE_RANGE = 2.4, SPECIAL_RANGE = 3.5;
+const ENEMY_HITS_TO_KILL = 3; // sword hits to drop one enemy (was 1 — a one-hit kill every time)
 const METER_HITS = 5; // connecting hits to charge the special
 // Enemy attacks: they fight back, but slower than her. An enemy that
 // reaches her (menacing) swings a heavy overhead chop (atkChop,
@@ -1571,9 +1577,18 @@ function hitCheck(range, dot) {
     if (d > range) return false;
     return (dx * fx + dz * fz) / (d || 1) > dot;
   };
-  let kills = 0;
+  // Returns the number of enemies HIT (not killed): each connecting hit
+  // advances the combo/meter, whether or not it drops the enemy. An
+  // enemy only falls once its hp (3 hits) is gone; a non-lethal hit
+  // draws blood and staggers its attack so the slash reads as a connect.
+  let hits = 0;
   for (const e of enemies) {
-    if ((e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting') && inFront(e.x, e.z)) { defeatEnemy(e); kills++; }
+    if ((e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting') && inFront(e.x, e.z)) {
+      hits++;
+      e.hp = (e.hp === undefined ? ENEMY_HITS_TO_KILL : e.hp) - 1;
+      if (e.hp <= 0) defeatEnemy(e);
+      else { spawnBlood(e.x, (e.y || 0) + 1.3, e.z); e.atkT = 0; e.hitDone = false; }
+    }
   }
   for (const sb of sandbags) if (!sb.used && inFront(sb.x, sb.z)) triggerSandbag(sb);
   if (!chandelier.used && inFront(chandelier.cleat.x, chandelier.cleat.z)) triggerChandelier();
@@ -1585,14 +1600,14 @@ function hitCheck(range, dot) {
   if (!crates.used && inFront(crates.x, crates.z)) triggerCrates();
   for (const sp of [spotL, spotR]) if (!sp.used && inFront(sp.x, sp.z)) triggerSpotlight(sp);
   if (!footlightsState.used && inFront(footlightsState.x, footlightsState.z)) triggerFootlights();
-  return kills;
+  return hits;
 }
 // A connecting hit advances the combo (which picks the next slash) and
 // fills the meter. A full meter queues the special, which auto-fires
 // when the current slash ends. A slash that hits nothing breaks the combo.
-function onConnect(kills) {
-  if (kills > 0) {
-    combo += kills; meter += kills;
+function onConnect(hits) {
+  if (hits > 0) {
+    combo += hits; meter += hits;
     hitsTaken = 0; // she is fighting back — the knockdown count resets
     playSlashHit();
     if (meter >= METER_HITS) { meter = 0; specialQueued = true; }
@@ -1625,7 +1640,10 @@ function doChainAttack() {
     // Far: dash in (spin + hop), then the lunging slash lands.
     const dx = target.x - player.position.x, dz = target.z - player.position.z;
     const d = Math.hypot(dx, dz) || 1;
-    const ex = target.x - dx / d * 1.8, ez = target.z - dz / d * 1.8;
+    // Dash in to 1.0 m from the enemy (was 1.8 m): the katana is 0.9 m,
+    // so from 1.8 m the sword visibly fell short and she never looked
+    // close enough to be hitting. At 1.0 m the blade reaches the enemy.
+    const ex = target.x - dx / d * 1.0, ez = target.z - dz / d * 1.0;
     const dashDist = Math.hypot(ex - player.position.x, ez - player.position.z);
     const dur = Math.max(0.25, Math.min(0.5, dashDist / DASH_SPEED));
     const key = DASH_CYCLE[combo % DASH_CYCLE.length];
@@ -1676,8 +1694,8 @@ function fireSpecial() {
   specialCount++;
   if (mxClips[key]) { playMxCharClipOnce(player, key); slashTimer = mxClips[key].duration; slashCooldown = mxClips[key].duration; }
   else slashCooldown = 1.2;
-  const kills = hitCheck(SPECIAL_RANGE, 0.3);
-  if (kills > 0) { combo += kills; playSlashHit(); setTimeout(playSlashHit, 120); }
+  const hits = hitCheck(SPECIAL_RANGE, 0.3);
+  if (hits > 0) { combo += hits; playSlashHit(); setTimeout(playSlashHit, 120); }
   else playSlashMiss();
   updateMeter();
 }
