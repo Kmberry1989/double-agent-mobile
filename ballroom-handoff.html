@@ -853,7 +853,7 @@ function stripRootTravel(clip) {
   });
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx'], ['openDoor', 'Opening_Door_Inwards.fbx'], ['idleLook', 'Looking_Around.fbx'], ['idleShrug', 'Shrugging.fbx'], ['idleNod', 'Head_Nod_Yes.fbx'], ['idleShake', 'Shaking_Head_No.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx'], ['openDoor', 'Opening_Door_Inwards.fbx'], ['idleLook', 'Looking_Around.fbx'], ['idleShrug', 'Shrugging.fbx'], ['idleNod', 'Head_Nod_Yes.fbx'], ['idleShake', 'Shaking_Head_No.fbx'], ['strafeLeft', 'Strafe_Left.fbx'], ['strafeRight', 'Strafe_Right.fbx'], ['turnLeft', 'Turn Left.fbx'], ['turnRight', 'Turn Right.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -933,6 +933,17 @@ function playClip(key) {
   if (!player.mixer) return;
   playMxCharClip(player, key);
   mixer = player.mixer;
+}
+// Movement clip: pure sideways (no forward/back) side-steps facing
+// forward — the character does NOT rotate to face the strafe direction.
+// Turning in place (yaw actively changing, not moving forward) plays the
+// Turn Left/Right clip; anything else moving is the walk loop.
+function moveClipKey(fx, fz, ml) {
+  if (ml > 0.1) {
+    if (fz === 0 && fx !== 0) return fx > 0 ? 'strafeRight' : 'strafeLeft';
+    return 'walk';
+  }
+  return turnDir !== 0 ? (turnDir > 0 ? 'turnLeft' : 'turnRight') : 'idle';
 }
 // Kyle idle variations (same set as ballroom.html): after ~5 s standing
 // still, he looks around, shrugs, nods, or shakes his head, then back to
@@ -1608,6 +1619,7 @@ function endTalk() { if (typeTimer) { clearInterval(typeTimer); typeTimer = null
 // ---- Input: keyboard + touch (no combat controls anywhere) ----
 const keys = {};
 let yaw = 0, pitch = 0.15, started = false, joyId = null, joyX = 0, joyY = 0, lookId = null, lastLX = 0, lastLY = 0;
+let prevYawTurn = 0, turnDir = 0; // previous yaw + active turn direction, for the Turn Left/Right clips
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 if (isTouch) document.body.classList.add('touch');
 // Ballroom waltz (user-supplied, mono AAC): looping background music, started on the Enter tap (the user gesture iPhone Safari needs for audio).
@@ -1902,9 +1914,14 @@ function animate() {
       if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
     }
     player.rotation.y = yaw;
+    // Turn detection: camera-yaw change this frame (mouse/touch look).
+    let _yd = yaw - prevYawTurn; while (_yd > Math.PI) _yd -= Math.PI * 2; while (_yd < -Math.PI) _yd += Math.PI * 2;
+    prevYawTurn = yaw;
+    turnDir = _yd > 0.01 ? 1 : (_yd < -0.01 ? -1 : 0);
     if (mixer) {
       mixer.update(dt);
       if (doorAnimT >= 0) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playMxCharClipOnce(player, 'openDoor'); }
+      else if (turnDir !== 0 && ml <= 0.1) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playClip(turnDir > 0 ? 'turnLeft' : 'turnRight'); }
       else if (!talking && !handedOff && ml <= 0.1) {
         // Kyle-as-player idle variations: ~5 s still, then a short gesture.
         if (idleVarKey) { if (t >= idleVarEnd) { idleVarKey = null; playClip('idle'); } }
@@ -1916,7 +1933,7 @@ function animate() {
             idleTimer = 4 + Math.random() * 2;
           } else playClip('idle');
         }
-      } else if (!talking) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playClip(ml > 0.1 ? 'walk' : 'idle'); }
+      } else if (!talking) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playClip(moveClipKey(fx, fz, ml)); }
       else { idleTimer = 4 + Math.random() * 2; idleVarKey = null; }
     }
     // Guest/contact bone animation: talk while talking, walk while moving, else idle.

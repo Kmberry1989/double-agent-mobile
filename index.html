@@ -118,6 +118,8 @@ const ANIM_MAP = {
   climb:'Climbing_Ladder.fbx', vault:'Vault_Over_Box.fbx', drive:'Driving.fbx', enterCar:'Entering_Car.fbx',
   exitCar:'Exiting_Car.fbx', wave:'Waving.fbx', talk:'Talking.fbx', talkPhone:'Talking_On_A_Cell_Phone.fbx',
   turn:'Turning.fbx', toRun:'Idle_To_Running.fbx',
+  strafeLeft:'Strafe_Left.fbx', strafeRight:'Strafe_Right.fbx',
+  turnLeft:'Turn Left.fbx', turnRight:'Turn Right.fbx',
   // Held poses (played once and held at the last frame, never looped as a walk cycle)
   maleCrouchPose:'Male_Crouch_Pose.fbx', femaleCrouchPose:'Female_Crouch_Pose.fbx',
   // Extra weapon-specific loops / actions (already on disk, now bound in the resolver)
@@ -146,7 +148,7 @@ let riggedModel = null;
 const fbxLoader = new FBXLoader();
 const fbxClips = {};        // action -> processed THREE.AnimationClip
 const fbxClipLoading = {};  // action -> Promise<clip|null>
-const ANIM_LOOPS = new Set(['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','cover',
+const ANIM_LOOPS = new Set(['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','cover','strafeLeft','strafeRight','turnLeft','turnRight',
   'aimIdle','aimWalk','aimPistol','fall','drive','pistolIdle','pistolWalk','pistolRun','pistolWalkArc',
   'pistolKneelingIdle','rifleIdle','rifleWalk','rifleRun','rifleSprint','rifleCrouchWalk','idleCrouchingRifle',
   'sittingIdle','typing']);
@@ -1075,6 +1077,7 @@ const armL = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.7,0.16), mat(0x2a3a4a))
 const armR = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.7,0.16), mat(0x2a3a4a)); armR.position.set(0.55,1.35,0.3); player.add(armR);
 player.position.set(-38, CHAR_LIFT, 38);
 let yaw = -Math.PI/4, pitch = 0.12, vy = 0, grounded = true, crouching = false, aiming = false;
+let prevYawTurn = -Math.PI/4; // previous frame's yaw, for turn-clip detection
 let modelYaw = yaw; // smoothed model yaw (animate lerps this toward camera yaw; never snap)
 let health = 100, detection = 0, intel = 0, gameOver = false, won = false;
 let weapon = 'pistol'; // pistol | rifle
@@ -2471,12 +2474,21 @@ function drawMinimap(){
   guards.forEach(g=>{ if(!g.dead){ mini.fillStyle = g.state==='ALERT'?'#ff2222':'#ffcc00'; mini.beginPath(); mini.arc(s(g.group.position.x),s(g.group.position.z),4,0,7); mini.fill(); } });
   mini.fillStyle='#57d977'; mini.save(); mini.translate(s(player.position.x),s(player.position.z)); mini.rotate(-yaw+Math.PI); mini.beginPath(); mini.moveTo(0,-7); mini.lineTo(5,5); mini.lineTo(-5,5); mini.closePath(); mini.fill(); mini.restore();
 }
-function animStateName(moving, sprinting){
+function animStateName(moving, sprinting, fx, fz, turnDir){
   if (!grounded) return vy>0?'jump':'fall';
   if (aiming) return moving?'aimWalk':'aimIdle';
   if (crouching) return moving?'crouchWalk':'crouchIdle';
   if (sprinting && moving) return 'sprint';
-  if (moving) return crouching?'sneak':'walk';
+  // Turning in place (or while strafing/backing up): the Turn Left/Right
+  // clip plays while the camera yaw is actively changing. Forward
+  // movement keeps the walk loop — the body turns via the modelYaw lerp.
+  if (turnDir !== 0 && fz <= 0) return turnDir > 0 ? 'turnLeft' : 'turnRight';
+  if (moving) {
+    // Pure sideways, no forward/back: side-step, facing forward (the
+    // character does NOT rotate to face the strafe direction).
+    if (fz === 0 && fx !== 0) return fx > 0 ? 'strafeRight' : 'strafeLeft';
+    return crouching?'sneak':'walk';
+  }
   return 'idle';
 }
 let wasGrounded = true;
@@ -2632,10 +2644,16 @@ function animate(){
     // from the loop), so it was not the cause and is left untriggered.
     // Strafing still faces camera/aim direction, not sideways: turning
     // the body sideways while strafing would break aim and look worse.
+    // Turn detection: how much the camera yaw changed this frame. A
+    // deliberate turn (mouse/touch look, >0.01 rad/frame) sets turnDir;
+    // animStateName plays the Turn Left/Right clip while it lasts.
+    let _yawDelta = yaw - prevYawTurn; while (_yawDelta>Math.PI) _yawDelta-=Math.PI*2; while (_yawDelta<-Math.PI) _yawDelta+=Math.PI*2;
+    prevYawTurn = yaw;
+    const turnDir = _yawDelta > 0.01 ? 1 : (_yawDelta < -0.01 ? -1 : 0);
     { let dyaw = yaw - modelYaw; while (dyaw>Math.PI) dyaw-=Math.PI*2; while (dyaw<-Math.PI) dyaw+=Math.PI*2;
       modelYaw += dyaw * Math.min(1, dt*10); }
     player.rotation.y = modelYaw;
-    currentAnim = animStateName(moving, sprinting);
+    currentAnim = animStateName(moving, sprinting, fx, fz, turnDir);
     // Drive the FBX state machine from game state. Jump is a one-shot
     // (triggered on Space), not a loop — fall is the airborne loop.
     if (currentAnim !== 'jump') updatePlayerAnimation(currentAnim, weapon, aiming, crouching);

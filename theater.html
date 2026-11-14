@@ -615,7 +615,7 @@ function playMxCharClipOnce(char, key) {
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); char._cur = act;
 }
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['strafeLeft', 'Strafe_Left.fbx'], ['strafeRight', 'Strafe_Right.fbx'], ['turnLeft', 'Turn Left.fbx'], ['turnRight', 'Turn Right.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -684,6 +684,17 @@ function playMxCharClipOnce(char, key) {
   }, undefined, () => {});
 });
 function playClip(key) { if (!player.mixer) return; playMxCharClip(player, key); mixer = player.mixer; }
+// Movement clip: pure sideways (no forward/back) side-steps facing
+// forward — the character does NOT rotate to face the strafe direction.
+// Turning in place (yaw actively changing, not moving forward) plays the
+// Turn Left/Right clip; anything else moving is the walk loop.
+function moveClipKey(fx, fz, ml) {
+  if (ml > 0.1) {
+    if (fz === 0 && fx !== 0) return fx > 0 ? 'strafeRight' : 'strafeLeft';
+    return 'walk';
+  }
+  return turnDir !== 0 ? (turnDir > 0 ? 'turnLeft' : 'turnRight') : 'idle';
+}
 
 // Katana attach — the viewer.html grip logic (per-hand baked offsets).
 // The katana's geometry sits +0.744 m in mesh-local X from the node origin,
@@ -1671,6 +1682,7 @@ function fireSpecial() {
 // ---- Game state / cinematic ----
 let won = false, started = false, cine = null, bowPhase = null, winShown = false;
 let yaw = Math.PI, pitch = 0.15;
+let prevYawTurn = Math.PI, turnDir = 0; // previous yaw + active turn direction, for the Turn Left/Right clips
 const keys = {};
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 if (isTouch) document.body.classList.add('touch');
@@ -1967,10 +1979,10 @@ function animate() {
     } else {
     updateLockOn(dt);
     updateDash(dt);
-    let ml = 0;
+    let ml = 0, fx = 0, fz = 0;
     if (!dash) {
-    let fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
-    let fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
+    fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
+    fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
     ml = Math.hypot(fx, fz);
     if (ml > 1) { fx /= ml; fz /= ml; }
     const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);
@@ -1994,9 +2006,13 @@ function animate() {
     }
     }
     player.rotation.y = yaw;
+    // Turn detection: camera-yaw change this frame (mouse/touch look).
+    let _yd = yaw - prevYawTurn; while (_yd > Math.PI) _yd -= Math.PI * 2; while (_yd < -Math.PI) _yd += Math.PI * 2;
+    prevYawTurn = yaw;
+    turnDir = _yd > 0.01 ? 1 : (_yd < -0.01 ? -1 : 0);
     if (mixer) {
       mixer.update(dt);
-      if (slashTimer <= 0 && !dash) playClip(ml > 0.1 ? 'walk' : 'idle');
+      if (slashTimer <= 0 && !dash) playClip(moveClipKey(fx, fz, ml));
     }
     }
     if (defeated >= 8 && !bowPhase && !won && !slowMo) startBow();
