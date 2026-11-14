@@ -2777,10 +2777,11 @@ function animStateName(moving, sprinting, fx, fz, turnDir){
   if (sneaking && moving) return 'sneak';
   if (crouching) return moving?'crouchWalk':'crouchIdle';
   if (sprinting && moving) return 'sprint';
-  // Turning in place (or while strafing/backing up): the Turn Left/Right
-  // clip plays while the camera yaw is actively changing. Forward
-  // movement keeps the walk loop — the body turns via the modelYaw lerp.
-  if (turnDir !== 0 && fz <= 0) return turnDir > 0 ? 'turnLeft' : 'turnRight';
+  // Turning in place: NO turn clip. The Turn Left/Right clips squat the
+  // character to half height (hips 0.23 m vs 0.54 m standing) and do not
+  // even rotate the body, so every turn read as an awkward crouch. The
+  // body turns smoothly via the modelYaw lerp instead; the loop below
+  // (strafe / walk / idle) plays while it turns.
   if (moving) {
     // Pure sideways, no forward/back: side-step, facing forward (the
     // character does NOT rotate to face the strafe direction).

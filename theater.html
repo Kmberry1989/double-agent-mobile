@@ -686,14 +686,16 @@ function playMxCharClipOnce(char, key) {
 function playClip(key) { if (!player.mixer) return; playMxCharClip(player, key); mixer = player.mixer; }
 // Movement clip: pure sideways (no forward/back) side-steps facing
 // forward — the character does NOT rotate to face the strafe direction.
-// Turning in place (yaw actively changing, not moving forward) plays the
-// Turn Left/Right clip; anything else moving is the walk loop.
+// Turning in place (yaw actively changing, not moving forward) plays idle:
+// the Turn Left/Right clips squat the character to half height (hips
+// 0.23 m), so every turn read as an awkward crouch. The body turns via
+// the yaw lerp instead. Anything else moving is the walk loop.
 function moveClipKey(fx, fz, ml) {
   if (ml > 0.1) {
     if (fz === 0 && fx !== 0) return fx > 0 ? 'strafeRight' : 'strafeLeft';
     return 'walk';
   }
-  return turnDir !== 0 ? (turnDir > 0 ? 'turnLeft' : 'turnRight') : 'idle';
+  return 'idle';
 }
 
 // Katana attach — the viewer.html grip logic (per-hand baked offsets).

@@ -834,6 +834,30 @@ function applyBasecolor(obj, texPath) {
   tex.colorSpace = THREE.SRGBColorSpace;
   obj.traverse((o)=>{ if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach((m)=>{ m.map = tex; m.color.set(0xffffff); m.needsUpdate = true; }); } });
 }
+// ---- Donald's drink: attach the glass to his right hand (2026-11-14) ----
+// The glass used to sit at a fixed offset in Donald's group, so as he
+// walked, stumbled, and turned it floated beside him instead of staying
+// in his hand. Attaching it to his Mixamo RightHand bone (world transform
+// set first, then hand.attach preserves it as a bone-local offset) makes
+// it follow the hand through every clip.
+function tryAttachDonaldDrink(npc) {
+  if (!npc || !npc.glass || !npc.model || npc.glass.userData.handAttached) return;
+  let hand = null;
+  const key = (n) => n.toLowerCase().replace(/[^a-z]/g, '');
+  npc.model.traverse((o) => { if (!o.isBone || hand) return; if (key(o.name) === 'mixamorigRighthand') hand = o; });
+  if (!hand) npc.model.traverse((o) => { if (!o.isBone || hand) return; if (key(o.name).indexOf('righthand') >= 0) hand = o; });
+  if (!hand) return;
+  try {
+    npc.group.updateMatrixWorld(true);
+    const hp = new THREE.Vector3();
+    hand.getWorldPosition(hp);
+    scene.attach(npc.glass); // preserve world transform while re-parenting
+    npc.glass.position.copy(hp); // glass centre at the hand, in the palm
+    npc.glass.quaternion.set(0, 0, 0, 1); // upright in the hand
+    hand.attach(npc.glass); // preserves the world transform as a bone-local offset
+    npc.glass.userData.handAttached = true;
+  } catch (e) { console.warn('[double-agent] Donald drink attach failed:', e); }
+}
 function loadGuestModelMixamo(npc, path, texPath) {
   fbxLoader.load(path, (obj) => {
     fitCharacter(obj, 1.8);
@@ -842,7 +866,7 @@ function loadGuestModelMixamo(npc, path, texPath) {
     npc.group.add(obj); npc.model = obj;
     npc.mixer = new THREE.AnimationMixer(obj); npc._cur = null;
     (npc.capsuleParts || []).forEach((m)=>{ m.visible = false; });
-    if (npc.role === 'donald' && npc.glass) npc.glass.position.set(-0.55, 1.35, 0.1);
+    if (npc.role === 'donald') tryAttachDonaldDrink(npc);
   }, undefined, () => {});
 }
 function loadGuestModelDispatch(npc, path, texPath) {
@@ -960,14 +984,16 @@ function playClip(key) {
 }
 // Movement clip: pure sideways (no forward/back) side-steps facing
 // forward — the character does NOT rotate to face the strafe direction.
-// Turning in place (yaw actively changing, not moving forward) plays the
-// Turn Left/Right clip; anything else moving is the walk loop.
+// Turning in place (yaw actively changing, not moving forward) plays idle:
+// the Turn Left/Right clips squat the character to half height (hips
+// 0.23 m), so every turn read as an awkward crouch. The body turns via
+// the yaw lerp instead. Anything else moving is the walk loop.
 function moveClipKey(fx, fz, ml) {
   if (ml > 0.1) {
     if (fz === 0 && fx !== 0) return fx > 0 ? 'strafeRight' : 'strafeLeft';
     return 'walk';
   }
-  return turnDir !== 0 ? (turnDir > 0 ? 'turnLeft' : 'turnRight') : 'idle';
+  return 'idle';
 }
 // Kyle idle variations (same set as ballroom.html): after ~5 s standing
 // still, he looks around, shrugs, nods, or shakes his head, then back to
@@ -1001,7 +1027,7 @@ function loadGuestModel(npc, path) {
     npc.group.add(obj); npc.model = obj;
     npc.mixer = new THREE.AnimationMixer(obj); npc._cur = null;
     (npc.capsuleParts || []).forEach((m)=>{ m.visible = false; });
-    if (npc.role === 'donald' && npc.glass) npc.glass.position.set(-0.55, 1.35, 0.1);
+    if (npc.role === 'donald') tryAttachDonaldDrink(npc);
   }, undefined, () => {});
 }
 const NPCS = [
@@ -1945,7 +1971,7 @@ function animate() {
     if (mixer) {
       mixer.update(dt);
       if (doorAnimT >= 0) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playMxCharClipOnce(player, 'openDoor'); }
-      else if (turnDir !== 0 && ml <= 0.1) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playClip(turnDir > 0 ? 'turnLeft' : 'turnRight'); }
+      else if (turnDir !== 0 && ml <= 0.1) { idleTimer = 4 + Math.random() * 2; idleVarKey = null; playClip('idle'); }
       else if (!talking && !handedOff && ml <= 0.1) {
         // Kyle-as-player idle variations: ~5 s still, then a short gesture.
         if (idleVarKey) { if (t >= idleVarEnd) { idleVarKey = null; playClip('idle'); } }
