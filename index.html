@@ -1067,6 +1067,64 @@ wallPipe(-27.9, 2, 12, 4, 'assets/textures/raw/painted-metal-red.jpg');
   const m = new THREE.Mesh(new THREE.PlaneGeometry(4, 1.2), new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }));
   m.position.set(0, 3.5, -30.98); scene.add(m);
 })();
+// 11. ENVIRONMENT TOP-UP (2026-11-14): more real-GLB cover/dressing, same
+// box()+addGLBToObstacle() pattern throughout (the box is the collision/
+// LOS mesh and goes invisible when the GLB loads; if a GLB fails the box
+// stays visible). Nothing here blocks the EXFIL (38,-38), any intel
+// pickup ((-32,0), (0,-34), (34,28)), any guard patrol route, or the
+// spawn alcove exit (east around the north wall end at x=-32, z 32..42).
+// The 2 m crate stack is the only new occluder (oh >= 2): the occlusion
+// list rebuilds itself when obstacles.length changes, so it is picked up
+// automatically (see courtyardOccluders, ~line 509).
+// NOTE on the 2026-11-07 texture-audit gaps, checked 2026-11-14: all three
+// were already closed in the base commit, so nothing is re-done here —
+// (a) the SILENT START alcove wall (-38,32) already carries the brick
+// texture (line 563); (b) the parked car at (-24,32) already loads the
+// real assets/vehicles/white_lambo.glb (line 858-859) with the metalness/
+// emissive/missing-normals fix — headless Draco decode verified the file
+// (6,532 verts, POSITION+TEXCOORD_0 only, metallic 1.0) and the exact
+// fit/placement math (world bbox -26.10..-21.90 x 0..1.20 x 29.58..34.42,
+// inside the 4.5 x 5.0 collider), so no second car was added; the live
+// visual is still unconfirmed and needs a phone/browser check;
+// (c) the 3 security cameras already carry textures (CAM_POLE_TEX /
+// CAM_HEAD_TEX, line 1448-1456, commit f664991).
+// Barrels (2) against the red building's east face (x=-28), mirroring the
+// blue-building barrel cluster. Clear of intel (-32,0) by ~8 m and of
+// every patrol route.
+[[-26, 5], [-26, 6.5]].forEach(([x, z])=>{
+  const o = box(x, z, 0.7, 0.7, 0.9, 0x5a6a7a, undefined, { material: 'metal' });
+  addGLBToObstacle(o, 'assets/props/barrel.glb', 0.7, 0.9, 0.7);
+});
+// Crate stack (2 m) at (36,8): two crate.glb placements stacked, each
+// fitted 1.6 x 1.0 x 1.6 (raw crate.glb is a near-cube 0.49 x 0.47 x 0.49,
+// so the stretch is ~2x, not the 5x a single 2 m fit would need).
+// Destructible like the other crates. Clear of the G2 patrol (x=28) by
+// ~8 m and of the olive building (34,28) by ~16 m.
+const envCrateStack = box(36, 8, 1.6, 1.6, 2.0, 0x9a6a3a, undefined, { destructible: true, hp: 150, material: 'wood', texture: 'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp', texRepeat: [1, 1] });
+addGLBToObstacle(envCrateStack, 'assets/props/crate.glb', 1.6, 1.0, 1.6, [[0, -0.5, 0, 0], [0, 0.5, 0, 0]]);
+// Sandbag stack (2 x 1 x 1) at (-30,-16), west of the G3 patrol leg
+// (x=-25) by 5 m. Destructible like the sandbag walls.
+const envSandbags = box(-30, -16, 2, 1, 1, 0x777777, undefined, { destructible: true, hp: 150, texture: 'assets/textures/props/prop_sandbag_wall_hessian_1024.webp', texRepeat: [1, 1] });
+addGLBToObstacle(envSandbags, 'assets/props/sandbags.glb', 2, 1, 1);
+// Barrels (2) by the dumpster (-38,-8), south of it so the west-wall
+// route stays open. Clear of the G3 patrol (z=-5 leg) by ~6 m.
+[[-36, -11], [-38, -12]].forEach(([x, z])=>{
+  const o = box(x, z, 0.7, 0.7, 0.9, 0x5a6a7a, undefined, { material: 'metal' });
+  addGLBToObstacle(o, 'assets/props/barrel.glb', 0.7, 0.9, 0.7);
+});
+// Fire hydrant (18,-10), at the east edge of the central asphalt pad —
+// 2.8 m from the (16,-8) floodlight base, 8 m east of the G1 patrol leg
+// (x=10). Raw hydrant is 0.78 x 1.00 x 0.75, fitted down to 0.5 x 0.9 x 0.5.
+const envHydrant = box(18, -10, 0.5, 0.5, 0.9, 0xccaa22, undefined, { material: 'metal' });
+addGLBToObstacle(envHydrant, 'assets/props/fire_hydrant_yellow.glb', 0.5, 0.9, 0.5);
+// Mailbox post (18,36), at the east end of the south dirt path, clear of
+// the spawn-alcove exit and of the G5 patrol by ~16 m.
+const envMailbox = box(18, 36, 0.5, 0.5, 1.2, 0x555555, undefined, { material: 'metal' });
+addGLBToObstacle(envMailbox, 'assets/props/mailbox_post.glb', 0.5, 1.2, 0.5);
+// Crates on a pallet (-16,-30), west of the blue building and ~10 m from
+// the nearest G3 waypoint (-25,-25). Destructible like the other crates.
+const envPalletCrates = box(-16, -30, 1.2, 1.2, 0.8, 0xa0824a, undefined, { destructible: true, hp: 150, material: 'wood', texture: 'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp', texRepeat: [1, 1] });
+addGLBToObstacle(envPalletCrates, 'assets/props/crates-on-pallet.glb', 1.2, 0.8, 1.2);
 
 // ---------- Player (procedural capsule, NOT a rigged model) ----------
 const player = new THREE.Group(); scene.add(player);
