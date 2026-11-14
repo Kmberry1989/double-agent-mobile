@@ -1145,8 +1145,23 @@ function afterModel(obj, info) {
   // long-legged character (Rochelle) doesn't sink to the clip's
   // standard-rig height. Reset per model (a cat or a static prop has
   // no Hips, so the re-base stays off for them).
+  // Capture the bind-pose Hips height in clip units (see stripRootTravel).
+  // The old code read the Hips bone's local o.position.y, which is 0 for
+  // GLB rigs (the root bone sits at the armature origin, so the retargeted
+  // clip put the hips at floor level and the legs sank to the waist —
+  // masquerade man, mall shoppers, trick-or-treaters all read hips Y
+  // -0.00). Measure the Hips world height after the fit instead, and
+  // divide by the fit scale to get it in the clip's (1.0 m tall) units —
+  // the same value for FBX and GLB alike, and each character keeps its
+  // own leg proportions (Rochelle stays 0.603, Kyle 0.537).
   bindHipsY = null;
-  obj.traverse(o => { if (bindHipsY === null && o.isBone && o.name.toLowerCase().indexOf('hips') >= 0) bindHipsY = o.position.y; });
+  if (bones.hips) {
+    obj.updateMatrixWorld(true);
+    const wp = new THREE.Vector3();
+    bones.hips.getWorldPosition(wp);
+    const s = obj.scale.x || 1;
+    bindHipsY = (wp.y - obj.position.y) / s;
+  }
   // Measure both hands' axes now, while the model is still in bind pose
   // (before any animation plays) — loadWeapon / loadWeaponL use these.
   handAxes = { R: measureHandAxes(obj, 'R'), L: measureHandAxes(obj, 'L') };
