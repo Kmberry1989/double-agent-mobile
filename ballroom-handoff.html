@@ -623,17 +623,19 @@ applyTex(islandMesh, 'assets/textures/exterior/exterior_lawn_grass_clover_1024.w
 // Fountain in the round-drive island (2026-11-06): simple stone basin + still
 // water + center column with a top tier. Procedural geometry (no fountain GLB
 // exists); the basin rim is a torus so the water reads as water, not a solid disc.
+// 2x bigger (2026-11-14, Kyle's pick): basin 7.6 m across, fills most of the
+// island. All parts scaled 2x about the drive ground (y -1.5); collider 4.4.
 const fountainStone = 0x9a958c, fountainWater = 0x6fa8c9;
-cyl(0, -1.45, 32, 1.9, 1.9, 0.1, fountainStone); // basin base disc, top at y -1.4
-const fountainWaterMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.65, 0.05, 24), new THREE.MeshStandardMaterial({ color: fountainWater, roughness: 0.25, metalness: 0.1 }));
-fountainWaterMesh.position.set(0, -1.38, 32); scene.add(fountainWaterMesh); // still water, just below the rim
-const fountainRim = new THREE.Mesh(new THREE.TorusGeometry(1.75, 0.12, 12, 32), new THREE.MeshStandardMaterial({ color: fountainStone }));
-fountainRim.rotation.x = Math.PI / 2; fountainRim.position.set(0, -1.35, 32); scene.add(fountainRim); // raised basin rim
-cyl(0, -1.0, 32, 0.25, 0.3, 1.0, fountainStone); // center column, top at y -0.5
-cyl(0, -0.5, 32, 0.6, 0.6, 0.1, fountainStone); // top tier disc
-const fountainFinial = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), new THREE.MeshStandardMaterial({ color: fountainStone }));
-fountainFinial.position.set(0, -0.38, 32); scene.add(fountainFinial);
-colliders.push({ x: 0, z: 32, r: 2.2 }); // fountain keeps the player out of the basin
+cyl(0, -1.4, 32, 3.8, 3.8, 0.2, fountainStone); // basin base disc, top at y -1.3
+const fountainWaterMesh = new THREE.Mesh(new THREE.CylinderGeometry(3.3, 3.3, 0.1, 24), new THREE.MeshStandardMaterial({ color: fountainWater, roughness: 0.25, metalness: 0.1 }));
+fountainWaterMesh.position.set(0, -1.26, 32); scene.add(fountainWaterMesh); // still water, just below the rim
+const fountainRim = new THREE.Mesh(new THREE.TorusGeometry(3.5, 0.24, 12, 32), new THREE.MeshStandardMaterial({ color: fountainStone }));
+fountainRim.rotation.x = Math.PI / 2; fountainRim.position.set(0, -1.2, 32); scene.add(fountainRim); // raised basin rim
+cyl(0, -0.5, 32, 0.5, 0.6, 2.0, fountainStone); // center column, top at y 0.5
+cyl(0, 0.5, 32, 1.2, 1.2, 0.2, fountainStone); // top tier disc
+const fountainFinial = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), new THREE.MeshStandardMaterial({ color: fountainStone }));
+fountainFinial.position.set(0, 0.74, 32); scene.add(fountainFinial);
+colliders.push({ x: 0, z: 32, r: 4.4 }); // fountain keeps the player out of the basin
 // Road leading off the driveway, south beyond where the player can walk (player limit z 45).
 // A thin asphalt box, z 45-75, top at -1.43 to match the round drive top; it only touches the drive at the z 45 edge, so no coplanar overlap.
 const roadMesh = box(0, -1.48, 60, 8, 0.1, 30, 0x333333); applyTex(roadMesh, 'assets/textures/exterior/exterior_drive_asphalt_1024.webp', 1, 4);
