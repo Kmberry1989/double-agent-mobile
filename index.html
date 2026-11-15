@@ -2266,15 +2266,16 @@ const SFX_FILES = {
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
   slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
 };
-// Footstep recordings (Kyle, 2026-11-14): real steps per surface. The
-// courtyard has no water surface, so step-water is loaded and ready for
-// a water area — it does not play yet. Gravel has no recording; it uses
-// the dirt step (both are loose surfaces).
+// Footstep recordings (Kyle, 2026-11-14): real steps per surface.
+// Water step (Kyle's pick, 2026-11-15): the water footstep plays on
+// the courtyard hard ground — the concrete and the asphalt, both hard
+// paved surfaces. Gravel has no recording; it uses the dirt step (both
+// are loose surfaces).
 const STEP_FILES = {
   dirt: 'assets/audio/step-dirt.m4a',
   grass: 'assets/audio/step-grass.m4a',
-  concrete: 'assets/audio/step-floor.m4a',
-  asphalt: 'assets/audio/step-floor.m4a',
+  concrete: 'assets/audio/step-water.m4a',
+  asphalt: 'assets/audio/step-water.m4a',
   gravel: 'assets/audio/step-dirt.m4a',
   water: 'assets/audio/step-water.m4a',
 };
