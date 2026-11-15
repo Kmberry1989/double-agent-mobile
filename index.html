@@ -15,10 +15,13 @@
   /* Movement cluster (left, with the joystick): crouch / sneak / sprint. */
   #moveGrid{position:absolute;left:20px;bottom:172px;display:grid;grid-template-columns:repeat(3,52px);gap:8px;pointer-events:auto}
   /* Action cluster (right): melee / aim / fire / use / carry. */
-  #actionGrid{position:absolute;right:16px;bottom:20px;display:grid;grid-template-columns:repeat(2,52px);grid-template-rows:repeat(3,52px);gap:8px;pointer-events:auto}
+  #actionGrid{position:absolute;right:16px;bottom:20px;display:grid;grid-template-columns:repeat(2,52px);grid-template-rows:repeat(2,52px);gap:8px;pointer-events:auto}
   .tbtn{width:52px;height:52px;border-radius:12px;border:2px solid rgba(255,255,255,.4);background:rgba(0,0,0,.55);color:#fff;font-size:13px;font-weight:700;cursor:pointer;touch-action:none;padding:0}
   .tbtn:active,.tbtn.on{background:rgba(87,217,119,.55)}
+  /* Button icons (2026-11-14): white transparent PNGs, no text labels. */
+  .tbtn img{width:34px;height:34px;display:block;margin:0 auto;pointer-events:none}
   #btnFire{background:rgba(180,40,40,.65);width:60px;height:60px;font-size:15px}
+  #btnFire img{width:40px;height:40px}
   #btnFire:active{background:rgba(255,60,60,.8)}
   @media (max-width:760px){
     #objectives{max-width:44vw;padding:7px 9px}
@@ -77,16 +80,15 @@
 <div id="touchUI" aria-label="Touch controls">
   <div id="joyBase"><div id="joyKnob"></div></div>
   <div id="moveGrid">
-    <button class="tbtn" id="btnCrouch" type="button">CROUCH</button>
-    <button class="tbtn" id="btnSneak" type="button">SNEAK</button>
-    <button class="tbtn" id="btnSprint" type="button">SPRINT</button>
+    <button class="tbtn" id="btnCrouch" type="button" aria-label="Crouch"><img src="assets/ui/icon-crouch.png" alt=""></button>
+    <button class="tbtn" id="btnSneak" type="button" aria-label="Sneak"><img src="assets/ui/icon-sneak.png" alt=""></button>
+    <button class="tbtn" id="btnSprint" type="button" aria-label="Sprint"><img src="assets/ui/icon-sprint.png" alt=""></button>
   </div>
   <div id="actionGrid">
-    <button class="tbtn" id="btnMelee" type="button">MELEE</button>
-    <button class="tbtn" id="btnAim" type="button">AIM</button>
-    <button class="tbtn" id="btnFire" type="button">FIRE</button>
-    <button class="tbtn" id="btnInteract" type="button">USE</button>
-    <button class="tbtn" id="btnCarry" type="button">CARRY</button>
+    <button class="tbtn" id="btnMelee" type="button" aria-label="Melee"><img src="assets/ui/icon-melee.png" alt=""></button>
+    <button class="tbtn" id="btnFire" type="button" aria-label="Fire"><img src="assets/ui/icon-fire.png" alt=""></button>
+    <button class="tbtn" id="btnInteract" type="button" aria-label="Use"><img src="assets/ui/icon-use.png" alt=""></button>
+    <button class="tbtn" id="btnCarry" type="button" aria-label="Carry"><img src="assets/ui/icon-carry.png" alt=""></button>
   </div>
 </div>
 <div id="overlay"><div class="box">
@@ -115,6 +117,10 @@ const ANIM_MAP = {
   crawl:'Low_Crawl.fbx', crawlBack:'Moving Backward In Crawl Position.fbx', crawlIdle:'Prone Firing Rifle.fbx',
   roll:'Run To Rolling.fbx',
   cover:'Taking_Cover_Idle.fbx', punch:'Punching.fbx', kick:'Side_Kick.fbx',
+  // Melee combo (Kyle, 2026-11-14): Lead Jab -> Hook -> Melee_Hook
+  // finisher. All three are repo-scale Mixamo clips (rest Hips ~0.39),
+  // so processClip leaves them alone (no unit scaling).
+  leadJab:'Lead Jab.fbx', hook:'Hook.fbx',
   // Takedown hook (Kyle's pick 2026-11-14): Drive melee_hook (0.47 s hook
   // punch). No real rear-chokehold clip exists, so the F takedown plays
   // this hook instead of the instant silent kill. The file is a raw
@@ -222,7 +228,7 @@ function playGuardDeath(g, action){
   });
   return 'pending';
 }
-const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','crawlBack','crawlIdle','meleeHook'];
+const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','crawlBack','crawlIdle','meleeHook','leadJab','hook'];
 let playerMixer = null, playerActions = {}, playerCurrentLoop = null, playerOneShot = null, playerOneShotName = null,
     playerOneShotHold = false, playerHeldPose = null, playerDesiredLoop = 'idle',
     playerRigOk = false, playerRigChecked = false, fbxPlaying = false;
@@ -2076,7 +2082,7 @@ addEventListener('keydown', e=>{
   if (e.code==='KeyZ'){ sneaking = !sneaking; noteActivity(); }
   if (e.code==='KeyE' && !aiming) tryInteract();
   // Animation-only keys.
-  if (e.code==='KeyH') playPlayerOneShot('punch');
+  if (e.code==='KeyH') doMelee(); // melee combo (takedown if available, else the chained punches)
   if (e.code==='KeyK') playPlayerOneShot('kick');
   if (e.code==='KeyJ') playPlayerOneShot('wave');
   if (e.code==='KeyT') playPlayerOneShot('talk');
@@ -2161,21 +2167,63 @@ document.addEventListener('pointerlockchange', ()=>{ locked = document.pointerLo
     // cannot double-toggle Aim/Crouch or double-fire.
     el.addEventListener('click', (e)=>{ e.preventDefault(); if (Date.now() - lastTouchBtn < 600) return; onDown && onDown(); onUp && onUp(); });
   }
-  // Melee (2026-11-14): the takedown when one is available (behind an
-  // unaware guard, in range — plays melee_hook), else a plain hook punch.
+  // Melee combo (Kyle, 2026-11-14): three chained punches — Lead Jab,
+  // Hook, then the Melee_Hook finisher. Pressing MELEE (or H) again
+  // within 0.9 s of the last press advances the chain; waiting longer
+  // restarts it at the jab. A takedown still takes priority over the
+  // combo. Each hit damages a guard in front (2 m, ~60 deg arc):
+  // 34 / 34 / 50, so a full combo kills a guard (100 hp).
+  const MELEE_COMBO = ['leadJab', 'hook', 'meleeHook'];
+  const MELEE_COMBO_DMG = [34, 34, 50];
+  let meleeComboStep = 0, meleeComboUntil = 0;
+  function meleeHit(dmg){
+    const range = 2.0;
+    const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    let best = null, bestD = range;
+    for (const g of guards){
+      if (g.dead) continue;
+      const d = g.group.position.distanceTo(player.position);
+      if (d > range) continue;
+      const to = g.group.position.clone().sub(player.position).setY(0).normalize();
+      if (to.dot(fwd) < 0.5) continue; // must be in front (~60 deg arc)
+      if (d < bestD){ best = g; bestD = d; }
+    }
+    if (!best) return false;
+    best.hp -= dmg; best.meter = 100; best.state = 'ALERT'; best.lastKnown = player.position.clone();
+    const chest = best.group.position.clone(); chest.y += 1.3;
+    spawnBloodMist(chest); spawnBloodSpatter(chest);
+    playSfx(pickSfx(SFX_FILES.hit));
+    if (best.hp <= 0){
+      best.dead = true; if (best.cone) best.cone.visible = false;
+      if (playGuardDeath(best, pickRandomDeath()) === false) tipGuardOver(best);
+      showMsg('Guard down', 1400);
+    }
+    return true;
+  }
   function doMelee(){
     if (takedownAvailable()){ tryTakedown(); return; }
     noteActivity();
-    playPlayerOneShot('punch');
+    const now = performance.now();
+    if (now > meleeComboUntil) meleeComboStep = 0; // chain expired — restart at the jab
+    const step = meleeComboStep;
+    playPlayerOneShot(MELEE_COMBO[step]);
+    meleeHit(MELEE_COMBO_DMG[step]);
+    meleeComboStep = (meleeComboStep + 1) % MELEE_COMBO.length;
+    meleeComboUntil = now + 900; // 0.9 s to chain the next hit
   }
+  // FIRE (2026-11-14): aim is a precursor to shooting, so there is no
+  // separate AIM button — holding FIRE aims (camera + spread tighten)
+  // and shoots, and releasing stops both.
   bindBtn('btnFire', ()=>{
+    aiming = true;
+    document.getElementById('btnFire').classList.add('on');
     tryShoot();
     if (fireTimer) clearInterval(fireTimer);
     fireTimer = setInterval(()=>{ if (!gameOver && !won) tryShoot(); }, 180);
-  }, ()=>{ if (fireTimer){ clearInterval(fireTimer); fireTimer = null; } });
-  bindBtn('btnAim', ()=>{
-    aiming = !aiming;
-    document.getElementById('btnAim').classList.toggle('on', aiming);
+  }, ()=>{
+    aiming = false;
+    document.getElementById('btnFire').classList.remove('on');
+    if (fireTimer){ clearInterval(fireTimer); fireTimer = null; }
   });
   bindBtn('btnMelee', doMelee);
   bindBtn('btnInteract', tryInteract);
@@ -2677,9 +2725,9 @@ function updateStealthButtons(){
   if (td) td.classList.toggle('on', !!takedownAvailable());
   const cb = document.getElementById('btnCarry');
   if (!cb) return;
+  // CARRY lights up while a body is carried (the icon stays; the
+  // highlight is the state, since the button no longer has a text label).
   cb.classList.toggle('on', !!carriedBody);
-  const label = carriedBody ? 'DROP' : 'CARRY';
-  if (cb.textContent !== label) cb.textContent = label;
 }
 function tryInteract(){
   if (gameOver || won) return;
