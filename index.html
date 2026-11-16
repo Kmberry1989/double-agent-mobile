@@ -925,9 +925,11 @@ groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground/ground_asphalt_tire_
     const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), skylineMat);
     b.position.set(x, h / 2, z); scene.add(b);
   }
-  // --- Rain puddles: dark, low-roughness ellipses on open concrete.
-  // y=0.03 sits above the ground slab (0) and the patches (0.02).
-  const puddleMat = new THREE.MeshStandardMaterial({ color: 0x1c2a38, roughness: 0.15, metalness: 0.4, transparent: true, opacity: 0.85 });
+  // --- Rain puddles: lighter blue-grey ellipses on open concrete so
+  // they read as water at night (a real puddle reflects the sky and is
+  // LIGHTER than the dark ground, not darker). y=0.03 sits above the
+  // ground slab (0) and the patches (0.02).
+  const puddleMat = new THREE.MeshStandardMaterial({ color: 0x46586e, roughness: 0.08, metalness: 0.5, transparent: true, opacity: 0.9 });
   const puddles = [
     [-20, 18, 2.2, 1.6], [12, 28, 1.8, 1.3], [-8, -8, 2.5, 1.8],
     [24, 8, 1.6, 2.2], [-28, -12, 2.0, 1.4], [5, -32, 1.9, 1.5],
@@ -938,29 +940,34 @@ groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground/ground_asphalt_tire_
     scene.add(p);
   }
   // --- Lit windows on the three courtyard buildings (warm, fog:false
-  // so they stay visible as lights). Offset 0.03 off each face.
+  // so they stay visible as lights). Offset 0.03 off each face. Sized
+  // 1.3x1.7 so they read at distance. The red building's windows are
+  // on its SOUTH face (z=12) — the face toward the spawn — not the east
+  // face, which is hidden from the spawn view.
   const litWinMat = new THREE.MeshBasicMaterial({ color: 0xffc46b, fog: false });
   function litWindow(x, y, z, rotY){
-    const w = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.3), litWinMat);
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 1.7), litWinMat);
     w.position.set(x, y, z); if (rotY) w.rotation.y = rotY; scene.add(w);
   }
   // Blue building south face (z=-31), clear of the vent (x=0) and the
   // existing tinted window (4, 2).
   litWindow(-3.5, 3.5, -30.97, 0); litWindow(3.5, 3.5, -30.97, 0);
-  // Red building east face (x=-28), above the chain-link fence (top y=3).
-  litWindow(-27.97, 4.2, 6, Math.PI / 2); litWindow(-27.97, 4.2, 10, Math.PI / 2);
+  // Red building south face (z=12), toward the spawn.
+  litWindow(-34, 3.5, 12.03, 0); litWindow(-30, 3.5, 12.03, 0);
   // Olive building west face (x=30).
   litWindow(29.97, 3.5, 26, -Math.PI / 2); litWindow(29.97, 3.5, 30, -Math.PI / 2);
-  // --- Ground debris: small flat rubble/leaves on open concrete,
-  // visual only — too low to read as cover or an obstacle.
-  const debrisCols = [0x2a2a2a, 0x3a2f22, 0x444444, 0x2e2a24];
+  // --- Ground debris: flat rubble/leaves on open concrete, visual
+  // only — too low to read as cover or an obstacle. Sized 0.25–0.55 m
+  // and in lighter tones so they read against the dark concrete at
+  // night (the first pass was too small and too dark to see).
+  const debrisCols = [0x5a5a4a, 0x6b5a3a, 0x777777, 0x8a7a5a];
   const debrisSpots = [
     [-15, 25], [20, 20], [-5, 15], [28, -5], [-18, -18], [0, 5],
     [15, -25], [-30, 10], [8, 18], [-12, -28], [32, 20], [-22, 2],
     [5, 30], [18, -35], [-35, -15], [25, 30],
   ];
   debrisSpots.forEach(([x, z], i)=>{
-    const s = 0.15 + ((i * 37) % 10) / 10 * 0.25; // 0.15–0.40 m, deterministic
+    const s = 0.25 + ((i * 37) % 10) / 10 * 0.3; // 0.25–0.55 m, deterministic
     const d = new THREE.Mesh(new THREE.BoxGeometry(s, 0.06, s * 0.7),
       new THREE.MeshStandardMaterial({ color: debrisCols[i % debrisCols.length], roughness: 0.95 }));
     d.position.set(x, 0.03, z); d.rotation.y = (i * 0.7) % Math.PI; scene.add(d);
