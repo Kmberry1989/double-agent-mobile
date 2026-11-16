@@ -514,6 +514,14 @@ scene.fog = new THREE.Fog(0x87a5a0, 60, 140);
 const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 300);
 const hemi = new THREE.HemisphereLight(0xdfefff, 0x334433, 0.9); scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 1.2); sun.position.set(30,50,20); sun.castShadow = true; scene.add(sun);
+// Shadow camera must cover the whole 90 m courtyard — the default
+// ortho box is only ±5 m around the origin, so ground shadows were
+// invisible almost everywhere. 2048 map for crisp building/prop shadows.
+sun.shadow.camera.left = -55; sun.shadow.camera.right = 55;
+sun.shadow.camera.top = 55; sun.shadow.camera.bottom = -55;
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 160;
+sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0005;
+sun.shadow.camera.updateProjectionMatrix();
 
 function mat(c){ return new THREE.MeshStandardMaterial({ color:c, roughness:0.9 }); }
 // ---------- Environment textures (assets/textures/) ----------
@@ -557,6 +565,39 @@ function box(x,z,w,d,h,color,y,opts){
   const o = { mesh:m, cx:x, cz:z, ow:w, od:d, oh:h, minX:x-w/2, maxX:x+w/2, minZ:z-d/2, maxZ:z+d/2, h,
     material: opts.material || 'concrete', destructible: !!opts.destructible, hp: opts.hp || 0, maxHp: opts.hp || 0, baseColor: color, textured: !!opts.texture };
   obstacles.push(o); losMeshes.push(m); return o;
+}
+// Broken brick wall: a ruined cover wall built course by course so the
+// outer edges are jagged brick-by-brick. Each course is 0.3 m tall; the
+// top courses are progressively shorter (broken off) and each course is
+// offset so the break is asymmetric — bricks missing in places, not a
+// smooth taper. The obstacle stays solid (full max extents) so
+// collision is unchanged; the missing bricks sit at the top and edges.
+// alongX: true = wall runs along x (length = len, thickness = thick).
+function brokenBrickWall(cx, cz, len, thick, h, alongX){
+  const COURSE_H = 0.3, BRICK_W = 0.6;
+  const courses = Math.max(1, Math.round(h / COURSE_H));
+  let s = Math.abs(Math.sin(cx * 12.9898 + cz * 78.233) * 43758.5453) % 1 + 0.001;
+  const rnd = ()=>{ s = (s * 16807) % 2147483647; return s / 2147483647; };
+  const mat = texturedMat(0x8a7a5a, 'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp', Math.max(1, Math.round(len / 4.5)), 1);
+  const meshes = [];
+  for (let i = 0; i < courses; i++){
+    const frac = i / Math.max(1, courses - 1); // 0 bottom -> 1 top
+    let brk = Math.pow(frac, 1.6) * len * 0.35 + rnd() * 1.2;
+    brk = Math.floor(brk / BRICK_W) * BRICK_W;
+    brk = Math.min(brk, len - 2.4); // keep at least 2.4 m of wall
+    const clen = len - brk;
+    const leftCut = Math.floor((brk * rnd()) / BRICK_W) * BRICK_W;
+    const off = brk / 2 - leftCut;
+    const w = alongX ? clen : thick, d = alongX ? thick : clen;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, COURSE_H, d), mat);
+    m.position.set(alongX ? cx + off : cx, i * COURSE_H + COURSE_H / 2, alongX ? cz : cz + off);
+    m.castShadow = true; m.receiveShadow = true;
+    scene.add(m); meshes.push(m); losMeshes.push(m);
+  }
+  const ow = alongX ? len : thick, od = alongX ? thick : len;
+  const o = { mesh: meshes[0], cx, cz, ow, od, oh: h, minX: cx - ow / 2, maxX: cx + ow / 2, minZ: cz - od / 2, maxZ: cz + od / 2, h,
+    material: 'concrete', destructible: false, hp: 0, maxHp: 0, baseColor: 0x8a7a5a, textured: true };
+  obstacles.push(o); return o;
 }
 // Camera occlusion (same pattern as theater.html): a wall between the
 // camera and the player must not render, or it blocks the view of the
@@ -604,15 +645,15 @@ ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 wetMats.push(ground.material);
 // Perimeter + courtyard structures. Coordinates are in metres, centre is (0,0).
 box(0,-42,90,2,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(0,42,90,2,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(-42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]}); box(42,0,2,90,4,0x555a55,undefined,{texture:'assets/textures/walls/wall_metal_cladding_sage_green_corrugated_1024.webp',texRepeat:[12,1]});
-box(-20,-18,14,2,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(18,-12,2,16,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/props/prop_sandbag_wall_hessian_1024.webp',texRepeat:[5,1]});
-box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/props/prop_sandbag_wall_sagging_spill_1024.webp',texRepeat:[5,1]}); box(-28,24,2,12,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]}); box(8,-26,18,2,3,0x777777,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[4,1]});
+brokenBrickWall(-20,-18,14,2,3,true); brokenBrickWall(18,-12,16,2,3,false); box(-8,10,16,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/props/prop_sandbag_wall_hessian_1024.webp',texRepeat:[5,1]});
+box(22,18,12,2,3,0x777777,undefined,{destructible:true,hp:250,texture:'assets/textures/props/prop_sandbag_wall_sagging_spill_1024.webp',texRepeat:[5,1]}); brokenBrickWall(-28,24,12,2,3,false); brokenBrickWall(8,-26,18,2,3,true);
 box(-14,0,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(-10,2,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(12,6,3,3,1.2,0xa0824a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]});
 box(30,-24,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_stains_1024.webp',texRepeat:[1,1]}); box(-34,-28,4,4,2,0x9a6a3a,undefined,{destructible:true,hp:150,material:'wood',texture:'assets/textures/props/prop_crate_wood_pine_no_nails_1024.webp',texRepeat:[1,1]}); box(0,-34,10,6,5,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/walls/wall_metal_flat_blue_painted_1024.webp',texRepeat:[2,1]});
 box(-32,8,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/raw/painted-metal-red.jpg',texRepeat:[2,1]}); box(34,28,8,8,6,0x5a6a7a,undefined,{material:'metal',texture:'assets/textures/raw/painted-metal-olive.jpg',texRepeat:[2,1]});
 // SILENT START: a walled alcove in the southwest corner. The player spawns here,
 // alone — no guard patrol waypoint and no security camera is within 30 m of it.
 // The only way out is east, around the end of the north wall, into the courtyard.
-box(-38,32,12,2,3,0x8a7a5a,undefined,{texture:'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp',texRepeat:[3,1]});
+brokenBrickWall(-38,32,12,2,3,true);
 // ---------- Environment GLBs (user uploads, assets/props/) ----------
 // Pattern: the existing box() obstacle stays as the gameplay mesh (collision,
 // LOS, destructible damage — its scale and removal already drive those), and
@@ -880,6 +921,38 @@ groundPatch(8, -14, 16, 12, 0x333333, 'assets/textures/ground/ground_asphalt_102
   const exfilLight = new THREE.PointLight(0x88ffaa, 20, 14); exfilLight.position.set(38, 3, -38); scene.add(exfilLight);
 })();
 groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground/ground_asphalt_tire_marks_oil_stains_1024.webp', 1, 1);
+// Ground mist + rain splashes (populated by courtyardGraphicalUpdate
+// below; updated every frame from updateSky).
+const mistPlanes = [];
+function updateMist(dt){
+  for (const m of mistPlanes){
+    m.position.x += m.userData.vx * dt;
+    m.position.z += m.userData.vz * dt;
+    if (m.position.x > 45) m.position.x = -45;
+    if (m.position.x < -45) m.position.x = 45;
+    if (m.position.z > 45) m.position.z = -45;
+    if (m.position.z < -45) m.position.z = 45;
+    // Gentle breathing so the fog never reads as a static decal.
+    m.material.opacity = m.userData.baseOp * (0.85 + 0.15 * Math.sin(performance.now() * 0.0004 + m.userData.phase));
+  }
+}
+const splashRings = [];
+function updateSplashes(dt){
+  for (const s of splashRings){
+    s.t += dt / 0.35;
+    if (s.t >= 1){
+      // Respawning near the player keeps splashes visible in view.
+      s.mesh.position.set(
+        Math.max(-40, Math.min(40, player.position.x + (Math.random() - 0.5) * 50)),
+        0.04,
+        Math.max(-40, Math.min(40, player.position.z + (Math.random() - 0.5) * 50)));
+      s.t = 0;
+    }
+    const sc = 0.25 + s.t * 1.1;
+    s.mesh.scale.set(sc, sc, 1);
+    s.mesh.material.opacity = 0.65 * (1 - s.t);
+  }
+}
 // ---------- Courtyard graphical update (2026-11-16) ----------
 // Visual pass found the courtyard's mid/background empty, the sky a
 // black void, and a sourceless orange halo. Additions, all visual-only
@@ -890,39 +963,56 @@ groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground/ground_asphalt_tire_
 // 0.25 opacity floor at night).
 (function courtyardGraphicalUpdate(){
   // --- Distant skyline: dark buildings outside the walls, with lit
-  // windows. One canvas facade texture (dark + scattered warm windows)
-  // keeps it to a single material; buildings are ~2:1 tall:wide so
-  // the texture does not stretch. MeshBasicMaterial with fog:false so
-  // the silhouette and windows read clearly as a backdrop (the scene
-  // fog would otherwise wash them to grey at this range).
-  const facadeCanvas = document.createElement('canvas');
-  facadeCanvas.width = 128; facadeCanvas.height = 256;
-  const fg = facadeCanvas.getContext('2d');
-  fg.fillStyle = '#0a0f16'; fg.fillRect(0, 0, 128, 256);
-  for (let r = 0; r < 14; r++) for (let c = 0; c < 7; c++){
-    if (Math.random() < 0.28){
-      fg.fillStyle = ['#ffc46b', '#ffd98a', '#ff9d4d'][Math.floor(Math.random() * 3)];
-      fg.globalAlpha = 0.55 + Math.random() * 0.45;
-      fg.fillRect(8 + c * 17, 10 + r * 17, 9, 12);
+  // windows. Two layers for depth: a near ring pushed out to ~70-80 m
+  // and a far ring at ~105-125 m, taller and dimmer (fewer, dimmer
+  // windows) so it reads as farther away. One canvas facade texture
+  // per layer (dark + scattered warm windows) keeps it to a single
+  // material each; buildings are ~2:1 tall:wide so the texture does
+  // not stretch. MeshBasicMaterial with fog:false so the silhouette
+  // and windows read clearly as a backdrop (the scene fog would
+  // otherwise wash them to grey at this range).
+  function facadeTexture(litFrac, base){
+    const c = document.createElement('canvas'); c.width = 128; c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = base; g.fillRect(0, 0, 128, 256);
+    for (let r = 0; r < 14; r++) for (let cc = 0; cc < 7; cc++){
+      if (Math.random() < litFrac){
+        g.fillStyle = ['#ffc46b', '#ffd98a', '#ff9d4d'][Math.floor(Math.random() * 3)];
+        g.globalAlpha = 0.55 + Math.random() * 0.45;
+        g.fillRect(8 + cc * 17, 10 + r * 17, 9, 12);
+      }
     }
+    g.globalAlpha = 1;
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   }
-  fg.globalAlpha = 1;
-  const facadeTex = new THREE.CanvasTexture(facadeCanvas);
-  facadeTex.colorSpace = THREE.SRGBColorSpace;
-  const skylineMat = new THREE.MeshBasicMaterial({ map: facadeTex, fog: false });
-  const skyline = [
-    // [x, z, w, d, h] — ring outside the ±42 walls, 10–26 m tall so
-    // they read above the 4 m perimeter walls.
-    [-52, -56, 12, 12, 24], [-32, -60, 10, 10, 18], [-12, -56, 14, 12, 26],
-    [8, -60, 10, 10, 16], [28, -56, 12, 12, 22], [48, -58, 10, 10, 18],
-    [-56, -38, 12, 12, 20], [-58, -12, 10, 10, 16], [-56, 14, 12, 12, 24],
-    [-58, 38, 10, 10, 18], [56, -38, 12, 12, 22], [58, -12, 10, 10, 16],
-    [56, 14, 12, 12, 26], [58, 38, 10, 10, 20],
-    [-52, 56, 12, 12, 18], [-30, 60, 10, 10, 24], [-8, 56, 14, 12, 20],
-    [14, 60, 10, 10, 16], [36, 56, 12, 12, 22], [54, 58, 10, 10, 18],
+  const nearMat = new THREE.MeshBasicMaterial({ map: facadeTexture(0.28, '#0a0f16'), fog: false });
+  const farMat = new THREE.MeshBasicMaterial({ map: facadeTexture(0.14, '#070b10'), fog: false });
+  // Near ring [x, z, w, d, h] — outside the ±42 walls, 18-30 m tall.
+  const skylineNear = [
+    [-68, -74, 12, 12, 24], [-42, -78, 10, 10, 18], [-16, -74, 14, 12, 28],
+    [10, -78, 10, 10, 16], [36, -74, 12, 12, 22], [62, -76, 10, 10, 18],
+    [-74, -50, 12, 12, 20], [-76, -16, 10, 10, 16], [-74, 18, 12, 12, 26],
+    [-76, 50, 10, 10, 18], [74, -50, 12, 12, 22], [76, -16, 10, 10, 16],
+    [74, 18, 12, 12, 28], [76, 50, 10, 10, 20],
+    [-68, 74, 12, 12, 18], [-40, 78, 10, 10, 26], [-10, 74, 14, 12, 20],
+    [18, 78, 10, 10, 16], [46, 74, 12, 12, 24], [70, 76, 10, 10, 18],
   ];
-  for (const [x, z, w, d, h] of skyline){
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), skylineMat);
+  for (const [x, z, w, d, h] of skylineNear){
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), nearMat);
+    b.position.set(x, h / 2, z); scene.add(b);
+  }
+  // Far ring — taller (32-55 m), dimmer, a second depth layer.
+  const skylineFar = [
+    [-96, -102, 16, 16, 40], [-58, -110, 14, 14, 34], [-18, -104, 18, 16, 48],
+    [24, -110, 14, 14, 32], [64, -104, 16, 16, 42], [98, -108, 14, 14, 36],
+    [-104, -68, 16, 16, 38], [-108, -22, 14, 14, 32], [-104, 26, 16, 16, 44],
+    [-108, 70, 14, 14, 34], [104, -68, 16, 16, 40], [108, -22, 14, 14, 32],
+    [104, 26, 16, 16, 46], [108, 70, 14, 14, 36],
+    [-96, 102, 16, 16, 34], [-56, 110, 14, 14, 42], [-14, 104, 18, 16, 36],
+    [28, 110, 14, 14, 32], [68, 104, 16, 16, 44], [100, 108, 14, 14, 36],
+  ];
+  for (const [x, z, w, d, h] of skylineFar){
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), farMat);
     b.position.set(x, h / 2, z); scene.add(b);
   }
   // --- Rain puddles: lighter blue-grey ellipses on open concrete so
@@ -976,6 +1066,45 @@ groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground/ground_asphalt_tire_
       new THREE.MeshStandardMaterial({ color: debrisCols[i % debrisCols.length], roughness: 0.95 }));
     d.position.set(x, 0.03, z); d.rotation.y = (i * 0.7) % Math.PI; scene.add(d);
   });
+  // --- Low fog: soft ground-mist banks drifting just above the
+  // concrete. Flat radial-gradient planes, very low opacity, so they
+  // read as haze rather than objects. Drift + breathing handled by
+  // updateMist() every frame.
+  const mistTex = (function(){
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(200,210,215,0.55)'); grad.addColorStop(1, 'rgba(200,210,215,0)');
+    g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  for (let i = 0; i < 12; i++){
+    const w = 16 + Math.random() * 16, d = 10 + Math.random() * 10;
+    const baseOp = 0.10 + Math.random() * 0.08;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
+      new THREE.MeshBasicMaterial({ map: mistTex, transparent: true, opacity: baseOp, depthWrite: false, fog: true }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(-38 + Math.random() * 76, 0.4 + Math.random() * 0.8, -38 + Math.random() * 76);
+    m.userData.vx = (Math.random() - 0.5) * 0.9;
+    m.userData.vz = (Math.random() - 0.5) * 0.9;
+    m.userData.baseOp = baseOp;
+    m.userData.phase = Math.random() * Math.PI * 2;
+    m.renderOrder = 2;
+    scene.add(m); mistPlanes.push(m);
+  }
+  // --- Rain splashing: small rings that bloom and fade where drops
+  // hit the concrete. A pool of 24 cycles continuously; respawn near
+  // the player so splashes stay in view. Updated by updateSplashes().
+  const splashGeo = new THREE.RingGeometry(0.06, 0.18, 20);
+  for (let i = 0; i < 24; i++){
+    const s = new THREE.Mesh(splashGeo,
+      new THREE.MeshBasicMaterial({ color: 0xbfd8ea, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    s.rotation.x = -Math.PI / 2;
+    s.position.set(-38 + Math.random() * 76, 0.04, -38 + Math.random() * 76);
+    s.renderOrder = 3;
+    scene.add(s);
+    splashRings.push({ mesh: s, t: Math.random() });
+  }
 })();
 // Chain-link fence: see-through panel mounted flush on the east face of the
 // red building (-32,8; face x=-28), so the building behind it already blocks
@@ -2013,7 +2142,7 @@ const cloudCanvas = document.createElement('canvas'); cloudCanvas.width = 256; c
 const cloudTex = new THREE.CanvasTexture(cloudCanvas); cloudTex.colorSpace = THREE.SRGBColorSpace;
 const cloudMat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.75, fog: false, depthWrite: false });
 const clouds = [];
-for (let i = 0; i < 8; i++){
+for (let i = 0; i < 18; i++){
   const sp = new THREE.Sprite(cloudMat);
   const sc = 30 + Math.random() * 45;
   sp.scale.set(sc, sc * 0.45, 1);
@@ -2126,6 +2255,74 @@ function applyFlash(){
   scene.background.copy(baseBg).lerp(FLASH_BG, f * 0.6);
   scene.fog.color.copy(baseFog).lerp(FLASH_BG, f * 0.6);
 }
+// ---------- Visible lightning bolts ----------
+// A strike is drawn as a jagged bolt that crackles down from the sky:
+// the line reveals top-to-bottom over ~0.15 s (drawRange), flickers,
+// then fades. Branches + a ground glow sell the strike. Spawned from
+// updateLightning when a strike fires; updated every frame from updateSky.
+const activeBolts = [];
+function spawnBolt(){
+  const sx = -70 + Math.random() * 140, sz = -70 + Math.random() * 140;
+  const pts = [new THREE.Vector3(sx, 78 + Math.random() * 14, sz)];
+  let x = sx, z = sz, y = pts[0].y;
+  while (y > 2){
+    y -= 6 + Math.random() * 4;
+    x += (Math.random() - 0.5) * 8; z += (Math.random() - 0.5) * 8;
+    pts.push(new THREE.Vector3(x, Math.max(y, 0), z));
+  }
+  const mat = new THREE.LineBasicMaterial({ color: 0xd6e9ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const line = new THREE.Line(geo, mat);
+  scene.add(line);
+  // 1-2 branches off the upper half.
+  const branches = [];
+  const nBr = 1 + (Math.random() < 0.5 ? 1 : 0);
+  for (let b = 0; b < nBr; b++){
+    const bi = 2 + Math.floor(Math.random() * Math.max(1, Math.floor(pts.length / 2)));
+    const bp = [pts[bi].clone()];
+    let bx = pts[bi].x, by = pts[bi].y, bz = pts[bi].z;
+    const nSeg = 3 + Math.floor(Math.random() * 3);
+    for (let s = 0; s < nSeg; s++){
+      by -= 5 + Math.random() * 4;
+      bx += (Math.random() - 0.5) * 10; bz += (Math.random() - 0.5) * 10;
+      bp.push(new THREE.Vector3(bx, Math.max(by, 0), bz));
+    }
+    const bgeo = new THREE.BufferGeometry().setFromPoints(bp);
+    const bline = new THREE.Line(bgeo, mat.clone());
+    bline.material.opacity = 0;
+    scene.add(bline); branches.push(bline);
+  }
+  // Ground glow at the strike point.
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: radialTex('rgba(220,235,255,0.9)', 'rgba(180,210,255,0)'), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  glow.scale.set(14, 14, 1);
+  glow.position.set(pts[pts.length - 1].x, 1.5, pts[pts.length - 1].z);
+  scene.add(glow);
+  activeBolts.push({ line, branches, glow, age: 0, life: 0.55, total: pts.length });
+}
+function updateBolts(dt){
+  for (let i = activeBolts.length - 1; i >= 0; i--){
+    const b = activeBolts[i]; b.age += dt;
+    const t = b.age / b.life;
+    if (t >= 1){
+      scene.remove(b.line); b.line.geometry.dispose(); b.line.material.dispose();
+      for (const br of b.branches){ scene.remove(br); br.geometry.dispose(); br.material.dispose(); }
+      scene.remove(b.glow); b.glow.material.dispose();
+      activeBolts.splice(i, 1); continue;
+    }
+    // Reveal top-to-bottom over the first 0.15 s, then flicker, then fade.
+    const reveal = Math.min(1, b.age / 0.15);
+    const n = Math.max(2, Math.floor(b.total * reveal));
+    b.line.geometry.setDrawRange(0, n);
+    for (const br of b.branches) br.geometry.setDrawRange(0, Math.max(2, Math.floor(br.geometry.attributes.position.count * reveal)));
+    let op;
+    if (b.age < 0.15) op = 1;
+    else if (b.age < 0.35) op = (Math.floor(b.age / 0.05) % 2 === 0) ? 0.95 : 0.25; // flicker
+    else op = 0.9 * (1 - (b.age - 0.35) / 0.2);
+    b.line.material.opacity = Math.max(0, op);
+    for (const br of b.branches) br.material.opacity = Math.max(0, op * 0.7);
+    b.glow.material.opacity = Math.max(0, op * 0.8);
+  }
+}
 function updateLightning(dt){
   if (weather !== 'Storm'){
     if (boltFlash !== 0){ boltFlash = 0; applyFlash(); }
@@ -2138,6 +2335,7 @@ function updateLightning(dt){
   boltNext -= dt;
   if (boltNext <= 0){
     boltFlash = 1.0;
+    spawnBolt(); // visible jagged streak to match the flash
     boltSecond = Math.random() < 0.7 ? 0.28 + Math.random() * 0.12 : -1;
     boltNext = 6 + Math.random() * 12; // next strike in 6–18 s
     // One thunder crack per strike, 1–3 s AFTER the flash is seen (the
@@ -2154,6 +2352,9 @@ function updateSky(dt){
   for (const c of clouds){ c.position.x += dt * 1.5; if (c.position.x > 160) c.position.x = -160; }
   updateRain(dt);
   updateLightning(dt);
+  updateBolts(dt);
+  updateMist(dt);
+  updateSplashes(dt);
 }
 
 
