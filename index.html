@@ -1050,19 +1050,20 @@ function updateSplashes(dt){
   litWindow(-34, 3.5, 12.03, 0); litWindow(-30, 3.5, 12.03, 0);
   // Olive building west face (x=30).
   litWindow(29.97, 3.5, 26, -Math.PI / 2); litWindow(29.97, 3.5, 30, -Math.PI / 2);
-  // --- Ground debris: flat rubble/leaves on open concrete, visual
-  // only — too low to read as cover or an obstacle. Sized 0.6–1.0 m
-  // and in light tones so they read against the dark concrete at
-  // night (earlier passes were too small and too dark to see).
-  const debrisCols = [0xaaaaaa, 0xc0b090, 0xbbbbbb, 0xd0c090];
+  // --- Ground debris: rubble chunks on open concrete, visual only —
+  // too low to read as cover or an obstacle. Unlit so the light tones
+  // show at night. Several placed near the spawn so they read in the
+  // opening view.
+  const debrisCols = [0xcccccc, 0xdddddd, 0xccbb88, 0xbbbbbb];
   const debrisSpots = [
     [-15, 25], [20, 20], [-5, 15], [28, -5], [-18, -18], [0, 5],
     [15, -25], [-30, 10], [8, 18], [-12, -28], [32, 20], [-22, 2],
     [5, 30], [18, -35], [-35, -15], [25, 30],
+    [-30, 28], [-22, 32], [-26, 20], [-12, 30], [0, 24], [14, 30], [-34, 20], [24, 20],
   ];
   debrisSpots.forEach(([x, z], i)=>{
-    const s = 0.6 + ((i * 37) % 10) / 10 * 0.4; // 0.6–1.0 m, deterministic
-    const hgt = 0.15 + ((i * 53) % 10) / 10 * 0.2; // 0.15–0.35 m tall, a real chunk
+    const s = 0.8 + ((i * 37) % 10) / 10 * 0.6; // 0.8–1.4 m, deterministic
+    const hgt = 0.25 + ((i * 53) % 10) / 10 * 0.25; // 0.25–0.5 m tall, a real chunk
     const d = new THREE.Mesh(new THREE.BoxGeometry(s, hgt, s * 0.7),
       new THREE.MeshBasicMaterial({ color: debrisCols[i % debrisCols.length] }));
     d.position.set(x, hgt / 2, z);
@@ -1073,23 +1074,30 @@ function updateSplashes(dt){
   // --- Low fog: soft ground-mist banks drifting just above the
   // concrete. Sprites (always face the camera) — flat horizontal
   // planes are nearly edge-on from a ground-level camera and read as
-  // a thin line, not fog. Each is a wide, short, soft billboard
-  // (15-30 m wide, 3-5 m tall) at ankle-to-waist height, drifting
-  // slowly. Opacity breathes via updateMist().
+  // a thin line, not fog. Each is a wide, tall, soft billboard at
+  // ankle-to-waist height, drifting slowly. Opacity breathes via
+  // updateMist(). Several are placed deliberately near the spawn so
+  // the mist reads in the opening view, not just at a distance.
   const mistTex = (function(){
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d');
     const grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
-    grad.addColorStop(0, 'rgba(200,210,215,0.8)'); grad.addColorStop(1, 'rgba(200,210,215,0)');
+    grad.addColorStop(0, 'rgba(200,210,215,0.85)'); grad.addColorStop(1, 'rgba(200,210,215,0)');
     g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
-  for (let i = 0; i < 12; i++){
-    const w = 15 + Math.random() * 15, h = 4 + Math.random() * 3;
-    const baseOp = 0.30 + Math.random() * 0.15;
+  const mistSpots = [
+    [-30, 30], [-18, 22], [-6, 28], [8, 20], [-28, 8], [-14, 2],
+    [0, 10], [16, 28], [24, 8], [-34, -8], [-20, -18], [-2, -12],
+    [12, -22], [28, -14], [-8, -30], [20, 32], [-38, 18], [32, 22],
+  ];
+  for (let i = 0; i < mistSpots.length; i++){
+    const [mx, mz] = mistSpots[i];
+    const w = 12 + Math.random() * 13, h = 5 + Math.random() * 3;
+    const baseOp = 0.45 + Math.random() * 0.20;
     const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, transparent: true, opacity: baseOp, depthWrite: false, fog: true }));
     m.scale.set(w, h, 1);
-    m.position.set(-38 + Math.random() * 76, 1.2 + Math.random() * 1.2, -38 + Math.random() * 76);
+    m.position.set(mx, 1.5 + Math.random() * 1.0, mz);
     m.userData.vx = (Math.random() - 0.5) * 0.9;
     m.userData.vz = (Math.random() - 0.5) * 0.9;
     m.userData.baseOp = baseOp;
