@@ -1063,13 +1063,15 @@ function updateSplashes(dt){
   debrisSpots.forEach(([x, z], i)=>{
     const s = 0.6 + ((i * 37) % 10) / 10 * 0.4; // 0.6–1.0 m, deterministic
     const d = new THREE.Mesh(new THREE.BoxGeometry(s, 0.06, s * 0.7),
-      new THREE.MeshStandardMaterial({ color: debrisCols[i % debrisCols.length], roughness: 0.95 }));
+      new THREE.MeshBasicMaterial({ color: debrisCols[i % debrisCols.length] }));
     d.position.set(x, 0.03, z); d.rotation.y = (i * 0.7) % Math.PI; scene.add(d);
   });
   // --- Low fog: soft ground-mist banks drifting just above the
-  // concrete. Flat radial-gradient planes, very low opacity, so they
-  // read as haze rather than objects. Drift + breathing handled by
-  // updateMist() every frame.
+  // concrete. Sprites (always face the camera) — flat horizontal
+  // planes are nearly edge-on from a ground-level camera and read as
+  // a thin line, not fog. Each is a wide, short, soft billboard
+  // (15-30 m wide, 3-5 m tall) at ankle-to-waist height, drifting
+  // slowly. Opacity breathes via updateMist().
   const mistTex = (function(){
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d');
@@ -1079,12 +1081,11 @@ function updateSplashes(dt){
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   for (let i = 0; i < 12; i++){
-    const w = 22 + Math.random() * 16, d = 16 + Math.random() * 10;
-    const baseOp = 0.18 + Math.random() * 0.12;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
-      new THREE.MeshBasicMaterial({ map: mistTex, transparent: true, opacity: baseOp, depthWrite: false, fog: true }));
-    m.rotation.x = -Math.PI / 2;
-    m.position.set(-38 + Math.random() * 76, 0.6 + Math.random() * 1.0, -38 + Math.random() * 76);
+    const w = 15 + Math.random() * 15, h = 3 + Math.random() * 2;
+    const baseOp = 0.16 + Math.random() * 0.10;
+    const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, transparent: true, opacity: baseOp, depthWrite: false, fog: true }));
+    m.scale.set(w, h, 1);
+    m.position.set(-38 + Math.random() * 76, 1.2 + Math.random() * 1.2, -38 + Math.random() * 76);
     m.userData.vx = (Math.random() - 0.5) * 0.9;
     m.userData.vz = (Math.random() - 0.5) * 0.9;
     m.userData.baseOp = baseOp;
