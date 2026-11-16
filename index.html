@@ -1105,7 +1105,7 @@ function updateSplashes(dt){
   for (let i = 0; i < mistSpots.length; i++){
     const [mx, mz] = mistSpots[i];
     const w = 15 + Math.random() * 15, h = 6 + Math.random() * 4;
-    const baseOp = 0.60 + Math.random() * 0.20;
+    const baseOp = 0.30 + Math.random() * 0.15; // less dense: was 0.60-0.80, now 0.30-0.45
     const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, transparent: true, opacity: baseOp, depthWrite: false, fog: true }));
     m.scale.set(w, h, 1);
     m.position.set(mx, 1.5 + Math.random() * 1.0, mz);
@@ -2170,9 +2170,9 @@ const cloudCanvas = document.createElement('canvas'); cloudCanvas.width = 256; c
 const cloudTex = new THREE.CanvasTexture(cloudCanvas); cloudTex.colorSpace = THREE.SRGBColorSpace;
 const cloudMat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.75, fog: false, depthWrite: false });
 const clouds = [];
-for (let i = 0; i < 18; i++){
+for (let i = 0; i < 28; i++){
   const sp = new THREE.Sprite(cloudMat);
-  const sc = 30 + Math.random() * 45;
+  const sc = 35 + Math.random() * 50;
   sp.scale.set(sc, sc * 0.45, 1);
   sp.position.set(-140 + Math.random() * 280, 45 + Math.random() * 45, -140 + Math.random() * 280);
   skyGroup.add(sp); clouds.push(sp);
