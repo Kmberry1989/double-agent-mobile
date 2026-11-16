@@ -880,6 +880,92 @@ groundPatch(8, -14, 16, 12, 0x333333, 'assets/textures/ground/ground_asphalt_102
   const exfilLight = new THREE.PointLight(0x88ffaa, 20, 14); exfilLight.position.set(38, 3, -38); scene.add(exfilLight);
 })();
 groundPatch(8, -14, 6, 4, 0x222222, 'assets/textures/ground/ground_asphalt_tire_marks_oil_stains_1024.webp', 1, 1);
+// ---------- Courtyard graphical update (2026-11-16) ----------
+// Visual pass found the courtyard's mid/background empty, the sky a
+// black void, and a sourceless orange halo. Additions, all visual-only
+// (NOT in obstacles/losMeshes — they block no movement, vision, or
+// shots): a distant city skyline to close the horizon, rain puddles,
+// lit windows on the three buildings, and scattered ground debris.
+// The halo fix is in setWeather (the sun-core sprite no longer has a
+// 0.25 opacity floor at night).
+(function courtyardGraphicalUpdate(){
+  // --- Distant skyline: dark buildings outside the walls, with lit
+  // windows. One canvas facade texture (dark + scattered warm windows)
+  // keeps it to a single material; buildings are ~2:1 tall:wide so
+  // the texture does not stretch. MeshBasicMaterial with fog:false so
+  // the silhouette and windows read clearly as a backdrop (the scene
+  // fog would otherwise wash them to grey at this range).
+  const facadeCanvas = document.createElement('canvas');
+  facadeCanvas.width = 128; facadeCanvas.height = 256;
+  const fg = facadeCanvas.getContext('2d');
+  fg.fillStyle = '#0a0f16'; fg.fillRect(0, 0, 128, 256);
+  for (let r = 0; r < 14; r++) for (let c = 0; c < 7; c++){
+    if (Math.random() < 0.28){
+      fg.fillStyle = ['#ffc46b', '#ffd98a', '#ff9d4d'][Math.floor(Math.random() * 3)];
+      fg.globalAlpha = 0.55 + Math.random() * 0.45;
+      fg.fillRect(8 + c * 17, 10 + r * 17, 9, 12);
+    }
+  }
+  fg.globalAlpha = 1;
+  const facadeTex = new THREE.CanvasTexture(facadeCanvas);
+  facadeTex.colorSpace = THREE.SRGBColorSpace;
+  const skylineMat = new THREE.MeshBasicMaterial({ map: facadeTex, fog: false });
+  const skyline = [
+    // [x, z, w, d, h] — ring outside the ±42 walls, 10–26 m tall so
+    // they read above the 4 m perimeter walls.
+    [-52, -56, 12, 12, 24], [-32, -60, 10, 10, 18], [-12, -56, 14, 12, 26],
+    [8, -60, 10, 10, 16], [28, -56, 12, 12, 22], [48, -58, 10, 10, 18],
+    [-56, -38, 12, 12, 20], [-58, -12, 10, 10, 16], [-56, 14, 12, 12, 24],
+    [-58, 38, 10, 10, 18], [56, -38, 12, 12, 22], [58, -12, 10, 10, 16],
+    [56, 14, 12, 12, 26], [58, 38, 10, 10, 20],
+    [-52, 56, 12, 12, 18], [-30, 60, 10, 10, 24], [-8, 56, 14, 12, 20],
+    [14, 60, 10, 10, 16], [36, 56, 12, 12, 22], [54, 58, 10, 10, 18],
+  ];
+  for (const [x, z, w, d, h] of skyline){
+    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), skylineMat);
+    b.position.set(x, h / 2, z); scene.add(b);
+  }
+  // --- Rain puddles: dark, low-roughness ellipses on open concrete.
+  // y=0.03 sits above the ground slab (0) and the patches (0.02).
+  const puddleMat = new THREE.MeshStandardMaterial({ color: 0x1c2a38, roughness: 0.15, metalness: 0.4, transparent: true, opacity: 0.85 });
+  const puddles = [
+    [-20, 18, 2.2, 1.6], [12, 28, 1.8, 1.3], [-8, -8, 2.5, 1.8],
+    [24, 8, 1.6, 2.2], [-28, -12, 2.0, 1.4], [5, -32, 1.9, 1.5],
+  ];
+  for (const [x, z, rx, rz] of puddles){
+    const p = new THREE.Mesh(new THREE.CircleGeometry(1, 24), puddleMat);
+    p.rotation.x = -Math.PI / 2; p.position.set(x, 0.03, z); p.scale.set(rx, rz, 1);
+    scene.add(p);
+  }
+  // --- Lit windows on the three courtyard buildings (warm, fog:false
+  // so they stay visible as lights). Offset 0.03 off each face.
+  const litWinMat = new THREE.MeshBasicMaterial({ color: 0xffc46b, fog: false });
+  function litWindow(x, y, z, rotY){
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.3), litWinMat);
+    w.position.set(x, y, z); if (rotY) w.rotation.y = rotY; scene.add(w);
+  }
+  // Blue building south face (z=-31), clear of the vent (x=0) and the
+  // existing tinted window (4, 2).
+  litWindow(-3.5, 3.5, -30.97, 0); litWindow(3.5, 3.5, -30.97, 0);
+  // Red building east face (x=-28), above the chain-link fence (top y=3).
+  litWindow(-27.97, 4.2, 6, Math.PI / 2); litWindow(-27.97, 4.2, 10, Math.PI / 2);
+  // Olive building west face (x=30).
+  litWindow(29.97, 3.5, 26, -Math.PI / 2); litWindow(29.97, 3.5, 30, -Math.PI / 2);
+  // --- Ground debris: small flat rubble/leaves on open concrete,
+  // visual only — too low to read as cover or an obstacle.
+  const debrisCols = [0x2a2a2a, 0x3a2f22, 0x444444, 0x2e2a24];
+  const debrisSpots = [
+    [-15, 25], [20, 20], [-5, 15], [28, -5], [-18, -18], [0, 5],
+    [15, -25], [-30, 10], [8, 18], [-12, -28], [32, 20], [-22, 2],
+    [5, 30], [18, -35], [-35, -15], [25, 30],
+  ];
+  debrisSpots.forEach(([x, z], i)=>{
+    const s = 0.15 + ((i * 37) % 10) / 10 * 0.25; // 0.15–0.40 m, deterministic
+    const d = new THREE.Mesh(new THREE.BoxGeometry(s, 0.06, s * 0.7),
+      new THREE.MeshStandardMaterial({ color: debrisCols[i % debrisCols.length], roughness: 0.95 }));
+    d.position.set(x, 0.03, z); d.rotation.y = (i * 0.7) % Math.PI; scene.add(d);
+  });
+})();
 // Chain-link fence: see-through panel mounted flush on the east face of the
 // red building (-32,8; face x=-28), so the building behind it already blocks
 // movement. The panel itself is in NO list: it blocks nothing — no movement
@@ -1975,7 +2061,10 @@ function setWeather(name, announce){
   hemi.intensity = w.hemi; sun.intensity = w.sun;
   baseHemi = w.hemi; baseSun = w.sun; baseBg.setHex(w.horizon); baseFog.setHex(w.fogColor);
   cloudMat.opacity = w.cloudOp; cloudMat.color.setHex(w.cloudTint);
-  sunCore.material.opacity = 0.25 + 0.75 * w.sunI; sunGlow.material.opacity = w.sunI;
+  // Sun sprites follow the weather sun intensity with no floor: the
+  // old 0.25 floor kept a warm disc (the "orange halo") visible at
+  // night in Storm (sunI 0). Now Storm hides it and Rain shows it faint.
+  sunCore.material.opacity = w.sunI; sunGlow.material.opacity = w.sunI;
   rainGroup.visible = w.rain;
   rainWanted = !!w.rain;
   if (audioReady) updateRainLoop();
