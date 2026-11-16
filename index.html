@@ -971,22 +971,22 @@ function updateSplashes(dt){
   // not stretch. MeshBasicMaterial with fog:false so the silhouette
   // and windows read clearly as a backdrop (the scene fog would
   // otherwise wash them to grey at this range).
-  function facadeTexture(litFrac, base){
+  function facadeTexture(litFrac, base, dim){
     const c = document.createElement('canvas'); c.width = 128; c.height = 256;
     const g = c.getContext('2d');
     g.fillStyle = base; g.fillRect(0, 0, 128, 256);
     for (let r = 0; r < 14; r++) for (let cc = 0; cc < 7; cc++){
       if (Math.random() < litFrac){
         g.fillStyle = ['#ffc46b', '#ffd98a', '#ff9d4d'][Math.floor(Math.random() * 3)];
-        g.globalAlpha = 0.55 + Math.random() * 0.45;
+        g.globalAlpha = dim * (0.55 + Math.random() * 0.45);
         g.fillRect(8 + cc * 17, 10 + r * 17, 9, 12);
       }
     }
     g.globalAlpha = 1;
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   }
-  const nearMat = new THREE.MeshBasicMaterial({ map: facadeTexture(0.28, '#0a0f16'), fog: false });
-  const farMat = new THREE.MeshBasicMaterial({ map: facadeTexture(0.14, '#070b10'), fog: false });
+  const nearMat = new THREE.MeshBasicMaterial({ map: facadeTexture(0.28, '#0a0f16', 1.0), fog: false });
+  const farMat = new THREE.MeshBasicMaterial({ map: facadeTexture(0.10, '#04070a', 0.45), fog: false });
   // Near ring [x, z, w, d, h] — outside the ±42 walls, 18-30 m tall.
   const skylineNear = [
     [-68, -74, 12, 12, 24], [-42, -78, 10, 10, 18], [-16, -74, 14, 12, 28],
@@ -1051,17 +1051,17 @@ function updateSplashes(dt){
   // Olive building west face (x=30).
   litWindow(29.97, 3.5, 26, -Math.PI / 2); litWindow(29.97, 3.5, 30, -Math.PI / 2);
   // --- Ground debris: flat rubble/leaves on open concrete, visual
-  // only — too low to read as cover or an obstacle. Sized 0.4–0.8 m
-  // and in lighter tones so they read against the dark concrete at
-  // night (the first passes were too small and too dark to see).
-  const debrisCols = [0x9a9a8a, 0x8a7a5a, 0xaaaaaa, 0xb09a6a];
+  // only — too low to read as cover or an obstacle. Sized 0.6–1.0 m
+  // and in light tones so they read against the dark concrete at
+  // night (earlier passes were too small and too dark to see).
+  const debrisCols = [0xaaaaaa, 0xc0b090, 0xbbbbbb, 0xd0c090];
   const debrisSpots = [
     [-15, 25], [20, 20], [-5, 15], [28, -5], [-18, -18], [0, 5],
     [15, -25], [-30, 10], [8, 18], [-12, -28], [32, 20], [-22, 2],
     [5, 30], [18, -35], [-35, -15], [25, 30],
   ];
   debrisSpots.forEach(([x, z], i)=>{
-    const s = 0.4 + ((i * 37) % 10) / 10 * 0.4; // 0.4–0.8 m, deterministic
+    const s = 0.6 + ((i * 37) % 10) / 10 * 0.4; // 0.6–1.0 m, deterministic
     const d = new THREE.Mesh(new THREE.BoxGeometry(s, 0.06, s * 0.7),
       new THREE.MeshStandardMaterial({ color: debrisCols[i % debrisCols.length], roughness: 0.95 }));
     d.position.set(x, 0.03, z); d.rotation.y = (i * 0.7) % Math.PI; scene.add(d);
@@ -1079,12 +1079,12 @@ function updateSplashes(dt){
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   for (let i = 0; i < 12; i++){
-    const w = 16 + Math.random() * 16, d = 10 + Math.random() * 10;
-    const baseOp = 0.10 + Math.random() * 0.08;
+    const w = 22 + Math.random() * 16, d = 16 + Math.random() * 10;
+    const baseOp = 0.18 + Math.random() * 0.12;
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
       new THREE.MeshBasicMaterial({ map: mistTex, transparent: true, opacity: baseOp, depthWrite: false, fog: true }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(-38 + Math.random() * 76, 0.4 + Math.random() * 0.8, -38 + Math.random() * 76);
+    m.position.set(-38 + Math.random() * 76, 0.6 + Math.random() * 1.0, -38 + Math.random() * 76);
     m.userData.vx = (Math.random() - 0.5) * 0.9;
     m.userData.vz = (Math.random() - 0.5) * 0.9;
     m.userData.baseOp = baseOp;
@@ -1808,7 +1808,11 @@ const CAM_HEAD_TEX = 'assets/textures/raw/painted-metal-blue.jpg';
 [[-20,-30],[28,0],[-5,32]].forEach(([x,z])=>{
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,4,8), texturedMat(0x333333, CAM_POLE_TEX, 1, 2)); pole.position.set(x,2,z); scene.add(pole);
   const headM = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.3,0.4), texturedMat(0x222222, CAM_HEAD_TEX, 1, 1)); headM.position.set(x,4.1,z); scene.add(headM);
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(3.5,12,20,1,true), new THREE.MeshBasicMaterial({color:0xff8800, transparent:true, opacity:0.10, side:THREE.DoubleSide, depthWrite:false}));
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(3.5,12,20,1,true), new THREE.MeshBasicMaterial({color:0xcc7700, transparent:true, opacity:0.04, side:THREE.DoubleSide, depthWrite:false}));
+  // Cone opacity was 0.10 bright orange — from the spawn it read as a
+  // large sourceless orange halo on the right side (the camera at
+  // (28,0) sweeps its cone toward the spawn). Dimmed to a faint hint
+  // so it still shows the camera's view direction without glowing.
   cone.rotation.x = -Math.PI/2; cone.rotation.z = Math.PI/2; cone.position.set(x,3.6,z+6); scene.add(cone);
   cameras.push({x,z,head:headM,cone,yaw:0,dir:1});
 });
@@ -2262,7 +2266,14 @@ function applyFlash(){
 // updateLightning when a strike fires; updated every frame from updateSky.
 const activeBolts = [];
 function spawnBolt(){
-  const sx = -70 + Math.random() * 140, sz = -70 + Math.random() * 140;
+  // Bias the strike to land in front of the player (in the camera's
+  // view) so bolts are actually seen — a fully random strike is usually
+  // behind or beside the camera and never appears on screen.
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const dist = 30 + Math.random() * 30;
+  const lat = (Math.random() - 0.5) * 50;
+  const sx = player.position.x + fx * dist - fz * lat;
+  const sz = player.position.z + fz * dist + fx * lat;
   const pts = [new THREE.Vector3(sx, 78 + Math.random() * 14, sz)];
   let x = sx, z = sz, y = pts[0].y;
   while (y > 2){
