@@ -964,8 +964,15 @@ function updateMist(dt){
     if (m.position.x < -45) m.position.x = 45;
     if (m.position.z > 45) m.position.z = -45;
     if (m.position.z < -45) m.position.z = 45;
+    // Fog only forms in the distance: near the player it would wash out
+    // the foreground and flatten the scene. Fade each bank in with its
+    // distance from the player — invisible within 15 m, full opacity
+    // past 35 m — so the mist reads as depth, not a flat wash.
+    const dx = m.position.x - player.position.x, dz = m.position.z - player.position.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const distF = Math.max(0, Math.min(1, (dist - 15) / 20));
     // Gentle breathing so the fog never reads as a static decal.
-    m.material.opacity = m.userData.baseOp * (0.85 + 0.15 * Math.sin(performance.now() * 0.0004 + m.userData.phase));
+    m.material.opacity = m.userData.baseOp * distF * (0.85 + 0.15 * Math.sin(performance.now() * 0.0004 + m.userData.phase));
   }
 }
 const splashRings = [];
@@ -1109,8 +1116,8 @@ function updateSplashes(dt){
   // planes are nearly edge-on from a ground-level camera and read as
   // a thin line, not fog. Each is a wide, tall, soft billboard at
   // ankle-to-waist height, drifting slowly. Opacity breathes via
-  // updateMist(). Several are placed deliberately near the spawn so
-  // the mist reads in the opening view, not just at a distance.
+  // updateMist(), and fades with distance from the player so the fog
+  // only forms in the distance — near mist would flatten the scene.
   const mistTex = (function(){
     const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d');
