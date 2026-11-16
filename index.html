@@ -1063,12 +1063,13 @@ function updateSplashes(dt){
   ];
   debrisSpots.forEach(([x, z], i)=>{
     const s = 0.8 + ((i * 37) % 10) / 10 * 0.6; // 0.8–1.4 m, deterministic
-    const hgt = 0.25 + ((i * 53) % 10) / 10 * 0.25; // 0.25–0.5 m tall, a real chunk
+    const hgt = 0.4 + ((i * 53) % 10) / 10 * 0.3; // 0.4–0.7 m tall, a real chunk
     const d = new THREE.Mesh(new THREE.BoxGeometry(s, hgt, s * 0.7),
-      new THREE.MeshBasicMaterial({ color: debrisCols[i % debrisCols.length] }));
+      new THREE.MeshStandardMaterial({ color: debrisCols[i % debrisCols.length], roughness: 0.9, emissive: 0x2a2a2a }));
     d.position.set(x, hgt / 2, z);
     d.rotation.y = (i * 0.7) % Math.PI;
     d.rotation.z = ((i * 13) % 10) / 10 * 0.2 - 0.1; // slight tilt so it reads as a chunk, not a slab
+    d.castShadow = true; d.receiveShadow = true;
     scene.add(d);
   });
   // --- Low fog: soft ground-mist banks drifting just above the
@@ -1079,11 +1080,21 @@ function updateSplashes(dt){
   // updateMist(). Several are placed deliberately near the spawn so
   // the mist reads in the opening view, not just at a distance.
   const mistTex = (function(){
-    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const c = document.createElement('canvas'); c.width = c.height = 256;
     const g = c.getContext('2d');
-    const grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
-    grad.addColorStop(0, 'rgba(200,210,215,0.85)'); grad.addColorStop(1, 'rgba(200,210,215,0)');
-    g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+    // A cloudy, uneven fog texture (not a smooth radial) so the bank
+    // reads as mist with body, not a faint wash. Several overlapping
+    // soft blobs with varying alpha.
+    g.clearRect(0, 0, 256, 256);
+    for (let i = 0; i < 14; i++){
+      const bx = 40 + Math.random() * 176, by = 60 + Math.random() * 136;
+      const br = 28 + Math.random() * 42;
+      const grad = g.createRadialGradient(bx, by, 2, bx, by, br);
+      grad.addColorStop(0, 'rgba(205,215,220,0.85)');
+      grad.addColorStop(1, 'rgba(205,215,220,0)');
+      g.fillStyle = grad;
+      g.fillRect(bx - br, by - br, br * 2, br * 2);
+    }
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   const mistSpots = [
@@ -1093,8 +1104,8 @@ function updateSplashes(dt){
   ];
   for (let i = 0; i < mistSpots.length; i++){
     const [mx, mz] = mistSpots[i];
-    const w = 12 + Math.random() * 13, h = 5 + Math.random() * 3;
-    const baseOp = 0.45 + Math.random() * 0.20;
+    const w = 15 + Math.random() * 15, h = 6 + Math.random() * 4;
+    const baseOp = 0.60 + Math.random() * 0.20;
     const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, transparent: true, opacity: baseOp, depthWrite: false, fog: true }));
     m.scale.set(w, h, 1);
     m.position.set(mx, 1.5 + Math.random() * 1.0, mz);
