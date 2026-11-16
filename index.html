@@ -1062,9 +1062,13 @@ function updateSplashes(dt){
   ];
   debrisSpots.forEach(([x, z], i)=>{
     const s = 0.6 + ((i * 37) % 10) / 10 * 0.4; // 0.6–1.0 m, deterministic
-    const d = new THREE.Mesh(new THREE.BoxGeometry(s, 0.06, s * 0.7),
+    const hgt = 0.15 + ((i * 53) % 10) / 10 * 0.2; // 0.15–0.35 m tall, a real chunk
+    const d = new THREE.Mesh(new THREE.BoxGeometry(s, hgt, s * 0.7),
       new THREE.MeshBasicMaterial({ color: debrisCols[i % debrisCols.length] }));
-    d.position.set(x, 0.03, z); d.rotation.y = (i * 0.7) % Math.PI; scene.add(d);
+    d.position.set(x, hgt / 2, z);
+    d.rotation.y = (i * 0.7) % Math.PI;
+    d.rotation.z = ((i * 13) % 10) / 10 * 0.2 - 0.1; // slight tilt so it reads as a chunk, not a slab
+    scene.add(d);
   });
   // --- Low fog: soft ground-mist banks drifting just above the
   // concrete. Sprites (always face the camera) — flat horizontal
@@ -1076,13 +1080,13 @@ function updateSplashes(dt){
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d');
     const grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
-    grad.addColorStop(0, 'rgba(200,210,215,0.55)'); grad.addColorStop(1, 'rgba(200,210,215,0)');
+    grad.addColorStop(0, 'rgba(200,210,215,0.8)'); grad.addColorStop(1, 'rgba(200,210,215,0)');
     g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   for (let i = 0; i < 12; i++){
-    const w = 15 + Math.random() * 15, h = 3 + Math.random() * 2;
-    const baseOp = 0.16 + Math.random() * 0.10;
+    const w = 15 + Math.random() * 15, h = 4 + Math.random() * 3;
+    const baseOp = 0.30 + Math.random() * 0.15;
     const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: mistTex, transparent: true, opacity: baseOp, depthWrite: false, fog: true }));
     m.scale.set(w, h, 1);
     m.position.set(-38 + Math.random() * 76, 1.2 + Math.random() * 1.2, -38 + Math.random() * 76);
