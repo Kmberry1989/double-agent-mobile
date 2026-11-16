@@ -578,7 +578,12 @@ function brokenBrickWall(cx, cz, len, thick, h, alongX){
   const courses = Math.max(1, Math.round(h / COURSE_H));
   let s = Math.abs(Math.sin(cx * 12.9898 + cz * 78.233) * 43758.5453) % 1 + 0.001;
   const rnd = ()=>{ s = (s * 16807) % 2147483647; return s / 2147483647; };
-  const mat = texturedMat(0x8a7a5a, 'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp', Math.max(1, Math.round(len / 4.5)), 1);
+  // One shared material, texture repeat (1,1): the per-course geometry UVs
+  // below carry the world scale (1 repeat per 4.5 m along the wall, 1 per
+  // 3 m of height), so the bricks stay at true scale and line up across
+  // courses. A shared repeat would squeeze the whole texture into each
+  // 0.3 m course and warp the bricks.
+  const mat = texturedMat(0x8a7a5a, 'assets/textures/walls/wall_brick_running_bond_red_brown_1024.webp', 1, 1);
   const meshes = [];
   for (let i = 0; i < courses; i++){
     const frac = i / Math.max(1, courses - 1); // 0 bottom -> 1 top
@@ -589,7 +594,34 @@ function brokenBrickWall(cx, cz, len, thick, h, alongX){
     const leftCut = Math.floor((brk * rnd()) / BRICK_W) * BRICK_W;
     const off = brk / 2 - leftCut;
     const w = alongX ? clen : thick, d = alongX ? thick : clen;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, COURSE_H, d), mat);
+    const geo = new THREE.BoxGeometry(w, COURSE_H, d);
+    // Remap the course UVs to world scale so the brick texture is not
+    // warped. BoxGeometry faces: 0 px, 1 nx, 2 py, 3 ny, 4 pz, 5 nz.
+    // px/nx: U = z, V = y. py/ny: U = x, V = z. pz/nz: U = x, V = y.
+    const pos = geo.attributes.position, uv = geo.attributes.uv;
+    const wallC = alongX ? cx : cz; // wall centre along its axis
+    const courseC = wallC + off; // course centre along its axis
+    const axisBase = courseC - wallC + len / 2; // wall-start to course-centre distance
+    const botY = i * COURSE_H; // bottom of this course
+    for (let v = 0; v < pos.count; v++){
+      const lx = pos.getX(v), ly = pos.getY(v), lz = pos.getZ(v);
+      const axisRel = axisBase + (alongX ? lx : lz); // distance along wall from wall start
+      const thickRel = (alongX ? lz : lx) + thick / 2; // distance across thickness
+      const hWorld = botY + COURSE_H / 2 + ly; // height above ground
+      const face = Math.floor(v / 4);
+      let u, vv;
+      if (alongX){
+        if (face === 0 || face === 1){ u = thickRel / 4.5; vv = hWorld / 3; }
+        else if (face === 2 || face === 3){ u = axisRel / 4.5; vv = thickRel / 4.5; }
+        else { u = axisRel / 4.5; vv = hWorld / 3; }
+      } else {
+        if (face === 0 || face === 1){ u = axisRel / 4.5; vv = hWorld / 3; }
+        else if (face === 2 || face === 3){ u = thickRel / 4.5; vv = axisRel / 4.5; }
+        else { u = thickRel / 4.5; vv = hWorld / 3; }
+      }
+      uv.setXY(v, u, vv);
+    }
+    const m = new THREE.Mesh(geo, mat);
     m.position.set(alongX ? cx + off : cx, i * COURSE_H + COURSE_H / 2, alongX ? cz : cz + off);
     m.castShadow = true; m.receiveShadow = true;
     scene.add(m); meshes.push(m); losMeshes.push(m);
