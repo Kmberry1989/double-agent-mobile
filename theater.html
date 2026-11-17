@@ -108,6 +108,15 @@ function cyl(x, y, z, rTop, rBot, h, color, seg) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, seg || 24), new THREE.MeshStandardMaterial({ color }));
   m.position.set(x, y, z); scene.add(m); return m;
 }
+// Canvas texture helper (2026-11-17 theater visual pass): draws a
+// 2D canvas and returns it as a texture. Used for the painted stage
+// backdrop (dusk city skyline) and the framed playbills (decorative
+// border only — no show name exists in the file, so no words).
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 const TEX = 'assets/textures/theater/';
 
 // ---- Theater environment ----
@@ -164,6 +173,60 @@ flatPlane(0, 10, 10, 28, 40, 0x2a3a3a, TEX + 'theater_ceiling_1024.webp', 6, 8, 
 [[-13.9, 10], [-13.9, 18], [-13.9, 26], [13.9, 10], [13.9, 18], [13.9, 26]].forEach(([x, z]) => {
   const s = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.3), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xffc94d, emissiveIntensity: 1.0 }));
   s.position.set(x, 3, z); scene.add(s);
+  // Warm flame sphere on top of each bracket (2026-11-17 visual pass).
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffaa00, emissiveIntensity: 2.0 }));
+  flame.position.set(x, 3.35, z); scene.add(flame);
+});
+// ---- Theater visual pass (2026-11-17): playbills, box-seat curtains,
+// aisle lights. Procedural dressing — no real GLBs exist for these.
+// Playbills: gold-framed posters on the side walls near the entrance
+// (z=28), decorative border only — no show name exists in the file.
+const playbillTex = canvasTex(256, 384, (ctx, w, h) => {
+  ctx.fillStyle = '#f2e6c8'; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 10; ctx.strokeRect(14, 14, w - 28, h - 28);
+  ctx.strokeStyle = '#8a6b3a'; ctx.lineWidth = 3; ctx.strokeRect(30, 30, w - 60, h - 60);
+  // Centre ornament: a gold diamond with rays, no words.
+  ctx.fillStyle = '#c9a227';
+  ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(Math.PI / 4); ctx.fillRect(-34, -34, 68, 68); ctx.restore();
+  ctx.fillStyle = '#f2e6c8';
+  ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(Math.PI / 4); ctx.fillRect(-20, -20, 40, 40); ctx.restore();
+  ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 4;
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    ctx.beginPath(); ctx.moveTo(w / 2 + Math.cos(a) * 52, h / 2 + Math.sin(a) * 52);
+    ctx.lineTo(w / 2 + Math.cos(a) * 72, h / 2 + Math.sin(a) * 72); ctx.stroke();
+  }
+  ctx.fillStyle = '#8a6b3a';
+  ctx.beginPath(); ctx.arc(w / 2, h / 2, 10, 0, Math.PI * 2); ctx.fill();
+});
+[-13.9, 13.9].forEach((x) => {
+  const frame = box(x, 2.0, 28, 0.06, 1.05, 0.75, 0xc9a227);
+  const poster = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.92), new THREE.MeshBasicMaterial({ map: playbillTex }));
+  poster.position.set(x + (x < 0 ? 0.04 : -0.04), 2.0, 28); poster.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2; scene.add(poster);
+});
+// Box-seat curtains: heavy red velvet panels framing the two balcony
+// seat blocks (blocks span x -11..-2 and 2..11 at z=29). They hang from
+// y=8 down to the balcony floor (y=4) — the player walks under them, so
+// they never block the house floor. DoubleSide: the player can walk to
+// z=29.5, behind them.
+const boxCurtainMat = new THREE.MeshStandardMaterial({ color: 0x5a1a2a, side: THREE.DoubleSide });
+[-11.5, -2, 2, 11.5].forEach((x) => {
+  const c = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 4), boxCurtainMat.clone());
+  c.position.set(x, 6, 29); c.rotation.y = Math.PI; scene.add(c);
+  applyTex(c, TEX + 'theater_red_velvet_curtain_1024.webp', 1, 1);
+});
+// Aisle lights: tiny warm bollards along the centre-aisle edges
+// (x=+-2.3, just outside the walkable aisle). Emissive only — no new
+// PointLights. They mark the aisle from the steps (z=9) to the back (z=27).
+const aislePostMat = new THREE.MeshStandardMaterial({ color: 0x2a1a12 });
+const aisleGlowMat = new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.6 });
+[9, 12, 15, 18, 21, 24, 27].forEach((z) => {
+  [-2.3, 2.3].forEach((x) => {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.22, 8), aislePostMat);
+    post.position.set(x, 0.11, z); scene.add(post);
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), aisleGlowMat);
+    glow.position.set(x, 0.28, z); scene.add(glow);
+  });
 });
 // Proscenium arch (gold trim): two pillars + top beam framing the stage at z=6.
 const pilL = box(-12.4, 4, 6, 0.8, 8, 0.8, 0xc9a227); applyTex(pilL, TEX + 'theater_gold_trim_1024.webp', 1, 4);
@@ -262,6 +325,33 @@ gltfLoader.load('assets/theater/models/audience_seats.glb', (gltf) => {
 }, undefined, () => {});
 // Fly loft: a beam above the stage the rigging hangs from.
 box(0, 9.2, 0, 24, 0.4, 0.6, 0x2a1a12);
+// ---- Ceiling rigging (2026-11-17 visual pass): a dark truss grid at
+// y=8 over the stage (ceiling is at y=10, so there is headroom), with
+// three hanging wash lights aimed straight down at the stage. The
+// fixtures and their faint beam cones are emissive/basic only — no new
+// lights. The centre fixture sits at (0, 7.3, 0), 2 m from the stage
+// chandelier (0, 7, -2), so nothing overlaps it.
+{
+  const trussMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+  [-4, 0, 4].forEach((z) => {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(20, 0.15, 0.15), trussMat);
+    beam.position.set(0, 8, z); scene.add(beam);
+  });
+  [-7.5, -2.5, 2.5, 7.5].forEach((x) => {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 10), trussMat);
+    beam.position.set(x, 8, 0); scene.add(beam);
+  });
+  const rigLensMat = new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffc94d, emissiveIntensity: 1.5 });
+  const rigBeamMat = new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false });
+  [-6, 0, 6].forEach((x) => {
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.35, 10), trussMat);
+    body.position.set(x, 7.55, 0); scene.add(body);
+    const lens = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), rigLensMat);
+    lens.position.set(x, 7.35, 0); scene.add(lens);
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(1.0, 6.4, 12, 1, true), rigBeamMat);
+    beam.position.set(x, STAGE_TOP + 3.2, 0); scene.add(beam);
+  });
+}
 
 // Spotlights (the cinematic pair): fixtures mounted in the house at y=8,
 // aimed at Rochelle at centre stage. Off until the cinematic turns them
@@ -321,9 +411,12 @@ makeSandbag(-6, -2); makeSandbag(6, -2); makeSandbag(-6, 3); makeSandbag(6, 3);
 // Hangs over the stage at (0, 7, -2). A rope runs from it down to a cleat
 // on the stage floor (3, 0.9, -5) — slash near the cleat to cut the rope
 // and drop the chandelier on whoever is underneath.
-const chandelier = { x: 0, z: -2, y: 7, dropped: false, falling: false, vy: 0, used: false, group: new THREE.Group() };
-{
-  const g = chandelier.group;
+// buildChandelier (2026-11-17 visual pass): the fixture itself — chain,
+// column, gold ring, 8 arms with candle cups + candles + flames, crystal
+// drops, finial. Shared by the droppable stage chandelier and the static
+// house chandelier below, so the two match.
+function buildChandelier() {
+  const g = new THREE.Group();
   const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3, 8), new THREE.MeshStandardMaterial({ color: 0x8a6b3a }));
   chain.position.set(0, 1.5, 0); g.add(chain);
   const col = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.2, 12), new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 }));
@@ -353,6 +446,11 @@ const chandelier = { x: 0, z: -2, y: 7, dropped: false, falling: false, vy: 0, u
   }
   const finial = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 }));
   finial.position.set(0, -0.7, 0); g.add(finial);
+  return g;
+}
+const chandelier = { x: 0, z: -2, y: 7, dropped: false, falling: false, vy: 0, used: false, group: buildChandelier() };
+{
+  const g = chandelier.group;
   g.position.set(chandelier.x, chandelier.y, chandelier.z); scene.add(g);
   const chLight = new THREE.PointLight(0xffc94d, 25, 15); chLight.position.set(0, -0.3, 0); g.add(chLight);
   // The drop rope: from the chandelier down to a cleat at the stage edge.
@@ -364,6 +462,12 @@ const chandelier = { x: 0, z: -2, y: 7, dropped: false, falling: false, vy: 0, u
   chandelier.cleat = { x: 3, z: -5 };
   colliders.push({ x: 3, z: -5, r: 0.5 });
 }
+// Second chandelier (2026-11-17 visual pass): same fixture, static (no
+// rope, no drop), over the centre of the audience area at (0, 7, 18) —
+// the same height as the stage chandelier, beside the house light.
+const houseChandelier = buildChandelier();
+houseChandelier.position.set(0, 7, 18); scene.add(houseChandelier);
+const houseChLight = new THREE.PointLight(0xffc94d, 25, 15); houseChLight.position.set(0, -0.3, 0); houseChandelier.add(houseChLight);
 
 // ---- Set flats (topple-able painted backdrops) ----
 // set_flat.glb (painted garden panel, 0.60 x 1.00 m; scale 5.0 -> ~3.0 x
@@ -428,6 +532,68 @@ function enemiesNearDrape(r) {
   });
 }
 colliders.push({ x: 0, z: -5.8, r: 1.0 });
+
+// ---- Stage set (2026-11-17 visual pass): painted backdrop + set
+// pieces, revealed when the main curtain opens. All procedural — no
+// real GLBs exist for these. The backdrop hangs on the upstage wall
+// (z=-9.7, just in front of the back wall at -10); the set pieces sit
+// at the stage sides, clear of the centre fight area.
+// Painted backdrop: a dusk city skyline — indigo gradient sky, moon,
+// dark building silhouettes with a few lit windows, rooftop band.
+const backdropTex = canvasTex(1024, 288, (ctx, w, h) => {
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, '#1a2340'); sky.addColorStop(0.55, '#3a2a4a'); sky.addColorStop(0.8, '#8a4a3a'); sky.addColorStop(1, '#2a1a24');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#e8dcc0'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.2, 22, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(232,220,192,0.25)'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.2, 34, 0, Math.PI * 2); ctx.fill();
+  // Far skyline (lighter, hazier) then near skyline (darker).
+  ctx.fillStyle = '#2a2440';
+  [[0, 90, 70, 60], [80, 70, 60, 90], [170, 100, 80, 50], [280, 60, 55, 100], [360, 110, 90, 40], [470, 80, 60, 80], [560, 100, 70, 55], [660, 70, 60, 95], [750, 105, 85, 45], [860, 85, 65, 85], [950, 95, 74, 60]].forEach(([x, bw, bh, top]) => {
+    ctx.fillRect(x, h - top - bh, bw, bh + top);
+  });
+  ctx.fillStyle = '#14101e';
+  [[20, 110, 60, 40], [130, 80, 90, 70], [230, 120, 70, 30], [370, 90, 100, 60], [480, 130, 80, 40], [630, 100, 110, 55], [750, 140, 90, 35], [900, 110, 80, 50]].forEach(([x, bw, bh, top]) => {
+    ctx.fillRect(x, h - top - bh, bw, bh + top);
+  });
+  // A few lit windows in the near skyline.
+  ctx.fillStyle = '#ffd97a';
+  for (let i = 0; i < 40; i++) {
+    const wx = 20 + Math.random() * 980, wy = h - 60 - Math.random() * 110;
+    ctx.fillRect(wx, wy, 5, 7);
+  }
+  // Rooftop/hedge band along the bottom.
+  ctx.fillStyle = '#0e0a14'; ctx.fillRect(0, h - 28, w, 28);
+});
+const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(22, 6.1), new THREE.MeshBasicMaterial({ map: backdropTex }));
+backdrop.position.set(0, STAGE_TOP + 3.05, -9.7); scene.add(backdrop);
+// Fake columns (fluted look via a plain shaft + gold capital/base) at
+// the upstage sides.
+[-11, 11].forEach((x) => {
+  const shaft = cyl(x, STAGE_TOP + 2.4, -8, 0.35, 0.4, 4.2, 0xd8cbb0);
+  const base = box(x, STAGE_TOP + 0.15, -8, 0.95, 0.3, 0.95, 0xc9a227);
+  const cap = box(x, STAGE_TOP + 4.65, -8, 0.95, 0.3, 0.95, 0xc9a227);
+  colliders.push({ x, z: -8, r: 0.6 });
+});
+// Bench (dark wood, gold trim) on stage left.
+{
+  const bx = -10.5, bz = 2;
+  box(bx, STAGE_TOP + 0.45, bz, 2.0, 0.15, 0.6, 0x5a3a1a);
+  box(bx, STAGE_TOP + 0.85, bz + 0.28, 2.0, 0.7, 0.1, 0x5a3a1a);
+  box(bx - 0.85, STAGE_TOP + 0.2, bz, 0.12, 0.4, 0.5, 0x3a2410);
+  box(bx + 0.85, STAGE_TOP + 0.2, bz, 0.12, 0.4, 0.5, 0x3a2410);
+  colliders.push({ x: bx, z: bz, r: 1.2 });
+}
+// Potted plant (terracotta pot, dark-green foliage) on stage right.
+{
+  const px = 10.5, pz = 2;
+  cyl(px, STAGE_TOP + 0.25, pz, 0.35, 0.25, 0.5, 0x8a4a2a);
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x2a5a2a });
+  [[0, 0.85, 0, 0.45], [-0.2, 1.15, 0.1, 0.35], [0.22, 1.1, -0.08, 0.33], [0, 1.45, 0, 0.28]].forEach(([dx, dy, dz, r]) => {
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), leafMat);
+    leaf.position.set(px + dx, STAGE_TOP + dy, pz + dz); scene.add(leaf);
+  });
+  colliders.push({ x: px, z: pz, r: 0.5 });
+}
 
 // ---- Prop crates + barrel (smashable) ----
 // A stack of crates + a barrel on stage right. Slash near them to smash

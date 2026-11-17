@@ -249,9 +249,15 @@ function addWindow(x, z, rotY) {
     fin.position.set(s * (W / 2 + 0.25), H / 2 + 0.32, 0.12); g.add(fin);
     const br = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, 0.12), brass);
     br.position.set(s * (W / 2 - 0.1), H / 2 + 0.32, 0.06); g.add(br);
-    const cp = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 3.9), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
-    cp.position.set(s * (W / 2 + 0.28), 0.06, 0.12); g.add(cp);
-    applyTex(cp, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
+    // Velvet curtain panel, folded: two angled planes per side (a shallow
+    // V fold) instead of one flat plane, so the drape reads as fabric.
+    const cmat = new THREE.MeshStandardMaterial({ color: 0x5a1a2a });
+    const cp1 = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 3.9), cmat);
+    cp1.position.set(s * (W / 2 + 0.15), 0.06, 0.11); cp1.rotation.y = s * 0.3; g.add(cp1);
+    const cp2 = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 3.9), cmat);
+    cp2.position.set(s * (W / 2 + 0.41), 0.06, 0.14); cp2.rotation.y = -s * 0.3; g.add(cp2);
+    applyTex(cp1, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
+    applyTex(cp2, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
   });
   g.position.set(x, 3.1, z); g.rotation.y = rotY; scene.add(g);
   return g;
@@ -323,9 +329,13 @@ balcGlass.position.set(0, 8.25, 14.7); balcGlass.rotation.y = Math.PI; scene.add
   [-1, 1].forEach((s) => {
     const fin = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), brass);
     fin.position.set(s * 2.5, 9.8, 13.84); scene.add(fin);
-    const cp = new THREE.Mesh(new THREE.PlaneGeometry(0.55, 3.8), new THREE.MeshStandardMaterial({ color: 0x5a1a2a }));
-    cp.position.set(s * 2.3, 7.9, 13.84); cp.rotation.y = Math.PI; scene.add(cp);
-    applyTex(cp, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
+    const cmat2 = new THREE.MeshStandardMaterial({ color: 0x5a1a2a });
+    const cp1 = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 3.8), cmat2);
+    cp1.position.set(s * 2.16, 7.9, 13.87); cp1.rotation.y = Math.PI + s * 0.3; scene.add(cp1);
+    const cp2 = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 3.8), cmat2);
+    cp2.position.set(s * 2.44, 7.9, 13.84); cp2.rotation.y = Math.PI - s * 0.3; scene.add(cp2);
+    applyTex(cp1, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
+    applyTex(cp2, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
   });
 }
 // Continuous carpet (2026-11-11): one red-gold runner the full length of
@@ -598,6 +608,134 @@ colliders.push({ x: 14.6, z: -13.6, r: 0.6, yMin: 5.5 }); // bedroom 2 nightstan
 colliders.push({ x: -4.0, z: 10.85, r: 0.8, yMin: 5.5 }); // bathroom vanity
 colliders.push({ x: -3.0, z: 13.4, r: 0.7, yMin: 5.5 }); // toilet
 colliders.push({ x: -3.7, z: 13.6, r: 0.5, yMin: 5.5 }); // toilet-paper holder (towel rack is covered by the east-wall collider)
+
+// ---- Ballroom visual upgrades (2026-11-17) ----
+// Dance-floor centerpiece, west-wall buffet, balcony guests + tables,
+// gold arch over the north exit door, and candles. Procedural geometry
+// (no real GLBs exist for these pieces). This block is byte-identical in
+// all three ballroom pages — the room is one room, only mission/player
+// logic differs. No colliders on the centerpiece or guests (they must not
+// block movement); the buffet and balcony tables get colliders like the
+// bar and round tables. Two new PointLights total (centerpiece + buffet);
+// balcony candles are emissive only, near the chandeliers.
+{
+  const VGOLD = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.7, roughness: 0.35 });
+  const VBRASS = new THREE.MeshStandardMaterial({ color: 0x8a6b2f, metalness: 0.85, roughness: 0.35 });
+  const VCREAM = new THREE.MeshStandardMaterial({ color: 0xf5ead0, roughness: 0.85 });
+  const VWAX = new THREE.MeshStandardMaterial({ color: 0xfff6dd, roughness: 0.6 });
+  const VFLAME = new THREE.MeshStandardMaterial({ color: 0xffb347, emissive: 0xff9a1f, emissiveIntensity: 2.2 });
+  const VSILVER = new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.8, roughness: 0.3 });
+  const VGLASS = new THREE.MeshStandardMaterial({ color: 0xbfd8ea, transparent: true, opacity: 0.65, roughness: 0.1 });
+  const VFLOWER = [0x8a1a2a, 0xf5ead0, 0xd98a9a].map((c)=>new THREE.MeshStandardMaterial({ color: c, roughness: 0.8 }));
+  function vMesh(geo, mat, x, y, z, ry) {
+    const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
+    if (ry) m.rotation.y = ry; scene.add(m); return m;
+  }
+  function vCandle(x, y, z, h) {
+    // Wax stick standing on the surface at y, flame on top.
+    vMesh(new THREE.CylinderGeometry(0.02, 0.022, h, 10), VWAX, x, y + h / 2, z);
+    const f = vMesh(new THREE.SphereGeometry(0.028, 10, 8), VFLAME, x, y + h + 0.03, z);
+    f.scale.y = 1.5;
+  }
+  function vCandelabra(x, y, z, n) {
+    // Brass stem + foot with n candles in a ring and one tall centre candle.
+    vMesh(new THREE.CylinderGeometry(0.09, 0.06, 0.03, 12), VBRASS, x, y + 0.015, z);
+    vMesh(new THREE.CylinderGeometry(0.02, 0.035, 0.28, 10), VBRASS, x, y + 0.14, z);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + 0.4;
+      vCandle(x + Math.cos(a) * 0.09, y + 0.28, z + Math.sin(a) * 0.09, 0.12);
+    }
+    vCandle(x, y + 0.28, z, 0.16);
+  }
+  function vGuest(x, z, rotY, color, gown) {
+    // Standing guest silhouette, 1.77 m tall on the balcony floor (y=6).
+    // Procedural — the mission guests are real models with lines; these
+    // are decoration only, no names, no talk, no collider (they stand
+    // against the walls, out of the main walkway).
+    const g = new THREE.Group(); g.position.set(x, 6, z); g.rotation.y = rotY; scene.add(g);
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+    const skin = new THREE.MeshStandardMaterial({ color: 0xd9a06b, roughness: 0.7 });
+    const hairM = new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.9 });
+    const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.16, gown ? 0.3 : 0.18, 1.0, 12), mat);
+    lower.position.y = 0.5; g.add(lower);
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.17, 0.55, 12), mat);
+    torso.position.y = 1.25; g.add(torso);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 12), skin);
+    head.position.y = 1.66; g.add(head);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 12), hairM);
+    hair.position.y = 1.7; hair.scale.set(1, 0.85, 1); g.add(hair);
+    return g;
+  }
+  function vBalconyTable(x, z) {
+    // Small round side table + candle on the balcony floor (y=6).
+    cyl(x, 6.03, z, 0.2, 0.22, 0.06, 0x3a2a18);
+    cyl(x, 6.4, z, 0.05, 0.08, 0.7, 0x3a2a18);
+    cyl(x, 6.78, z, 0.35, 0.35, 0.05, 0xf5ead0);
+    vCandle(x, 6.81, z, 0.12);
+    colliders.push({ x, z, r: 0.5, yMin: 5.5 });
+  }
+
+  // 1. Dance-floor centerpiece (0, -1, below the centre chandelier):
+  // low pedestal table with a gold rim, a ring of flowers, and a brass
+  // candelabra. Total height ~0.95 m — below the camera, no collider.
+  cyl(0, 0.2, -1, 0.38, 0.44, 0.4, 0x3a2a18); // pedestal
+  cyl(0, 0.42, -1, 0.46, 0.46, 0.04, 0xc9a227); // gold rim disc
+  cyl(0, 0.455, -1, 0.32, 0.32, 0.03, 0x2a4a22); // green base under the flowers
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    vMesh(new THREE.SphereGeometry(0.055, 10, 8), VFLOWER[i % 3], Math.cos(a) * 0.3, 0.5, -1 + Math.sin(a) * 0.3);
+  }
+  vCandelabra(0, 0.44, -1, 5);
+  const centerLight = new THREE.PointLight(0xffc94d, 15, 10);
+  centerLight.position.set(0, 1.8, -1); scene.add(centerLight);
+
+  // 2. Buffet table, west wall (x -19, z 0..6): dark-wood table with a
+  // cream cloth top + front drape, silver platters, tureens, glasses,
+  // and two candelabras. The west window at z=0 starts at y 1.4, above
+  // the 0.95 m buffet, so the glass is unobstructed; the painting at
+  // z=3.5 hangs above the buffet like a sideboard picture.
+  box(-19.0, 0.45, 3, 0.9, 0.9, 6, 0x4a2c14);
+  box(-19.0, 0.92, 3, 1.0, 0.06, 6.1, 0xf5ead0); // cloth top, slight overhang
+  box(-18.52, 0.48, 3, 0.04, 0.9, 6.05, 0xf5ead0); // cloth front drape
+  [1, 3, 5].forEach((z)=>{
+    cyl(-19.0, 0.98, z, 0.26, 0.26, 0.06, 0xc0c0c0); // silver platter
+    const dome = vMesh(new THREE.SphereGeometry(0.13, 14, 10), VSILVER, -19.0, 1.02, z);
+    dome.scale.y = 0.6;
+  });
+  [2, 4].forEach((z)=>{ // tureens
+    vMesh(new THREE.SphereGeometry(0.13, 14, 10), VCREAM, -19.0, 1.06, z);
+    vMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 10), VBRASS, -19.0, 1.18, z);
+  });
+  [[-18.8, 0.6], [-19.2, 1.6], [-18.8, 2.4], [-19.2, 3.6], [-18.8, 4.6], [-19.2, 5.5]].forEach(([x, z])=>{
+    vMesh(new THREE.CylinderGeometry(0.028, 0.028, 0.13, 10), VGLASS, x, 1.015, z);
+  });
+  vCandelabra(-19.0, 0.95, 0.5, 3);
+  vCandelabra(-19.0, 0.95, 5.5, 3);
+  const buffetLight = new THREE.PointLight(0xffc94d, 12, 8);
+  buffetLight.position.set(-18.2, 2.0, 3); scene.add(buffetLight);
+  colliders.push({ x: -19, z: 1.5, r: 1.4, y: 0 });
+  colliders.push({ x: -19, z: 4.5, r: 1.4, y: 0 });
+
+  // 3. Balcony guests + tables. North balcony guests stand against the
+  // bedroom south walls (z -11.55, inside the wall colliders' zone, so
+  // they never block the walkway); south balcony guests stand against
+  // the south wall. Small round tables with a candle each.
+  vGuest(6.5, -11.55, 0, 0x5a1a2a, true); // burgundy gown, north balcony
+  vGuest(10.5, -11.55, 0, 0x1a1a1a, false); // black tux, north balcony
+  vGuest(-1, 13.4, Math.PI, 0x2a3a5a, true); // navy gown, south balcony
+  vGuest(4, 13.4, Math.PI, 0x3a2a1a, false); // brown tux, south balcony
+  vBalconyTable(15.6, -13.5); // north strip pocket, clear of the walkway step
+  vBalconyTable(2, 12.8); // south balcony
+
+  // 5. Gold arch over the north exit door (x=0 is the door, so a mirror
+  // there would cover the exit — the arch frames it instead): gold
+  // pilasters flanking the door, a lintel, a half-torus arch, keystone.
+  vMesh(new THREE.BoxGeometry(0.3, 3.2, 0.12), VGOLD, -1.65, 1.6, -13.88);
+  vMesh(new THREE.BoxGeometry(0.3, 3.2, 0.12), VGOLD, 1.65, 1.6, -13.88);
+  vMesh(new THREE.BoxGeometry(3.9, 0.3, 0.12), VGOLD, 0, 3.35, -13.88);
+  vMesh(new THREE.TorusGeometry(1.8, 0.1, 8, 32, Math.PI), VGOLD, 0, 3.5, -13.88);
+  vMesh(new THREE.BoxGeometry(0.32, 0.55, 0.16), VGOLD, 0, 5.32, -13.88);
+}
 
 // ---- ActionForge characters: real GLB models + baked clips ----
 // The 5 remaining ActionForge guest GLBs share one 71-joint skeleton, so one set of baked
