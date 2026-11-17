@@ -1519,6 +1519,13 @@ function startReload() {
 let timeScale = 1, timeScaleTarget = 1, lastGunfireT = 0, headshotSlowT = 0;
 const SLOWMO_SCALE = 0.4, SLOWMO_RAMP = 5;
 const BATTLE_RANGE = 25, BATTLE_MIN_GUARDS = 2, BATTLE_SHOT_WINDOW = 3000, HEADSHOT_HOLD = 1.5;
+// Bullet-time takedown cinematic (Kyle's pick 2026-11-16): the takedown
+// killshot is a Max Payne-style bullet-time moment — time drops to 0.25x,
+// the camera swings to a side profile shot, Kyle raises the pistol and
+// fires point-blank, and the guard drops in slow motion. takedownCine is
+// { guard, t, shotFired } while the cinematic runs (real seconds).
+let takedownSlowT = 0, takedownCine = null;
+const TAKEDOWN_SLOWMO = 0.25, TAKEDOWN_CINE_T = 2.2, TAKEDOWN_SHOT_T = 0.5;
 
 // ---------- Real player models (with capsule / box-gun fallbacks) ----------
 // WEAPON SPLIT (user-corrected, standing): unprefixed GLBs are ENEMY
@@ -2935,19 +2942,53 @@ function tryTakedown(){
     // Behind check: guard forward vs direction from guard to player.
     const behind = isBehindGuard(g);
     if (behind && g.state!=='ALERT' && g.meter<80){
-      // Takedown (Kyle's pick 2026-11-14): the player throws the melee_hook
-      // hook punch (0.47 s) instead of the instant silent kill. No real
-      // rear-chokehold clip exists, so the hook is the takedown. The guard
-      // still drops — the hook is the kill.
-      playPlayerOneShot('meleeHook');
-      g.dead=true; g.hp=0; if (g.cone) g.cone.visible=false; if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g);
-      playSfx(pickSfx(SFX_FILES.slashHit));
-      showMsg('Silent takedown — no alarm',1800); return;
+      // Bullet-time killshot (Kyle's pick 2026-11-16): the takedown is a
+      // cinematic slow-mo pistol kill, not the melee_hook punch. Kyle
+      // squares up behind the guard, time drops to bullet time, the
+      // camera swings to a side profile shot, and he fires point-blank.
+      // The pistol is front and centre (hand-bone attached, as in the
+      // Viewer), and the kill stays silent — no alarm, no noiseAlert.
+      startTakedownCine(g);
+      return;
     }
     if (behind){ playSfx(pickSfx(SFX_FILES.slashMiss)); showMsg('Guard is alert — takedown blocked',1400); } else showMsg('Get behind an unaware guard for a takedown',1400);
     return;
   }
   showMsg('No guard in takedown range',1000);
+}
+function startTakedownCine(g){
+  // Face the guard squarely so the pistol points at him, then start the
+  // bullet-time cinematic. The firePistol one-shot raises the pistol;
+  // the shot itself fires at TAKEDOWN_SHOT_T into the cinematic, once
+  // the pistol is up (see the animate loop). Time stays slow for the
+  // full cinematic so the guard drops in slow motion.
+  const dx = g.group.position.x - player.position.x, dz = g.group.position.z - player.position.z;
+  yaw = Math.atan2(-dx, -dz);
+  takedownCine = { guard: g, t: 0, shotFired: false };
+  takedownSlowT = TAKEDOWN_CINE_T;
+  // Fire animation matches the equipped weapon, so the pistol (or rifle)
+  // in his hand is the one he raises — same clip tryShoot uses.
+  playPlayerOneShot(weapon === 'rifle' ? (crouching ? 'fireRifleCrouch' : 'fireRifle') : 'firePistol');
+}
+function fireTakedownShot(g){
+  // Point-blank pistol killshot to the guard's head, in bullet time.
+  // Muzzle flash + tracer + gunshot + blood, and the guard dies. The
+  // kill stays silent for gameplay (no noiseAlert) — it is a stealth
+  // takedown, just a cinematic one.
+  const muzzle = getPlayerMuzzle(_muzzleV);
+  const headPos = g.group.position.clone(); headPos.y += 2.1;
+  const dir = headPos.clone().sub(muzzle).normalize();
+  showMuzzleFlash(muzzle, dir);
+  spawnTracer(muzzle, headPos);
+  playShotSound();
+  spawnBloodMist(headPos);
+  spawnBloodSpatter(headPos);
+  addDecal(new THREE.Vector3(g.group.position.x, 0.02, g.group.position.z), new THREE.Vector3(0, 1, 0), 'blood');
+  g.dead = true; g.hp = 0; if (g.cone) g.cone.visible = false;
+  if (playGuardDeath(g, pickRandomDeath()) === false) tipGuardOver(g);
+  ammoInMag = Math.max(0, ammoInMag - 1); // the killshot spends one round
+  lastGunfireT = performance.now();
+  showMsg('Silent takedown — no alarm', 1800);
 }
 let rollCooldownUntil = 0;
 function tryRoll(){
@@ -3328,13 +3369,27 @@ function animate(){
   // 1.0x. Only the gameplay dt is scaled — weather/sky and the idle
   // orbit keep real-time timing.
   if (headshotSlowT > 0) headshotSlowT -= rawDt;
+  if (takedownSlowT > 0) takedownSlowT -= rawDt;
+  // Bullet-time takedown cinematic: the timer runs on real time (the
+  // gameplay dt is slowed). The shot fires once the pistol is up, then
+  // the cinematic holds until the guard has dropped in slow motion.
+  if (takedownCine){
+    takedownCine.t += rawDt;
+    if (!takedownCine.shotFired && takedownCine.t >= TAKEDOWN_SHOT_T){
+      takedownCine.shotFired = true;
+      fireTakedownShot(takedownCine.guard);
+    }
+    if (takedownCine.t >= TAKEDOWN_CINE_T) takedownCine = null;
+  }
   let nearBattle = false;
   if (now - lastGunfireT < BATTLE_SHOT_WINDOW){
     let near = 0;
     for (const g of guards){ if (!g.dead && g.group.position.distanceTo(player.position) <= BATTLE_RANGE) near++; }
     nearBattle = near >= BATTLE_MIN_GUARDS;
   }
-  timeScaleTarget = (headshotSlowT > 0 || nearBattle) ? SLOWMO_SCALE : 1;
+  // The takedown cinematic uses the deeper bullet-time scale (0.25x);
+  // it wins over the headshot/battle slow-mo while it runs.
+  timeScaleTarget = takedownSlowT > 0 ? TAKEDOWN_SLOWMO : ((headshotSlowT > 0 || nearBattle) ? SLOWMO_SCALE : 1);
   timeScale += (timeScaleTarget - timeScale) * Math.min(1, rawDt * SLOWMO_RAMP);
   if (Math.abs(timeScaleTarget - timeScale) < 0.002) timeScale = timeScaleTarget;
   const dt = rawDt * timeScale;
@@ -3482,15 +3537,28 @@ function animate(){
   // transition makes it a slow ~0.5 s fade), and back in for normal play.
   document.getElementById('cross').style.opacity = orbiting ? '0' : '.85';
   let camPos;
-  if (orbiting) {
+  let camLerp = 0.35, camLook = null;
+  if (takedownCine){
+    // Bullet-time killshot camera: a side profile shot of Kyle and the
+    // guard, 3.5 m out from their midpoint, looking at the midpoint at
+    // chest height. Slow lerp so the camera glides into the shot.
+    const g = takedownCine.guard;
+    const mid = player.position.clone().add(g.group.position).multiplyScalar(0.5);
+    mid.y = player.position.y + 1.5;
+    const fwd = g.group.position.clone().sub(player.position).setY(0).normalize();
+    const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+    camPos = mid.clone().addScaledVector(side, 3.5); camPos.y += 0.6;
+    camLerp = 0.12; camLook = mid;
+  } else if (orbiting) {
     camPos = orbitCamPos(new THREE.Vector3());
   } else {
     camPos = player.position.clone().addScaledVector(back, aiming?2.2:3.4).addScaledVector(right, aiming?0.9:1.1);
     camPos.addScaledVector(right, leanAmt * 0.5); // lean shifts the view sideways to peek
     camPos.y = player.position.y + (crawling?0.9:(crouching?1.6:2.1)) + Math.sin(pitch)*1.2;
   }
-  camera.position.lerp(camPos, 0.35);
-  if (orbiting) camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
+  camera.position.lerp(camPos, camLerp);
+  if (camLook) camera.lookAt(camLook);
+  else if (orbiting) camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
   else camera.lookAt(player.position.x - Math.sin(yaw)*8, player.position.y+1.5+Math.sin(pitch)*8, player.position.z - Math.cos(yaw)*8);
   // No wall between the camera and the player: hide any large obstacle
   // the camera-to-chest ray hits (over-shoulder and orbit alike).
