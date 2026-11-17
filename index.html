@@ -1526,12 +1526,16 @@ const BATTLE_RANGE = 25, BATTLE_MIN_GUARDS = 2, BATTLE_SHOT_WINDOW = 3000, HEADS
 let takedownSlowT = 0, takedownCine = null;
 const TAKEDOWN_SLOWMO = 0.25, TAKEDOWN_CINE_T = 2.2, TAKEDOWN_SHOT_T = 0.5;
 // Rear chokehold takedown (Kyle's pick 2026-11-17, alongside the bullet-
-// time killshot): F / MELEE behind an unaware guard while NOT aiming
-// plays the 3 s sleeper chokehold — Kyle locks the choke, the guard
-// struggles then goes limp, and drops silent. Aiming + F / MELEE keeps
-// the bullet-time pistol killshot. chokeholdTakedown is { guard, t }
-// while the chokehold runs (real seconds); the guard is frozen (AI off,
-// victim clip playing) until the clip ends, then dies and tips over.
+// time killshot): F / MELEE behind an unaware guard plays the 3 s sleeper
+// chokehold — Kyle locks the choke, the guard struggles then goes limp,
+// and drops silent. The bullet-time pistol killshot is the FIRE execution
+// instead: shoot an unaware guard from behind at close range and the
+// cinematic killshot plays rather than a loud shot (see tryShoot). No
+// aim-without-firing is needed on touch — MELEE is the choke, FIRE at
+// an unaware back up close is the killshot. chokeholdTakedown is
+// { guard, t } while the chokehold runs (real seconds); the guard is
+// frozen (AI off, victim clip playing) until the clip ends, then dies
+// and tips over.
 let chokeholdTakedown = null;
 const CHOKEHOLD_T = 3.0;
 
@@ -2869,22 +2873,38 @@ function tryShoot(){
   noteActivity(); // shooting ends any idle orbit
   const now = performance.now();
   if (gameOver || won) return;
+  if (takedownCine || chokeholdTakedown) return; // no shooting mid-takedown
   if (now<reloadUntil) return;
   const w = weapons[weapon];
   if (now-lastShot < w.rate*1000) return;
   // Empty mag: reload starts automatically, no message, no key press.
   if (ammoInMag<=0){ startReload(); return; }
+  // Ray from camera centre, done BEFORE the shot is spent: if the
+  // crosshair is on an unaware guard whose back is to the player at
+  // close range, this is an execution, not a shot — the bullet-time
+  // pistol killshot plays instead (silent, one round spent by the
+  // cinematic itself). No aiming without firing is needed on touch:
+  // FIRE at an unaware guard's back, up close, IS the killshot.
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+  ray.set(camera.position, dir); ray.far = 60;
+  const targets = guards.filter(g=>!g.dead).map(g=>g.group);
+  const hits = ray.intersectObjects(targets, true);
+  if (hits.length){
+    let node = hits[0].object; let g = null;
+    while (node){ g = guards.find(x=>x.group===node); if (g) break; node = node.parent; }
+    if (g && g.state!=='ALERT' && g.meter<80 && isBehindGuard(g) &&
+        g.group.position.distanceTo(player.position) <= 2.8){
+      startTakedownCine(g);
+      return;
+    }
+  }
   lastShot = now; ammoInMag--; lastGunfireT = now; // any shot feeds the battle slow-mo
   if (ammoInMag<=0) startReload(); // the last round fires, then the reload starts on its own
   ejectCasing();
   playShotSound();
   playPlayerOneShot(weapon==='rifle' ? (crouching ? 'fireRifleCrouch' : 'fireRifle') : 'firePistol');
-  // Ray from camera centre. Hitscan: the shot resolves instantly, so the
+  // Hitscan: the shot resolves instantly, so the
   // tracer and the slow-mo carry the anticipation.
-  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-  ray.set(camera.position, dir); ray.far = 60;
-  const targets = guards.filter(g=>!g.dead).map(g=>g.group);
-  const hits = ray.intersectObjects(targets, true);
   let guardHit = false;
   let endPoint = null;
   if (hits.length){
@@ -2955,10 +2975,11 @@ function tryTakedown(){
     // Behind check: guard forward vs direction from guard to player.
     const behind = isBehindGuard(g);
     if (behind && g.state!=='ALERT' && g.meter<80){
-      // Two takedowns (Kyle's pick 2026-11-17): gun up (aiming) = the
-      // bullet-time pistol killshot; gun down = the rear chokehold
-      // (silent sleeper, no shot, no alarm). Both stay silent.
-      if (aiming) startTakedownCine(g); else startChokeholdTakedown(g);
+      // MELEE takedown = rear chokehold (silent sleeper, 3 s). The
+      // bullet-time pistol killshot is the FIRE execution instead: shoot
+      // an unaware guard from behind at close range and it plays the
+      // cinematic killshot rather than a loud shot (see tryShoot).
+      startChokeholdTakedown(g);
       return;
     }
     if (behind){ playSfx(pickSfx(SFX_FILES.slashMiss)); showMsg('Guard is alert — takedown blocked',1400); } else showMsg('Get behind an unaware guard for a takedown',1400);
@@ -3069,13 +3090,15 @@ function tryRoll(){
   playPlayerOneShot('roll');
 }
 // ---------- Stealth: takedown affordance, carry/drop, hiding bodies ----------
-// Takedowns (Kyle's picks): F / MELEE behind an unaware guard. Gun down
-// (not aiming) = rear chokehold (3 s sleeper, v2 clip 2026-11-17); gun up
-// (aiming) = bullet-time pistol killshot. Both silent, no alarm. The
-// chokehold clips (Takedown_Chokehold_Attacker/Victim) are the takedown,
-// not the hook — melee_hook is the melee combo finisher only. The
-// takedown prompt is the TAKE DOWN button's state only (highlighted when
-// a takedown is available) — no text anywhere.
+// Takedowns (Kyle's picks): behind an unaware guard, both silent, no
+// alarm. MELEE (F key / MELEE button) = rear chokehold (3 s sleeper, v2
+// clip 2026-11-17). FIRE at an unaware guard's back up close = bullet-
+// time pistol killshot (the cinematic plays instead of a loud shot).
+// No aim-without-firing needed on touch — the button you press picks
+// the takedown. The chokehold clips (Takedown_Chokehold_Attacker/Victim)
+// are the takedown, not the hook — melee_hook is the melee combo
+// finisher only. The takedown prompt is the TAKE DOWN button's state
+// only (highlighted when a takedown is available) — no text anywhere.
 function isBehindGuard(g){
   const toPlayer = new THREE.Vector3().subVectors(player.position, g.group.position).normalize();
   const fwd = new THREE.Vector3(Math.sin(g.yaw),0,Math.cos(g.yaw));
