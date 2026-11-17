@@ -746,6 +746,19 @@ function addGLBToObstacle(obstacle, path, targetW, targetH, targetD, placements,
   const o = box(x, z, 0.7, 0.7, 0.9, 0x5a6a7a, undefined, { material: 'metal' });
   addGLBToObstacle(o, 'assets/props/barrel.glb', 0.7, 0.9, 0.7);
 });
+// Courtyard extras (2026-11-17, Kyle's "all" visual pass): a trash-bin
+// pair west of the security office, and a second barrel cluster on the
+// olive building's west face. (The two extra lit windows on the blue
+// building's east face are in the lit-windows section below, where
+// litWindow is defined.)
+[[6, -28, 'assets/props/trash_bin_green.glb'], [6.8, -27.2, 'assets/props/trash_bin_blue.glb']].forEach(([x, z, p])=>{
+  const o = box(x, z, 0.6, 0.6, 0.9, 0x2a4a2a, undefined, { material: 'metal' });
+  addGLBToObstacle(o, p, 0.6, 0.9, 0.6);
+});
+[[29, 26], [29, 30]].forEach(([x, z])=>{
+  const o = box(x, z, 0.7, 0.7, 0.9, 0x5a6a7a, undefined, { material: 'metal' });
+  addGLBToObstacle(o, 'assets/props/barrel.glb', 0.7, 0.9, 0.7);
+});
 // Roadblocks: flanking the perimeter, not blocking the EXFIL path — one by
 // the north wall, one by the west wall.
 [[0, -40], [-40, 0]].forEach(([x, z])=>{
@@ -1088,6 +1101,9 @@ function updateSplashes(dt){
   litWindow(-34, 3.5, 12.03, 0); litWindow(-30, 3.5, 12.03, 0);
   // Olive building west face (x=30).
   litWindow(29.97, 3.5, 26, -Math.PI / 2); litWindow(29.97, 3.5, 30, -Math.PI / 2);
+  // Blue building east face (x=5), above the barrel cluster — lights the
+  // office approach (2026-11-17 courtyard extras).
+  litWindow(5.03, 3.5, -32, Math.PI / 2); litWindow(5.03, 3.5, -36, Math.PI / 2);
   // --- Ground debris: rubble chunks on open concrete, visual only —
   // too low to read as cover or an obstacle. Unlit so the light tones
   // show at night. Several placed near the spawn so they read in the
