@@ -949,9 +949,24 @@ for (let i = 0; i < 28; i++) {
 // Ground floor 2 per side + upper floor 1 per side, same warm yellow
 // MeshBasicMaterial style as the courtyard lit windows.
 const wingWinMat = new THREE.MeshBasicMaterial({ color: 0xffc86a });
-[[-24.4, 3], [-32.4, 3], [-28.4, 9.25], [24.4, 3], [32.4, 3], [28.4, 9.25]].forEach(([x, y]) => {
+const wingFrameMat = new THREE.MeshStandardMaterial({ color: 0x4a3520, roughness: 0.7 });
+function framedWingWindow(x, y){
+  // Warm glass, proud 0.06 of the wing face.
   const w = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 2.0), wingWinMat);
-  w.position.set(x, y, 20.06); scene.add(w); // faces +z (south, toward the drive)
+  w.position.set(x, y, 20.06); scene.add(w);
+  // Dark bronze frame around the glass (proud of it, so the glow reads
+  // as a window, not a flat panel): top/bottom/left/right bars.
+  const fb = (bw, bh, bx, by, bz)=>{ const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, 0.06), wingFrameMat); b.position.set(bx, by, bz); scene.add(b); };
+  fb(1.76, 0.08, x, y + 1.04, 20.09); fb(1.76, 0.08, x, y - 1.04, 20.09);
+  fb(0.08, 2.0, x - 0.84, y, 20.09); fb(0.08, 2.0, x + 0.84, y, 20.09);
+  // Mullions: one vertical + one horizontal bar across the glass.
+  fb(0.05, 2.0, x, y, 20.08); fb(1.6, 0.05, x, y, 20.08);
+  // Sill: slightly wider, sticks out from the wall.
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(1.84, 0.08, 0.14), wingFrameMat);
+  sill.position.set(x, y - 1.08, 20.10); scene.add(sill);
+}
+[[-24.4, 3], [-32.4, 3], [-28.4, 9.25], [24.4, 3], [32.4, 3], [28.4, 9.25]].forEach(([x, y]) => {
+  framedWingWindow(x, y); // faces +z (south, toward the drive)
 });
 // 6. Flower beds + standalone trees. Beds sit on the lawn at the drive
 // corners, clear of the drive (r 13), the cars, the lamps, and the road.
