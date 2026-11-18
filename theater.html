@@ -514,17 +514,20 @@ makeSetFlat(-9.5, -5, 0.3); makeSetFlat(9.5, -5, -0.3);
 // ---- Heavy main curtain (droppable upstage drape) ----
 // curtain.glb (red velvet drape, 1.52 x 2.37 m; scale 3.0 -> ~4.6 x 7.1 m
 // per copy). One copy is only ~1/5 of the 24 m stage width, so the drape
-// is 5 copies side by side (spacing 4.56 m, centres -9.12..9.12, span
-// -11.4..11.4) to fill the proscenium. Repeating keeps the pleats
+// is 4 copies side by side (spacing 4.56 m, centres -9.12, -4.56, 4.56,
+// 9.12 — the centre copy is LEFT OUT on purpose, so the painted backdrop
+// shows through a 4.6 m gap in the middle of the drape instead of being
+// hidden behind a solid red wall). Repeating keeps the pleats
 // unstretched; a non-uniform scale would stretch them. Origin is
 // centred, so each copy is raised by half its scaled height to hang from
-// the floor up. All 5 copies live in the same inner group, so the whole
+// the floor up. All 4 copies live in the same inner group, so the whole
 // drape topples forward (+z, onto enemies in front) as one unit when cut.
 const drapeOuter = new THREE.Group();
 drapeOuter.position.set(0, STAGE_TOP, -5.8); scene.add(drapeOuter);
 const drape = new THREE.Group();
 drapeOuter.add(drape);
 for (let i = 0; i < 5; i++) {
+  if (i === 2) continue; // centre copy omitted — backdrop shows through
   const cx = -9.12 + i * 4.56;
   gltfLoader.load('assets/theater/models/curtain.glb', (gltf) => {
     const m = gltf.scene;
@@ -534,10 +537,12 @@ for (let i = 0; i < 5; i++) {
   }, undefined, () => {});
 }
 const drapeState = { x: 0, z: -5.8, dropped: false, fallT: 0, used: false };
-// The drape spans x -11.4..11.4 (5 copies, centres -9.12..9.12, each
-// ~4.56 m wide). Its slash trigger and defeat must work along the whole
-// width, not just at the centre — otherwise enemies at the far edges are
-// never caught. DRAPE_HALF_W is that half-width; the helpers below use it.
+// The drape spans x -11.4..-2.28 and 2.28..11.4 (4 copies, centres
+// -9.12, -4.56, 4.56, 9.12, each ~4.56 m wide, with a 4.56 m gap in the
+// centre for the backdrop). Its slash trigger and defeat must work along
+// the whole width, not just at the centre — otherwise enemies at the far
+// edges are never caught. DRAPE_HALF_W is that half-width; the helpers
+// below use it.
 const DRAPE_HALF_W = 11.4;
 function enemiesNearDrape(r) {
   // Enemies within r of the drape segment (x -11.4..11.4 at z = the
@@ -549,7 +554,9 @@ function enemiesNearDrape(r) {
     return Math.hypot(e.x - cx, e.z - (drapeState.z + 1)) < r;
   });
 }
-colliders.push({ x: 0, z: -5.8, r: 1.0 });
+// Colliders for the drape side panels (the centre is open for the
+// backdrop, so no collider there — the player can walk through the gap).
+[-9.12, -4.56, 4.56, 9.12].forEach((cx) => colliders.push({ x: cx, z: -5.8, r: 1.5 }));
 
 // ---- Stage set (2026-11-17 visual pass): painted backdrop + set
 // pieces, revealed when the main curtain opens. All procedural — no
