@@ -577,9 +577,11 @@ const backdropTex = canvasTex(1024, 288, (ctx, w, h) => {
     const sx = Math.random() * w, sy = Math.random() * h * 0.4;
     ctx.fillRect(sx, sy, 2, 2);
   }
-  // Moon: larger, with a stronger glow.
-  ctx.fillStyle = '#f5e8c8'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.18, 28, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(245,232,200,0.35)'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.18, 46, 0, Math.PI * 2); ctx.fill();
+  // Moon: larger, with a stronger glow. Centred (w*0.5) so it shows
+  // through the gap in the upstage drape — at w*0.78 it sat behind the
+  // right drape panel and was invisible from the house.
+  ctx.fillStyle = '#f5e8c8'; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.18, 28, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(245,232,200,0.35)'; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.18, 46, 0, Math.PI * 2); ctx.fill();
   // Far skyline (lighter, hazier) then near skyline (darker).
   ctx.fillStyle = '#3a3050';
   [[0, 90, 70, 60], [80, 70, 60, 90], [170, 100, 80, 50], [280, 60, 55, 100], [360, 110, 90, 40], [470, 80, 60, 80], [560, 100, 70, 55], [660, 70, 60, 95], [750, 105, 85, 45], [860, 85, 65, 85], [950, 95, 74, 60]].forEach(([x, bw, bh, top]) => {
