@@ -170,21 +170,22 @@ function updateWallOcclusion() {
 }
 flatPlane(0, 10, 10, 28, 40, 0x2a3a3a, TEX + 'theater_ceiling_1024.webp', 6, 8, Math.PI / 2);
 // Sconces (glowing fixtures, no extra lights) on the house side walls.
-// 2026-11-18 fix: the first version read as nothing — the brackets were
-// small dark gold and the flames tiny (r 0.07) against the dark red walls.
-// Now each sconce has a visible gold backplate, a larger bracket, a
-// bigger brighter flame, and a soft glow halo so it reads from the house.
+// 2026-11-18 fix, round 2: the first fix still did not read on camera —
+// the checker's zoomed shots of both side walls showed bare wallpaper.
+// So the sconces are now much bigger and brighter: a tall backplate,
+// a chunky bracket, a large flame, and a wide glow halo. If these still
+// do not read, the problem is placement/camera, not size.
 [[-13.9, 10], [-13.9, 18], [-13.9, 26], [13.9, 10], [13.9, 18], [13.9, 26]].forEach(([x, z]) => {
-  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.9, 0.5), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0x664411, emissiveIntensity: 0.6 }));
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.8), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0x664411, emissiveIntensity: 0.8 }));
   plate.position.set(x, 3, z); scene.add(plate);
-  const s = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.7, 0.35), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xffc94d, emissiveIntensity: 1.2 }));
+  const s = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.45), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xffc94d, emissiveIntensity: 1.5 }));
   s.position.set(x, 3, z); scene.add(s);
-  // Warm flame: bigger and brighter than the first pass.
-  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.14, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffaa00, emissiveIntensity: 3.0 }));
-  flame.position.set(x, 3.45, z); scene.add(flame);
-  // Soft glow halo around the flame so the sconce reads across the house.
-  const halo = new THREE.Mesh(new THREE.SphereGeometry(0.38, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.22, depthWrite: false }));
-  halo.position.set(x, 3.45, z); scene.add(halo);
+  // Warm flame: large and bright.
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffaa00, emissiveIntensity: 4.0 }));
+  flame.position.set(x, 3.55, z); scene.add(flame);
+  // Wide glow halo around the flame so the sconce reads across the house.
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 10), new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.35, depthWrite: false }));
+  halo.position.set(x, 3.55, z); scene.add(halo);
 });
 // ---- Theater visual pass (2026-11-17): playbills, box-seat curtains,
 // aisle lights. Procedural dressing — no real GLBs exist for these.
