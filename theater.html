@@ -509,7 +509,7 @@ function makeSetFlat(x, z, rotY) {
   const flat = { x, z, mesh: inner, toppled: false, fallT: 0, used: false };
   setFlats.push(flat); colliders.push({ x, z, r: 1.5 }); return flat;
 }
-makeSetFlat(-8, -5, 0.3); makeSetFlat(8, -5, -0.3);
+makeSetFlat(-9.5, -5, 0.3); makeSetFlat(9.5, -5, -0.3);
 
 // ---- Heavy main curtain (droppable upstage drape) ----
 // curtain.glb (red velvet drape, 1.52 x 2.37 m; scale 3.0 -> ~4.6 x 7.1 m
@@ -559,31 +559,44 @@ colliders.push({ x: 0, z: -5.8, r: 1.0 });
 // Painted backdrop: a dusk city skyline — indigo gradient sky, moon,
 // dark building silhouettes with a few lit windows, rooftop band.
 const backdropTex = canvasTex(1024, 288, (ctx, w, h) => {
+  // Dusk sky: deep violet at the top, magenta mid, warm orange at the
+  // horizon — a painted sunset, not a black void.
   const sky = ctx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, '#1a2340'); sky.addColorStop(0.55, '#3a2a4a'); sky.addColorStop(0.8, '#8a4a3a'); sky.addColorStop(1, '#2a1a24');
+  sky.addColorStop(0, '#2a1a4a'); sky.addColorStop(0.45, '#6a3a5a'); sky.addColorStop(0.72, '#c96a3a'); sky.addColorStop(0.88, '#8a4a3a'); sky.addColorStop(1, '#3a1a2a');
   ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = '#e8dcc0'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.2, 22, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(232,220,192,0.25)'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.2, 34, 0, Math.PI * 2); ctx.fill();
+  // Stars in the upper sky.
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  for (let i = 0; i < 60; i++) {
+    const sx = Math.random() * w, sy = Math.random() * h * 0.4;
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+  // Moon: larger, with a stronger glow.
+  ctx.fillStyle = '#f5e8c8'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.18, 28, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(245,232,200,0.35)'; ctx.beginPath(); ctx.arc(w * 0.78, h * 0.18, 46, 0, Math.PI * 2); ctx.fill();
   // Far skyline (lighter, hazier) then near skyline (darker).
-  ctx.fillStyle = '#2a2440';
+  ctx.fillStyle = '#3a3050';
   [[0, 90, 70, 60], [80, 70, 60, 90], [170, 100, 80, 50], [280, 60, 55, 100], [360, 110, 90, 40], [470, 80, 60, 80], [560, 100, 70, 55], [660, 70, 60, 95], [750, 105, 85, 45], [860, 85, 65, 85], [950, 95, 74, 60]].forEach(([x, bw, bh, top]) => {
     ctx.fillRect(x, h - top - bh, bw, bh + top);
   });
-  ctx.fillStyle = '#14101e';
+  ctx.fillStyle = '#1e1828';
   [[20, 110, 60, 40], [130, 80, 90, 70], [230, 120, 70, 30], [370, 90, 100, 60], [480, 130, 80, 40], [630, 100, 110, 55], [750, 140, 90, 35], [900, 110, 80, 50]].forEach(([x, bw, bh, top]) => {
     ctx.fillRect(x, h - top - bh, bw, bh + top);
   });
-  // A few lit windows in the near skyline.
-  ctx.fillStyle = '#ffd97a';
-  for (let i = 0; i < 40; i++) {
+  // Lit windows in the near skyline — more of them, bigger, warmer.
+  ctx.fillStyle = '#ffdd88';
+  for (let i = 0; i < 80; i++) {
     const wx = 20 + Math.random() * 980, wy = h - 60 - Math.random() * 110;
-    ctx.fillRect(wx, wy, 5, 7);
+    ctx.fillRect(wx, wy, 6, 8);
   }
-  // Rooftop/hedge band along the bottom.
+  // Rooftop/hedge band along the bottom, with a few chimneys.
   ctx.fillStyle = '#0e0a14'; ctx.fillRect(0, h - 28, w, 28);
+  ctx.fillStyle = '#0e0a14';
+  [[60, 18, 22], [300, 14, 26], [620, 16, 20], [880, 20, 24]].forEach(([x, cw, ch]) => {
+    ctx.fillRect(x, h - 28 - ch, cw, ch);
+  });
 });
-const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(22, 6.1), new THREE.MeshBasicMaterial({ map: backdropTex }));
-backdrop.position.set(0, STAGE_TOP + 3.05, -9.7); scene.add(backdrop);
+const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(23, 6.5), new THREE.MeshBasicMaterial({ map: backdropTex }));
+backdrop.position.set(0, STAGE_TOP + 3.25, -9.7); scene.add(backdrop);
 // Fake columns (fluted look via a plain shaft + gold capital/base) at
 // the upstage sides.
 [-11, 11].forEach((x) => {
