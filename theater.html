@@ -179,6 +179,11 @@ flatPlane(0, 10, 10, 28, 40, 0x2a3a3a, TEX + 'theater_ceiling_1024.webp', 6, 8, 
 // deeper. If these read, the fix is to re-mount them on short arms;
 // if they still do not read, the sconce meshes are not rendering at all.
 [[-13.0, 10], [-13.0, 18], [-13.0, 26], [13.0, 10], [13.0, 18], [13.0, 26]].forEach(([x, z]) => {
+  // Mounting arm: connects the backplate to the wall so the off-wall
+  // position reads as a fixture on an arm, not a floating object.
+  const armX = x < 0 ? -13.5 : 13.5;
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.08, 0.08), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0x664411, emissiveIntensity: 0.6 }));
+  arm.position.set(armX, 2.5, z); scene.add(arm);
   const plate = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.3, 0.8), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0x664411, emissiveIntensity: 0.8 }));
   plate.position.set(x, 2.5, z); scene.add(plate);
   const s = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.45), new THREE.MeshStandardMaterial({ color: 0xc9a227, emissive: 0xffc94d, emissiveIntensity: 1.5 }));
