@@ -751,8 +751,8 @@ colliders.push({ x: -3.7, z: 13.6, r: 0.5, yMin: 5.5 }); // toilet-paper holder 
 // Kyle's mission starts outside. Ground is 1.5 m below the ballroom floor,
 // so a 6-step flight climbs from the drive to the double doors.
 // Bushes and mansion wings are procedural geometry (no bush model was
-// supplied for these); both Lamborghinis in the drive are the real repo GLB
-// (the black one is the white model with its paint tinted black at load).
+// supplied for these); both Lamborghinis in the drive are real repo GLBs
+// (the black one is Kyle's own black_lambo.glb, provided 2026-11-18).
 flatPlane(0, -1.5, 42, 80, 70, 0x2e5a2e, 'assets/textures/exterior/exterior_lawn_grass_clover_1024.webp', 8, 7); // lawn, extended south past the new road
 const driveMesh = cyl(0, -1.48, 32, 13, 13, 0.1, 0x333333); // round drive
 applyTex(driveMesh, 'assets/textures/exterior/exterior_drive_asphalt_1024.webp', 4, 4);
@@ -1096,15 +1096,17 @@ gltfLoader.load('assets/vehicles/white_lambo.glb', (gltf) => {
   g.position.set(11, -0.9, 32); g.rotation.y = 0.4; scene.add(g);
   colliders.push({ x: 11, z: 32, r: 2.8 });
 }, undefined, () => {});
-// Black Lamborghini, west curb of the round drive — the same real repo GLB
-// loaded a second time, with its paint tinted black at load. The model is a
-// single textured mesh (paint baked into its texture), so the tint is a
-// near-black material color multiplied over the texture; no black_lambo.glb
-// exists and none was created — this is a paint job on the real model, not a
-// procedural car. The material is cloned so the white one stays white.
-gltfLoader.load('assets/vehicles/white_lambo.glb', (gltf) => {
+// Black Lamborghini, west curb of the round drive — Kyle's own real repo
+// GLB (black_lambo.glb, provided 2026-11-18; replaces the old tinted
+// white_lambo, which read as a featureless black blob). Single textured
+// mesh, black paint baked into its texture (avg RGB ~21,20,18). Same
+// metalness fix as the white Lambo / sedan / SUV: metalness 1.0 with no
+// env map reflects nothing, so the paint reads black — lower it so the
+// black paint gets diffuse light and the body lines, headlights, and
+// gold accents read. Nose at +Z (same as the white Lambo).
+gltfLoader.load('assets/vehicles/black_lambo.glb', (gltf) => {
   const g = fitPropGroup(gltf.scene, 2.0, 1.2, 4.5); if (!g) return;
-  g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.color.setHex(0x111111); } });
+  g.traverse((o) => { if (o.isMesh) { o.material.metalness = 0; o.material.roughness = 0.55; } });
   g.position.set(-11, -0.9, 32); g.rotation.y = Math.PI; scene.add(g); // facing north, like the red sedan it replaces
   colliders.push({ x: -11, z: 32, r: 2.8 });
 }, undefined, () => {});
