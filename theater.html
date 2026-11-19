@@ -427,7 +427,7 @@ makeSandbag(-6, -2); makeSandbag(6, -2); makeSandbag(-6, 3); makeSandbag(6, 3);
 
 // ---- Chandelier (droppable) ----
 // Hangs over the stage at (0, 7, -2). A rope runs from it down to a cleat
-// on the stage floor (3, 0.9, -5) — slash near the cleat to cut the rope
+// on the stage floor (1, 0.9, -3.5) — slash near the cleat to cut the rope
 // and drop the chandelier on whoever is underneath.
 // buildChandelier (2026-11-17 visual pass): the fixture itself — chain,
 // column, gold ring, 8 arms with candle cups + candles + flames, crystal
@@ -471,14 +471,20 @@ const chandelier = { x: 0, z: -2, y: 7, dropped: false, falling: false, vy: 0, u
   const g = chandelier.group;
   g.position.set(chandelier.x, chandelier.y, chandelier.z); scene.add(g);
   const chLight = new THREE.PointLight(0xffc94d, 25, 15); chLight.position.set(0, -0.3, 0); g.add(chLight);
-  // The drop rope: from the chandelier down to a cleat at the stage edge.
-  const ropeLen = Math.hypot(3 - 0, 5 - 2, 7 - STAGE_TOP);
+  // The drop rope: from the chandelier down to a cleat close by on the
+  // stage floor (1, 0.9, -3.5) — slash near the cleat to cut the rope
+  // and drop the chandelier. The cleat sits close to the chandelier so
+  // the rope is short and steep: the old cleat at (3, -5) sent the rope
+  // angling down-right across the frame, where it visually crossed a
+  // spotlight cone (2026-11-17 check). A short rope hugs the chandelier
+  // and stays clear of the beams.
+  const ropeLen = Math.hypot(1 - 0, 3.5 - 2, 7 - STAGE_TOP);
   const dropRope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, ropeLen, 8), new THREE.MeshStandardMaterial({ color: 0x8a6b3a }));
-  dropRope.position.set(1.5, (7 + STAGE_TOP) / 2, -3.5);
-  dropRope.rotation.z = Math.atan2(3 - 0, 7 - STAGE_TOP); dropRope.rotation.x = -Math.atan2(-5 - -2, 7 - STAGE_TOP);
+  dropRope.position.set(0.5, (7 + STAGE_TOP) / 2, -2.75);
+  dropRope.rotation.z = Math.atan2(1 - 0, 7 - STAGE_TOP); dropRope.rotation.x = -Math.atan2(-3.5 - -2, 7 - STAGE_TOP);
   scene.add(dropRope); chandelier.rope = dropRope;
-  chandelier.cleat = { x: 3, z: -5 };
-  colliders.push({ x: 3, z: -5, r: 0.5 });
+  chandelier.cleat = { x: 1, z: -3.5 };
+  colliders.push({ x: 1, z: -3.5, r: 0.5 });
 }
 // Second chandelier (2026-11-17 visual pass): same fixture, static (no
 // rope, no drop), over the centre of the audience area at (0, 7, 18) —
