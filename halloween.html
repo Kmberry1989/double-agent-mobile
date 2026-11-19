@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
+<title>Double Agent — Trick or Treat</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a0612;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  canvas{display:block}
+  #overlay,#win,#fail{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,4,14,.88);z-index:10;text-align:center;padding:20px}
+  #win,#fail{display:none}
+  button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#ff8c1a;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
+  a{color:#ffb45e}
+  .levels{position:fixed;top:10px;right:10px;z-index:11;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:46vw}
+  .levels a{background:rgba(0,0,0,.55);border:1px solid #8a6b3a;color:#ffb45e;border-radius:8px;padding:6px 10px;font-size:13px;text-decoration:none}
+  .levels a.cur{opacity:.45;pointer-events:none}
+  #mission{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5;max-width:min(480px,92vw)}
+  #mission b{color:#ffb45e}
+  #tagStatus{color:#ffb45e;min-height:1.2em}
+  #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5;touch-action:none}
+  #knob{position:absolute;left:37px;top:37px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.45)}
+  body.touch #joy{display:block}
+  #tagBtn{position:fixed;right:18px;bottom:24px;width:92px;height:92px;border-radius:50%;background:rgba(255,140,26,.85);border:2px solid rgba(255,255,255,.4);color:#111;font-size:17px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
+  body.touch #tagBtn{display:block}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html" class="cur" aria-current="page">Halloween</a></nav>
+<div id="mission"><b>Terrorists stopped:</b> <span id="stopCount">0 / 5</span><div id="tagStatus"></div></div>
+<div id="joy"><div id="knob"></div></div>
+<button id="tagBtn">TAG</button>
+<div id="overlay"><h1>Trick or Treat</h1><button id="startBtn">Enter the neighborhood</button></div>
+<div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
+<div id="fail"><h1>Mission failed</h1><p id="failText"></p><button onclick="location.reload()">Try again</button></div>
+<script type="module">
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+const gltfLoader = new GLTFLoader();
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+gltfLoader.setDRACOLoader(dracoLoader);
+const fbxLoader = new FBXLoader();
+const texLoader = new THREE.TextureLoader();
+
+// ---- Layout ----
+// Residential street, Halloween night. The street runs north-south along
+// Z: south end z=+60 (spawn), north end z=-60 (EXFIL). Street x -6..6,
+// sidewalks x +-6..9, front yards x +-9..21, houses at x=+-16 facing the
+// street. Ground is flat (y=0) everywhere the player walks.
+const CHAR_LIFT = 0.05;
+const STREET = { xMin: -20, xMax: 20, zMin: -58, zMax: 58 };
+const EXFIL = { x: 0, z: -56, r: 2.5 };
+const TAG_RANGE = 2.5;
+const TERRORIST_COUNT = 5;
+// Houses: [x, z] — west side x=-16 (front faces +X), east side x=+16
+// (front faces -X). Door is on the street-facing side at x=+-11.
+const HOUSES = [
+  { x: -16, z: -42 }, { x: -16, z: -14 }, { x: -16, z: 14 }, { x: -16, z: 42 },
+  { x: 16, z: -28 }, { x: 16, z: 0 }, { x: 16, z: 28 }, { x: 16, z: 56 },
+];
+// The target house for the attack — the last terrorist (witch) converges
+// on its front yard. East side, z=0.
+const TARGET_HOUSE = { x: 16, z: 0 };
+const DOORS_WEST = HOUSES.filter(h => h.x < 0).map(h => ({ x: -11, z: h.z }));
+const DOORS_EAST = HOUSES.filter(h => h.x > 0).map(h => ({ x: 11, z: h.z }));
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050810);
+scene.fog = new THREE.Fog(0x050810, 35, 130);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 300);
+scene.add(new THREE.AmbientLight(0x8a7ab0, 0.35));
+scene.add(new THREE.HemisphereLight(0x3a4a6a, 0x1a1210, 0.4));
+const moonLight = new THREE.DirectionalLight(0xbfd0ff, 0.5);
+moonLight.position.set(40, 60, -80);
+scene.add(moonLight);
+
+function applyTex(mesh, path, rx, ry) {
+  texLoader.load(path, (tex) => {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(rx, ry); tex.colorSpace = THREE.SRGBColorSpace;
+    mesh.material.map = tex; mesh.material.color.setHex(0xffffff); mesh.material.needsUpdate = true;
+  }, undefined, () => {});
+}
+function flatPlane(x, y, z, w, d, color, path, rx, ry, rotX) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color }));
+  m.rotation.x = rotX === undefined ? -Math.PI / 2 : rotX; m.position.set(x, y, z); m.receiveShadow = true; scene.add(m);
+  if (path) applyTex(m, path, rx, ry); return m;
+}
+function box(x, y, z, w, h, d, color) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color }));
+  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
+}
+function canvasTex(w, h, draw) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+// Fit a loaded GLB prop to a target box (non-uniform, like the courtyard's
+// fitPropChild): scales to the target W/H/D and recentres on its bbox
+// centre, so the returned object sits with its centre at the origin.
+function fitProp(obj, targetW, targetH, targetD) {
+  obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  obj.updateMatrixWorld(true);
+  let bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
+  if (!size.x || !size.y || !size.z) return null;
+  obj.scale.set(targetW / size.x, targetH / size.y, targetD / size.z);
+  bb = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); bb.getCenter(c);
+  obj.position.set(-c.x, -c.y, -c.z);
+  return obj;
+}
+function loadProp(path, x, y, z, tw, th, td, rotY, onLoad) {
+  gltfLoader.load(path, (gltf) => {
+    const m = fitProp(gltf.scene, tw, th, td); if (!m) return;
+    const holder = new THREE.Group();
+    holder.add(m);
+    holder.position.set(x, y, z);
+    if (rotY) holder.rotation.y = rotY;
+    scene.add(holder);
+    if (onLoad) onLoad(holder, m);
+  }, undefined, () => {});
+}
+const colliders = [];
+
+// ---- Sky: moon + stars ----
+// Moon: a bright disc sprite with a soft glow, high in the north sky.
+const moonTex = canvasTex(256, 256, (g) => {
+  const grad = g.createRadialGradient(128, 128, 20, 128, 128, 128);
+  grad.addColorStop(0, 'rgba(255,246,220,1)');
+  grad.addColorStop(0.35, 'rgba(255,240,200,0.95)');
+  grad.addColorStop(0.5, 'rgba(255,240,200,0.25)');
+  grad.addColorStop(1, 'rgba(255,240,200,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
+});
+const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonTex, transparent: true, depthWrite: false, fog: false }));
+moon.scale.set(26, 26, 1); moon.position.set(35, 58, -110); scene.add(moon);
+// Stars: small points scattered on a dome overhead.
+(function makeStars() {
+  const n = 350, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, e = 0.15 + Math.random() * 1.3, r = 160;
+    pos[i * 3] = Math.cos(a) * Math.cos(e) * r;
+    pos[i * 3 + 1] = Math.sin(e) * r;
+    pos[i * 3 + 2] = Math.sin(a) * Math.cos(e) * r;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xdde6ff, size: 1.4, sizeAttenuation: false, fog: false }));
+  scene.add(stars);
+})();
+
+// ---- Ground: street, sidewalks, yards ----
+// Base slab under everything (dark), then the street, sidewalks, yards.
+flatPlane(0, 0, 0, 60, 140, 0x1a1a20);
+flatPlane(0, 0.01, 0, 12, 120, 0x2a2a2e, 'assets/textures/ground/ground_asphalt_1024.webp', 3, 24);
+flatPlane(-7.5, 0.02, 0, 3, 120, 0x55555a);
+flatPlane(7.5, 0.02, 0, 3, 120, 0x55555a);
+flatPlane(-15, 0.015, 0, 12, 120, 0x1e2a1a, 'assets/textures/ground/ground_grass_1024.webp', 4, 24);
+flatPlane(15, 0.015, 0, 12, 120, 0x1e2a1a, 'assets/textures/ground/ground_grass_1024.webp', 4, 24);
+// Centre line: yellow dashes down the middle of the street.
+for (let z = -58; z <= 58; z += 6) {
+  const dash = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 3), new THREE.MeshBasicMaterial({ color: 0xc9a227 }));
+  dash.rotation.x = -Math.PI / 2; dash.position.set(0, 0.03, z); scene.add(dash);
+}
+
+// ---- Houses + porches ----
+// The Victorian Halloween house GLB faces glTF +Z (verified by a Blender
+// render: porch, steps and lit door are on the +Z side). West houses face
+// +X (rotY PI/2), east houses face -X (rotY -PI/2). House is fitted to
+// 10 wide x 8.5 tall x 10 deep; the group sits with the house base at y=0
+// and the front door on the street side at x=+-11.
+const PUMPKIN_VARIANTS = [
+  'pumpkin_jackolantern.glb', 'pumpkin_jackolantern_angry.glb',
+  'pumpkin_jackolantern_big_grin.glb', 'pumpkin_jackolantern_lopsided.glb',
+  'pumpkin_jackolantern_skull.glb', 'pumpkin_jackolantern_squat.glb',
+  'pumpkin_jackolantern_vines.glb', 'pumpkin_jackolantern_warty_grin.glb',
+];
+const porchMat = new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffb45e, emissiveIntensity: 1.8 });
+const poolMat = new THREE.MeshBasicMaterial({ color: 0xffb45e, transparent: true, opacity: 0.16, depthWrite: false });
+HOUSES.forEach((h, hi) => {
+  const rotY = h.x < 0 ? Math.PI / 2 : -Math.PI / 2;
+  const doorX = h.x < 0 ? -11 : 11;
+  loadProp('assets/props/house_victorian_halloween.glb', h.x, 0, h.z, 10, 8.5, 10, rotY);
+  colliders.push({ x: h.x, z: h.z, r: 5.5 });
+  // Porch light: warm bulb + PointLight at the door, and a light pool on
+  // the ground in front of it. The pools are the bright spots terrorists
+  // stay out of — they walk the dark street instead.
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), porchMat);
+  bulb.position.set(doorX, 2.6, h.z); scene.add(bulb);
+  const pl = new THREE.PointLight(0xffb45e, 12, 11); pl.position.set(doorX, 2.6, h.z); scene.add(pl);
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(2.6, 24), poolMat);
+  pool.rotation.x = -Math.PI / 2; pool.position.set(doorX + (h.x < 0 ? 1.2 : -1.2), 0.04, h.z); scene.add(pool);
+  // Doormat in front of the door.
+  loadProp('assets/props/doormat_halloween.glb', doorX + (h.x < 0 ? 0.8 : -0.8), 0.03, h.z, 1.1, 0.12, 1.4, rotY);
+  // Jack-o'-lantern on the porch, to one side of the door. The face
+  // reads as glowing: the whole pumpkin gets a warm emissive so it
+  // glows in the dark.
+  const pumpFile = PUMPKIN_VARIANTS[hi % PUMPKIN_VARIANTS.length];
+  loadProp('assets/props/' + pumpFile, doorX + (h.x < 0 ? 0.7 : -0.7), 0.03, h.z + (hi % 2 ? 1.3 : -1.3), 0.55, 0.5, 0.55, Math.random() * Math.PI, (holder, m) => {
+    m.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0xff7a1a); o.material.emissiveIntensity = 0.7; } });
+  });
+});
+// Yard dressing, spread across the yards so no two neighbouring houses
+// repeat the same prop.
+loadProp('assets/props/cauldron_black.glb', -13.5, 0, -30, 1.0, 0.85, 0.9, 0.6);
+loadProp('assets/props/cauldron_black.glb', 13.5, 0, 20, 1.0, 0.85, 0.9, 2.2);
+loadProp('assets/props/ghost_sheet.glb', -13, 0, 2, 1.0, 1.6, 0.6, 0.4);
+loadProp('assets/props/ghost_sheet.glb', 13, 0, -18, 1.0, 1.6, 0.6, -0.7);
+loadProp('assets/props/cobweb_tattered.glb', -10.9, 1.6, -14, 1.6, 1.0, 0.3, Math.PI / 2);
+loadProp('assets/props/cobweb_tattered.glb', 10.9, 1.6, 28, 1.6, 1.0, 0.3, -Math.PI / 2);
+loadProp('assets/props/broom_witch.glb', -10.6, 0, 14, 0.35, 1.3, 0.35, 0.3);
+loadProp('assets/props/broom_witch.glb', 10.6, 0, -28, 0.35, 1.3, 0.35, -0.4);
+loadProp('assets/props/cat_black_halloween.glb', -12.5, 0, 30, 0.4, 0.6, 0.5, 1.2);
+loadProp('assets/props/cat_black_halloween.glb', 12.5, 0, -42, 0.4, 0.6, 0.5, -0.8);
+// Street lamps along the sidewalks: tall lanterns, emissive, two with a
+// real light so the street has dim pools between the porch lights.
+[-40, -20, 0, 20, 40].forEach((z, i) => {
+  const x = i % 2 ? -7.5 : 7.5;
+  loadProp('assets/props/lantern_tall.glb', x, 0, z, 0.6, 1.6, 0.6, 0, (holder, m) => {
+    m.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0xffc46b); o.material.emissiveIntensity = 0.8; } });
+  });
+});
+[[-7.5, -20], [7.5, 20]].forEach(([x, z]) => {
+  const l = new THREE.PointLight(0xffc46b, 8, 10); l.position.set(x, 1.8, z); scene.add(l);
+});
+
+// ---- EXFIL: green glowing gate at the north end of the street ----
+// Inert until all 5 terrorists are stopped, then it brightens. Walking
+// into it with all 5 stopped wins the mission.
+const exfilGroup = new THREE.Group();
+exfilGroup.position.set(EXFIL.x, 0, EXFIL.z);
+scene.add(exfilGroup);
+const exfilRing = new THREE.Mesh(new THREE.RingGeometry(1.6, 2.2, 32),
+  new THREE.MeshBasicMaterial({ color: 0x33ff66, transparent: true, opacity: 0.35, side: THREE.DoubleSide }));
+exfilRing.rotation.x = -Math.PI / 2; exfilRing.position.y = 0.05; exfilGroup.add(exfilRing);
+const exfilDisc = new THREE.Mesh(new THREE.CircleGeometry(1.6, 32),
+  new THREE.MeshBasicMaterial({ color: 0x33ff66, transparent: true, opacity: 0.12, depthWrite: false }));
+exfilDisc.rotation.x = -Math.PI / 2; exfilDisc.position.y = 0.04; exfilGroup.add(exfilDisc);
+[-1.8, 1.8].forEach((dx) => {
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.6, 10),
+    new THREE.MeshStandardMaterial({ color: 0x1a5a2a, emissive: 0x33ff66, emissiveIntensity: 0.5 }));
+  post.position.set(dx, 1.3, 0); exfilGroup.add(post);
+});
+const exfilLight = new THREE.PointLight(0x33ff66, 3, 12);
+exfilLight.position.set(EXFIL.x, 2, EXFIL.z); scene.add(exfilLight);
+
+// ---- Character helpers (same patterns as theater.html) ----
+function fitCharacter(obj, height) {
+  obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  obj.updateMatrixWorld(true);
+  let bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
+  if (!size.y) return;
+  obj.scale.setScalar(height / size.y);
+  bb = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); bb.getCenter(c);
+  obj.position.set(-c.x, -bb.min.y, -c.z);
+}
+function stripRootTravel(clip) {
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') >= 0 && t.name.endsWith('.position') && nt.values && nt.values.length >= 3) {
+      const x0 = nt.values[0], z0 = nt.values[2];
+      for (let i = 0; i + 2 < nt.values.length; i += 3) { nt.values[i] = x0; nt.values[i + 2] = z0; }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+}
+// Tripo (trick-or-treater) skeletons are Z-up: convert the shared Y-up
+// Mixamo clips into the skeleton's frame, as theater.html does for its
+// Tripo enemies. Mixamo FBX characters (player, terrorists) play the
+// shared clips untouched.
+function convertClipForTripo(clip, model) {
+  let hips = null;
+  model.traverse((o) => { if (!hips && o.isBone && o.name.toLowerCase().indexOf('hips') >= 0) hips = o; });
+  if (!hips || !hips.parent) return clip;
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3(1, 1, 1);
+  let node = hips.parent;
+  const chain = [];
+  while (node && node !== model) { chain.unshift(node); node = node.parent; }
+  for (const n of chain) { q.multiply(n.quaternion); s.multiply(n.scale); }
+  const qInv = q.clone().invert();
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') < 0) return nt;
+    if (t.name.endsWith('.position')) {
+      const v = new THREE.Vector3();
+      for (let i = 0; i + 2 < nt.values.length; i += 3) {
+        v.set(nt.values[i], nt.values[i + 1], nt.values[i + 2]).applyQuaternion(qInv);
+        nt.values[i] = v.x / s.x; nt.values[i + 1] = v.y / s.y; nt.values[i + 2] = v.z / s.z;
+      }
+    } else if (t.name.endsWith('.quaternion')) {
+      const qq = new THREE.Quaternion();
+      for (let i = 0; i + 3 < nt.values.length; i += 4) {
+        qq.set(nt.values[i], nt.values[i + 1], nt.values[i + 2], nt.values[i + 3]);
+        qq.premultiply(qInv);
+        nt.values[i] = qq.x; nt.values[i + 1] = qq.y; nt.values[i + 2] = qq.z; nt.values[i + 3] = qq.w;
+      }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name + '_tripo', clip.duration, tracks);
+}
+function boneKey(name) {
+  if (!name) return '';
+  let base = name.split('.')[0].split('|')[0];
+  if (base.indexOf(':') >= 0) base = base.slice(base.indexOf(':') + 1);
+  return base.toLowerCase();
+}
+function modelBoneSet(model) {
+  const set = new Set();
+  model.traverse((o) => { if (o.isBone) set.add(boneKey(o.name)); });
+  return set;
+}
+// Shared walk/idle clips (Mixamo, metre-scale). Loaded once; every
+// character plays them through its own mixer.
+const mxClips = {};
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx']].forEach(([key, file]) => {
+  fbxLoader.load('assets/animations/' + file, (obj) => {
+    const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
+    if (raw) mxClips[key] = stripRootTravel(raw);
+  }, undefined, () => {});
+});
+function playCharClip(char, key) {
+  if (!char.mixer || !mxClips[key]) return;
+  const clip = char.isTripo
+    ? (char._tripoClips[key] || (char._tripoClips[key] = convertClipForTripo(mxClips[key], char.model)))
+    : mxClips[key];
+  const act = char.mixer.clipAction(clip);
+  if (char._cur === act && act.isRunning()) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset().fadeIn(0.15).play(); char._cur = act;
+}
+// A clip only animates a model if at least one of its track bones exists
+// on that model; otherwise the mixer is left off and the character moves
+// in its bind pose (still walks, still taggable).
+function clipsFitModel(model) {
+  const clip = mxClips.idle || mxClips.walk;
+  if (!clip || !model) return false;
+  const bones = modelBoneSet(model);
+  return clip.tracks.some((t) => bones.has(boneKey(t.name)));
+}
+
+// ---- Player (Kyle_undercover, Mixamo) ----
+const player = new THREE.Group(); player.position.set(0, CHAR_LIFT, 54); scene.add(player);
+let playerModel = null, mixer = null;
+const playerChar = { mixer: null, model: null, isTripo: false, _cur: null, _tripoClips: {} };
+fbxLoader.load('assets/characters/Kyle_undercover.fbx', (obj) => {
+  fitCharacter(obj, 1.8);
+  obj.rotation.y = Math.PI;
+  player.add(obj); playerModel = obj;
+  playerChar.model = obj;
+  playerChar.mixer = new THREE.AnimationMixer(obj); mixer = playerChar.mixer;
+}, undefined, () => {
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a2a }));
+  body.position.y = 1.0; player.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
+  head.position.y = 1.95; player.add(head); playerModel = body;
+});
+function playPlayerClip(key) {
+  if (!playerChar.mixer) return;
+  playCharClip(playerChar, key); mixer = playerChar.mixer;
+}
+
+// ---- NPCs ----
+// All NPCs share this shape: an outer group (position + facing yaw) and
+// an inner group (the loaded model + candy bag) so the fall tips the
+// inner group without disturbing the facing. `kind` is 'civilian' or
+// 'terrorist'. `stopped` marks a tagged terrorist (removed from play).
+const npcs = [];
+const npcHitMeshes = [];
+function registerHitMeshes(npc, root) {
+  root.traverse((o) => { if (o.isMesh) { o.userData.npc = npc; npcHitMeshes.push(o); } });
+}
+function makeCandyBag() {
+  const bag = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.26, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x8a4a1a, roughness: 0.9 }));
+  body.position.y = 0; bag.add(body);
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.1, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0x5a2a0a, roughness: 0.9 }));
+  handle.position.y = 0.17; bag.add(handle);
+  return bag;
+}
+// Trick-or-treaters: all 11 real GLBs. Each wanders door to door on one
+// side of the street (sidewalks + yards, not the street centre), pausing
+// at each door. Every one carries a candy bag at its side — that is the
+// tell that marks them as civilians.
+const TOT_ROSTER = [
+  { file: 'trickortreater-frankenstein.glb', side: 'west' },
+  { file: 'trickortreater-ghost.glb', side: 'east' },
+  { file: 'trickortreater-hero.glb', side: 'west' },
+  { file: 'trickortreater-mummy.glb', side: 'east' },
+  { file: 'trickortreater-pirate.glb', side: 'west' },
+  { file: 'trickortreater-princess.glb', side: 'east' },
+  { file: 'trickortreater-pumpkin.glb', side: 'west' },
+  { file: 'trickortreater-skeleton.glb', side: 'east' },
+  { file: 'trickortreater-vampire.glb', side: 'west' },
+  { file: 'trickortreater-werewolf.glb', side: 'east' },
+  // The witch walks the east side, near the target house — the same
+  // costume as the terrorist witch nearby. Only the tell (no bag, straight
+  // purposeful walk) sets them apart.
+  { file: 'trickortreater-witch.glb', side: 'east' },
+];
+function makeCivilian(spec, idx) {
+  const doors = spec.side === 'west' ? DOORS_WEST : DOORS_EAST;
+  const start = doors[idx % doors.length];
+  const outer = new THREE.Group();
+  outer.position.set(start.x + (Math.random() - 0.5) * 2, CHAR_LIFT, start.z + (Math.random() - 0.5) * 4);
+  scene.add(outer);
+  const inner = new THREE.Group(); outer.add(inner);
+  const npc = {
+    kind: 'civilian', file: spec.file, outer, inner,
+    model: null, mixer: null, isTripo: true, _cur: null, _tripoClips: {},
+    speed: 0.8, doors, doorIdx: idx % doors.length, target: null,
+    pauseT: 2 + Math.random() * 3, stopped: false, fallT: 0, animOk: false,
+  };
+  const bag = makeCandyBag();
+  bag.position.set(0.34, 0.85, 0.05);
+  inner.add(bag);
+  registerHitMeshes(npc, bag);
+  gltfLoader.load('assets/characters/halloween/' + spec.file, (gltf) => {
+    const m = gltf.scene;
+    fitCharacter(m, 1.8);
+    inner.add(m);
+    npc.model = m;
+    registerHitMeshes(npc, m);
+    // Mixer is always created; playNpcClip lazily checks clip/model bone
+    // compatibility once the shared clips have loaded.
+    npc.mixer = new THREE.AnimationMixer(m);
+  }, undefined, () => {});
+  npcs.push(npc);
+  return npc;
+}
+TOT_ROSTER.forEach((spec, i) => makeCivilian(spec, i));
+// Terrorists: 5 real enemy FBXs. No candy bag — that is the clearest tell.
+// Each walks a straight, purposeful route along the dark street (never
+// door to door, never into the porch-light pools), ping-ponging between
+// its waypoints. The witch converges on the target house (east, z=0).
+const TERRORIST_ROSTER = [
+  { file: 'enemy-frankenstein.fbx', speed: 1.6, waypoints: [[-3, 50], [-3, -50]], pauses: [0, 0] },
+  { file: 'enemy-ghost.fbx', speed: 1.6, waypoints: [[3, -50], [3, 50]], pauses: [0, 0] },
+  { file: 'enemy-pumpkin.fbx', speed: 1.7, waypoints: [[0, 40], [0, -40]], pauses: [0, 0] },
+  { file: 'enemy-skeleton.fbx', speed: 1.6, waypoints: [[-1.5, -45], [-1.5, 45]], pauses: [0, 0] },
+  { file: 'enemy-witch.fbx', speed: 1.6, waypoints: [[1.5, 45], [1.5, 2], [8, 0], [1.5, 2], [1.5, -45]], pauses: [0, 0, 5, 0, 0] },
+];
+function makeTerrorist(spec) {
+  const start = spec.waypoints[0];
+  const outer = new THREE.Group();
+  outer.position.set(start[0], CHAR_LIFT, start[1]);
+  scene.add(outer);
+  const inner = new THREE.Group(); outer.add(inner);
+  const npc = {
+    kind: 'terrorist', file: spec.file, outer, inner,
+    model: null, mixer: null, isTripo: false, _cur: null, _tripoClips: {},
+    speed: spec.speed, waypoints: spec.waypoints, pauses: spec.pauses,
+    wpIdx: 1, wpDir: 1, pauseT: 0, stopped: false, fallT: 0, animOk: false,
+  };
+  fbxLoader.load('assets/characters/' + spec.file, (obj) => {
+    fitCharacter(obj, 1.8);
+    obj.rotation.y = Math.PI;
+    inner.add(obj);
+    npc.model = obj;
+    registerHitMeshes(npc, obj);
+    // Mixer is always created; playNpcClip lazily checks clip/model bone
+    // compatibility once the shared clips have loaded.
+    npc.mixer = new THREE.AnimationMixer(obj);
+  }, undefined, () => {});
+  npcs.push(npc);
+  return npc;
+}
+TERRORIST_ROSTER.forEach((spec) => makeTerrorist(spec));
+
+// ---- NPC movement ----
+function faceToward(npc, dx, dz, dt) {
+  if (!dx && !dz) return;
+  const target = Math.atan2(dx, dz) + (npc.kind === 'terrorist' ? Math.PI : 0);
+  let d = target - npc.outer.rotation.y;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  npc.outer.rotation.y += d * Math.min(1, dt * 8);
+}
+function playNpcClip(npc, key) {
+  if (!npc.mixer) return;
+  // Lazy compatibility check: the shared clips load async, so a model
+  // that loaded before them must not be permanently marked un-animatable.
+  // Retry until a clip exists and its bones match this model.
+  if (!npc.animOk) {
+    if (!clipsFitModel(npc.model)) return;
+    npc.animOk = true;
+  }
+  playCharClip(npc, key);
+}
+function updateCivilian(npc, dt) {
+  if (npc.stopped) return;
+  if (npc.target) {
+    const dx = npc.target.x - npc.outer.position.x, dz = npc.target.z - npc.outer.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.4) {
+      npc.target = null;
+      npc.pauseT = 3 + Math.random() * 3;
+      playNpcClip(npc, 'idle');
+      return;
+    }
+    const step = npc.speed * dt;
+    npc.outer.position.x += dx / d * step;
+    npc.outer.position.z += dz / d * step;
+    faceToward(npc, dx, dz, dt);
+    playNpcClip(npc, 'walk');
+  } else {
+    npc.pauseT -= dt;
+    if (npc.pauseT <= 0) {
+      let next = Math.floor(Math.random() * npc.doors.length);
+      if (next === npc.doorIdx) next = (next + 1) % npc.doors.length;
+      npc.doorIdx = next;
+      npc.target = npc.doors[next];
+    }
+    playNpcClip(npc, 'idle');
+  }
+}
+function updateTerrorist(npc, dt) {
+  if (npc.stopped) return;
+  if (npc.pauseT > 0) {
+    npc.pauseT -= dt;
+    playNpcClip(npc, 'idle');
+    return;
+  }
+  const wp = npc.waypoints[npc.wpIdx];
+  const dx = wp[0] - npc.outer.position.x, dz = wp[1] - npc.outer.position.z;
+  const d = Math.hypot(dx, dz);
+  if (d < 0.4) {
+    npc.pauseT = npc.pauses[npc.wpIdx] || 0;
+    npc.wpIdx += npc.wpDir;
+    if (npc.wpIdx >= npc.waypoints.length) { npc.wpIdx = npc.waypoints.length - 2; npc.wpDir = -1; }
+    else if (npc.wpIdx < 0) { npc.wpIdx = 1; npc.wpDir = 1; }
+    playNpcClip(npc, 'idle');
+    return;
+  }
+  const step = npc.speed * dt;
+  npc.outer.position.x += dx / d * step;
+  npc.outer.position.z += dz / d * step;
+  faceToward(npc, dx, dz, dt);
+  playNpcClip(npc, 'walk');
+}
+// A stopped terrorist tips over and fades out over ~1.6 s.
+function updateStopped(npc, dt) {
+  if (!npc.stopped) return;
+  npc.fallT += dt;
+  const k = Math.min(npc.fallT / 0.6, 1);
+  npc.inner.rotation.x = -k * Math.PI / 2 * 0.9;
+  npc.inner.position.y = -0.15 * k;
+  if (npc.fallT > 0.6) {
+    const f = Math.max(0, 1 - (npc.fallT - 0.6));
+    npc.inner.traverse((o) => {
+      if (o.isMesh) { o.material.transparent = true; o.material.opacity = f; }
+    });
+  }
+  if (npc.fallT > 1.6) npc.outer.visible = false;
+  if (npc.mixer) npc.mixer.update(dt);
+}
+function updateNpcs(dt) {
+  for (const npc of npcs) {
+    if (npc.stopped) { updateStopped(npc, dt); continue; }
+    if (npc.kind === 'civilian') updateCivilian(npc, dt);
+    else updateTerrorist(npc, dt);
+    if (npc.mixer) npc.mixer.update(dt);
+  }
+}
+
+// ---- Tag mechanic, win / fail ----
+let stopped = 0, won = false, failed = false, started = false, winShown = false, failShown = false;
+let yaw = 0, pitch = 0.15;
+let statusTimer = null;
+function updateStopCount() {
+  const el = document.getElementById('stopCount');
+  if (el) el.textContent = stopped + ' / ' + TERRORIST_COUNT;
+}
+function setStatus(text) {
+  const el = document.getElementById('tagStatus');
+  if (!el) return;
+  el.textContent = text;
+  if (statusTimer) clearTimeout(statusTimer);
+  if (text) statusTimer = setTimeout(() => { el.textContent = ''; }, 2500);
+}
+function stopTerrorist(npc) {
+  npc.stopped = true; npc.fallT = 0;
+  stopped++;
+  updateStopCount();
+  setStatus('Terrorist stopped');
+  if (stopped >= TERRORIST_COUNT) {
+    // EXFIL activates: brighter ring, disc and light.
+    exfilLight.intensity = 14;
+    exfilRing.material.opacity = 0.9;
+    exfilDisc.material.opacity = 0.3;
+  }
+}
+function showWin() {
+  if (winShown) return;
+  winShown = true; won = true;
+  document.getElementById('winText').textContent = 'All five terrorists are stopped. Kyle walks out in costume, blending back in.';
+  document.getElementById('win').style.display = 'flex';
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+function failMission() {
+  if (failShown) return;
+  failShown = true; failed = true;
+  document.getElementById('failText').textContent = 'You tagged a civilian.';
+  document.getElementById('fail').style.display = 'flex';
+  if (document.pointerLockElement) document.exitPointerLock();
+}
+// Nearest NPC in front of the player, within tag range.
+function nearestInFront() {
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  let best = null, bestD = Infinity;
+  for (const npc of npcs) {
+    if (npc.stopped) continue;
+    const dx = npc.outer.position.x - player.position.x, dz = npc.outer.position.z - player.position.z;
+    const d = Math.hypot(dx, dz);
+    if (d > TAG_RANGE || d < 0.01) continue;
+    if ((dx / d) * fx + (dz / d) * fz < 0.5) continue;
+    if (d < bestD) { bestD = d; best = npc; }
+  }
+  return best;
+}
+const tagRay = new THREE.Raycaster();
+function raycastNpc(ndcX, ndcY) {
+  tagRay.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+  const hits = tagRay.intersectObjects(npcHitMeshes, false);
+  for (const h of hits) {
+    const npc = h.object.userData.npc;
+    if (!npc || npc.stopped) continue;
+    const d = Math.hypot(npc.outer.position.x - player.position.x, npc.outer.position.z - player.position.z);
+    if (d <= TAG_RANGE) return npc;
+  }
+  return null;
+}
+function doTag(ndcX, ndcY) {
+  if (!started || won || failed) return;
+  const target = (ndcX !== undefined ? raycastNpc(ndcX, ndcY) : null) || nearestInFront();
+  if (!target) return;
+  if (target.kind === 'terrorist') stopTerrorist(target);
+  else failMission();
+}
+
+// ---- Input ----
+const keys = {};
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+if (isTouch) document.body.classList.add('touch');
+const clock = new THREE.Clock();
+document.getElementById('startBtn').onclick = () => {
+  document.getElementById('overlay').style.display = 'none'; started = true;
+  if (!isTouch) renderer.domElement.requestPointerLock();
+};
+addEventListener('keydown', (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === 'e' && started && !e.repeat) { e.preventDefault(); doTag(0, 0); }
+});
+addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+addEventListener('mousemove', (e) => {
+  if (document.pointerLockElement && started) {
+    yaw -= e.movementX * 0.003; pitch = Math.max(-0.4, Math.min(0.5, pitch - e.movementY * 0.003));
+  }
+});
+let lastPointerTag = 0;
+renderer.domElement.addEventListener('mousedown', (e) => {
+  lastPointerTag = performance.now();
+  if (started) doTag(0, 0);
+});
+renderer.domElement.addEventListener('click', (e) => {
+  const now = performance.now();
+  if (now - lastPointerTag < 300) return;
+  lastPointerTag = now;
+  if (started) doTag(0, 0);
+});
+document.getElementById('tagBtn').addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  if (started) doTag(0, 0);
+});
+// Touch joystick (same pattern as theater.html): bottom-left stick moves,
+// drag on the canvas looks around, a quick tap tags.
+let joyId = null, joyX = 0, joyY = 0;
+const joy = document.getElementById('joy'), knob = document.getElementById('knob');
+function moveJoy(t) {
+  const r = joy.getBoundingClientRect();
+  const dx = (t.clientX - (r.left + 65)) / 50, dy = (t.clientY - (r.top + 65)) / 50;
+  const m = Math.min(1, Math.hypot(dx, dy)) || 1;
+  joyX = dx / Math.max(1, Math.hypot(dx, dy)) * m;
+  joyY = dy / Math.max(1, Math.hypot(dx, dy)) * m;
+  knob.style.left = (37 + joyX * 35) + 'px';
+  knob.style.top = (37 + joyY * 35) + 'px';
+}
+function endJoy(e) {
+  for (const t of e.changedTouches) if (t.identifier === joyId) {
+    joyId = null; joyX = joyY = 0;
+    knob.style.left = '37px'; knob.style.top = '37px';
+  }
+}
+joy.addEventListener('touchstart', (e) => { if (!started) return; const t = e.changedTouches[0]; joyId = t.identifier; moveJoy(t); e.preventDefault(); }, { passive: false });
+joy.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (t.identifier === joyId) moveJoy(t); e.preventDefault(); }, { passive: false });
+joy.addEventListener('touchend', endJoy);
+joy.addEventListener('touchcancel', endJoy);
+let lookId = null, lastLX = 0, lastLY = 0, lookStartX = 0, lookStartY = 0, lookStartT = 0;
+renderer.domElement.addEventListener('touchstart', (e) => {
+  if (!started) return;
+  for (const t of e.changedTouches) { lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY; lookStartX = t.clientX; lookStartY = t.clientY; lookStartT = performance.now(); }
+}, { passive: true });
+renderer.domElement.addEventListener('touchmove', (e) => {
+  for (const t of e.changedTouches) if (t.identifier === lookId) {
+    yaw -= (t.clientX - lastLX) * 0.005; pitch = Math.max(-0.4, Math.min(0.5, pitch - (t.clientY - lastLY) * 0.005));
+    lastLX = t.clientX; lastLY = t.clientY;
+  }
+}, { passive: true });
+renderer.domElement.addEventListener('touchend', (e) => {
+  for (const t of e.changedTouches) if (t.identifier === lookId) {
+    const dx = t.clientX - lookStartX, dy = t.clientY - lookStartY;
+    if (performance.now() - lookStartT < 500 && Math.hypot(dx, dy) < 15) {
+      const nx = (t.clientX / innerWidth) * 2 - 1, ny = -((t.clientY / innerHeight) * 2 - 1);
+      doTag(nx, ny);
+    }
+    lookId = null;
+  }
+});
+
+// ---- Idle-orbit cinematic camera (same pattern as theater.html) ----
+const IDLE_ORBIT_DELAY = 10;
+const IDLE_ORBIT_PERIOD = 24;
+let idleT = 0, orbitActive = false, orbitT = 0, orbitAngle = 0;
+let idleLastX = null, idleLastZ = null;
+function noteActivity() { idleT = 0; orbitActive = false; }
+['pointerdown', 'pointermove', 'wheel', 'touchstart', 'touchmove', 'keydown'].forEach(ev =>
+  addEventListener(ev, noteActivity, { passive: true }));
+function idleOrbitActive(dt, canOrbit) {
+  if (!canOrbit) { idleT = 0; orbitActive = false; return false; }
+  const px = player.position.x, pz = player.position.z;
+  if (idleLastX === null) { idleLastX = px; idleLastZ = pz; }
+  if (Math.hypot(px - idleLastX, pz - idleLastZ) > 0.001) {
+    idleT = 0; orbitActive = false; idleLastX = px; idleLastZ = pz;
+    return false;
+  }
+  idleLastX = px; idleLastZ = pz;
+  idleT += dt;
+  if (idleT < IDLE_ORBIT_DELAY) return false;
+  if (!orbitActive) {
+    orbitActive = true; orbitT = 0;
+    orbitAngle = Math.atan2(camera.position.x - px, camera.position.z - pz);
+  }
+  orbitT += dt;
+  return true;
+}
+function orbitCamPos(out) {
+  const ang = orbitAngle + orbitT * (Math.PI * 2 / IDLE_ORBIT_PERIOD);
+  const dist = 5 + Math.sin(orbitT * 0.5);
+  const h = 2.25 + Math.sin(orbitT * 0.33) * 0.75;
+  out.set(
+    player.position.x + Math.sin(ang) * dist,
+    player.position.y + h,
+    player.position.z + Math.cos(ang) * dist
+  );
+  return out;
+}
+
+// ---- Loop ----
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  updateNpcs(dt);
+  if (started && !won && !failed) {
+    let ml = 0, fx = 0, fz = 0;
+    fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
+    fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
+    if (joyId !== null) { fx += joyX; fz += -joyY; }
+    ml = Math.hypot(fx, fz);
+    if (ml > 1) { fx /= ml; fz /= ml; }
+    const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);
+    const dz = -fx * Math.sin(yaw) - fz * Math.cos(yaw);
+    const speed = (keys['shift'] ? 5.5 : 4) * dt;
+    player.position.x = Math.max(STREET.xMin, Math.min(STREET.xMax, player.position.x + dx * speed));
+    player.position.z = Math.max(STREET.zMin, Math.min(STREET.zMax, player.position.z + dz * speed));
+    player.position.y = CHAR_LIFT;
+    for (const c of colliders) {
+      const ddx = player.position.x - c.x, ddz = player.position.z - c.z, d = Math.hypot(ddx, ddz);
+      if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
+    }
+    player.rotation.y = yaw;
+    if (mixer) {
+      mixer.update(dt);
+      playPlayerClip(ml > 0.1 ? 'walk' : 'idle');
+    }
+    // Win: all 5 stopped, walk into the EXFIL gate at the north end.
+    if (stopped >= TERRORIST_COUNT) {
+      const ed = Math.hypot(player.position.x - EXFIL.x, player.position.z - EXFIL.z);
+      if (ed < EXFIL.r) showWin();
+    }
+  } else if (mixer) {
+    mixer.update(dt);
+  }
+  const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+  if (idleOrbitActive(dt, started && !won && !failed)) {
+    const op = orbitCamPos(new THREE.Vector3());
+    camera.position.lerp(op, Math.min(1, dt * 3));
+    camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
+  } else {
+    camera.position.set(player.position.x + back.x * 5, player.position.y + 2.6, player.position.z + back.z * 5);
+    camera.lookAt(player.position.x - back.x * 3, player.position.y + 1.6, player.position.z - back.z * 3);
+  }
+  renderer.render(scene, camera);
+}
+updateStopCount();
+if (new URLSearchParams(location.search).has('test')) {
+  window.__halloween = {
+    player, npcs, colliders, EXFIL,
+    get stopped() { return stopped; }, get won() { return won; }, get failed() { return failed; },
+    get started() { return started; },
+    doTag, stopTerrorist, failMission, showWin, nearestInFront, updateStopCount,
+  };
+}
+animate();
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('contextmenu', e => e.preventDefault());
+</script>
+</body>
+</html>
