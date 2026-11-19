@@ -1183,6 +1183,98 @@ function updateSplashes(dt){
     scene.add(s);
     splashRings.push({ mesh: s, t: Math.random() });
   }
+  // --- Tire tracks + rooftop props (2026-11-18 visual pass, Kyle pick).
+  // Tire tracks: a car drove across the asphalt pad and turned. Two dark
+  // treaded tracks on a canvas texture, laid flat over the pad at y=0.04
+  // (above the asphalt patch and the oil-stains patch at 0.02). The
+  // existing 6x4 oil-stains patch stays underneath as the centre.
+  const tireTex = (function(){
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 768;
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, 1024, 768);
+    // One wheel track: a smooth S-curve through points, stroked as a
+    // dark band plus a dashed tread overlay.
+    function wheelTrack(points, w){
+      function path(){
+        g.beginPath();
+        g.moveTo(points[0][0], points[0][1]);
+        for (let i = 1; i < points.length; i++){
+          const [x0, y0] = points[i-1], [x1, y1] = points[i];
+          const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+          g.quadraticCurveTo(x0, y0, mx, my);
+        }
+        g.lineTo(points[points.length-1][0], points[points.length-1][1]);
+      }
+      g.strokeStyle = 'rgba(10,10,10,0.7)';
+      g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round';
+      path(); g.stroke();
+      // Tread blocks: a dashed darker line on the same path.
+      g.strokeStyle = 'rgba(0,0,0,0.8)';
+      g.lineWidth = w;
+      g.setLineDash([16, 14]);
+      path(); g.stroke();
+      g.setLineDash([]);
+    }
+    // Canvas top = north (z=-20), bottom = south (z=-8); left = west
+    // (x=0), right = east (x=16). 64 px per metre. Two wheel tracks
+    // ~1.4 m apart, S-curving north across the pad.
+    const left = [[400, 768], [420, 600], [380, 450], [400, 300], [360, 150], [380, 0]];
+    const right = [[490, 768], [510, 600], [470, 450], [490, 300], [450, 150], [470, 0]];
+    wheelTrack(left, 34);
+    wheelTrack(right, 34);
+    // A second, fainter pair: a car that turned and parked facing east.
+    const left2 = [[700, 768], [720, 620], [780, 520], [860, 480], [950, 470]];
+    const right2 = [[700, 678], [720, 530], [780, 430], [860, 390], [950, 380]];
+    wheelTrack(left2, 28);
+    wheelTrack(right2, 28);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const tireTracks = new THREE.Mesh(new THREE.PlaneGeometry(16, 12),
+    new THREE.MeshBasicMaterial({ map: tireTex, transparent: true, depthWrite: false }));
+  tireTracks.rotation.x = -Math.PI / 2;
+  tireTracks.position.set(8, 0.04, -14);
+  scene.add(tireTracks);
+  // --- Rooftop props: real GLB pipes and vents on the three building
+  // roofs, plus procedural AC units (no AC GLB exists in the repo).
+  // Roofs are 5-6 m up and out of reach, so these are visual only —
+  // no collision, no LOS. Metalness fix (0 / 0.6) so the metal reads
+  // by diffuse light — this page has no env map, so metalness 1.0
+  // would read black.
+  function roofProp(path, x, y, z, tw, th, td, rotY){
+    gltfLoader.load(path, (gltf)=>{
+      const m = fitPropChild(gltf.scene, tw, th, td); if (!m) return;
+      m.traverse((o)=>{ if (o.isMesh){ o.material.metalness = 0; o.material.roughness = 0.6; } });
+      m.position.set(x, y + th / 2, z); if (rotY) m.rotation.y = rotY; scene.add(m);
+    }, undefined, ()=>{});
+  }
+  function acUnit(x, y, z, rotY){
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 1.0),
+      new THREE.MeshStandardMaterial({ color: 0xb8bcc0, roughness: 0.6, metalness: 0.3 }));
+    body.position.y = 0.35; body.castShadow = true; body.receiveShadow = true; g.add(body);
+    const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.06, 24),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.8 }));
+    fan.position.y = 0.73; g.add(fan);
+    const grille = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.4),
+      new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.9 }));
+    grille.position.set(0, 0.35, 0.51); g.add(grille);
+    g.position.set(x, y, z); if (rotY) g.rotation.y = rotY; scene.add(g);
+  }
+  // Blue building roof (y=5, x -5..5, z -37..-31).
+  roofProp('assets/props/pipe.glb', -2, 5, -36, 0.15, 0.15, 2.0, Math.PI / 2);
+  roofProp('assets/props/pipe.glb', 0, 5, -36, 0.15, 0.15, 2.0, Math.PI / 2);
+  roofProp('assets/props/vent-ceiling.glb', 3.5, 5, -35, 1.2, 0.1, 1.2, 0);
+  acUnit(-3.5, 5, -33, 0);
+  // Red building roof (y=6, x -36..-28, z 4..12).
+  roofProp('assets/props/vent-tunnel.glb', -34, 6, 6, 1.2, 0.5, 0.5, 0);
+  roofProp('assets/props/pipe.glb', -34, 6, 10, 0.15, 0.15, 2.0, Math.PI / 2);
+  roofProp('assets/props/pipe.glb', -32, 6, 10, 0.15, 0.15, 2.0, Math.PI / 2);
+  acUnit(-30, 6, 9, Math.PI / 2);
+  // Olive building roof (y=6, x 30..38, z 24..32).
+  roofProp('assets/props/vent-ceiling.glb', 32, 6, 27, 1.2, 0.1, 1.2, 0);
+  roofProp('assets/props/pipe.glb', 36, 6, 27, 0.15, 0.15, 2.0, 0);
+  roofProp('assets/props/pipe.glb', 36, 6, 29, 0.15, 0.15, 2.0, 0);
+  acUnit(33, 6, 30, -Math.PI / 2);
 })();
 // Chain-link fence: see-through panel mounted flush on the east face of the
 // red building (-32,8; face x=-28), so the building behind it already blocks
