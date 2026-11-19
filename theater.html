@@ -8,6 +8,7 @@
   html,body{margin:0;height:100%;overflow:hidden;background:#120a08;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
   canvas{display:block}
   #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
+  .padControls{font-size:13px;line-height:1.6;opacity:.8;margin:14px 0 0;max-width:520px}
   #win{display:none}
   button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
   a{color:#ffd97a}
@@ -37,13 +38,14 @@
 <div id="dmgFlash"></div>
 <div id="joy"><div id="knob"></div></div>
 <div id="barTop"></div><div id="barBottom"></div>
-<div id="overlay"><h1>The Theater</h1><button id="startBtn">Enter the theater</button></div>
+<div id="overlay"><h1>The Theater</h1><button id="startBtn">Enter the theater</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / Square / R1 / L1 Attack</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <script type="module">
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { createGamepad, GP } from './assets/js/gamepad.js';
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
@@ -2123,6 +2125,28 @@ renderer.domElement.addEventListener('click', (e) => {
   lastPointerAttack = now;
   if (started && !cine && !won) doChainAttack();
 });
+
+// ---------- Gamepad (PS4 DualShock 4, Bluetooth) ----------
+// Left stick moves, right stick looks, Cross / Square / R1 / L1 attack
+// — the same doChainAttack() the tap, click, Space and F keys call.
+// pollGamepad(dt) runs once per frame from animate().
+const gp = createGamepad();
+function pollGamepad(dt) {
+  gp.update();
+  // Cross on the start overlay = Enter (controller-only start).
+  if (gp.pressed(GP.CROSS)) {
+    const ov = document.getElementById('overlay');
+    if (ov && getComputedStyle(ov).display !== 'none') { document.getElementById('startBtn').click(); return; }
+  }
+  if (!started || won || cine || bowPhase) return;
+  // Right stick: camera look (same as pointer-lock mouse look).
+  if (gp.rx || gp.ry) {
+    yaw -= gp.rx * GP.LOOK_SPEED * dt;
+    pitch = Math.max(-0.4, Math.min(0.5, pitch - gp.ry * GP.LOOK_SPEED * dt));
+    noteActivity();
+  }
+  if (gp.pressed(GP.CROSS) || gp.pressed(GP.SQUARE) || gp.pressed(GP.R1) || gp.pressed(GP.L1)) doChainAttack();
+}
 let lookId = null, lastLX = 0, lastLY = 0, lookStartX = 0, lookStartY = 0, lookStartT = 0;
 // ---- Touch joystick (2026-11-14): Rochelle moves on a phone. ----
 // Same pattern as the ballroom. The stick is a separate element above
@@ -2225,6 +2249,7 @@ function orbitCamPos(out) {
 function animate() {
   requestAnimationFrame(animate);
   let dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
+  pollGamepad(dt); // PS4 controller: sticks, look, attack (no-op with no gamepad)
   gameT += dt; // game time — drives the knockdown hit window (see gameT)
   if (slowMo) {
     slowMo.t += dt; // real time
@@ -2258,6 +2283,7 @@ function animate() {
     // Touch joystick (2026-11-14): stick up = forward, stick right =
     // strafe right. The ml>1 normalize below keeps the diagonal honest.
     if (joyId !== null) { fx += joyX; fz += -joyY; }
+    if (gp.connected) { fx += gp.lx; fz += -gp.ly; } // gamepad left stick
     ml = Math.hypot(fx, fz);
     if (ml > 1) { fx /= ml; fz /= ml; }
     const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);

@@ -15,6 +15,7 @@
   #dialog .line{font-size:16px;line-height:1.45}
   #dialog .hint{font-size:12px;color:#bbb;margin-top:8px}
   #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
+  .padControls{font-size:13px;line-height:1.6;opacity:.8;margin:14px 0 0;max-width:520px}
   #win{display:none}
   button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
   #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5}
@@ -37,7 +38,7 @@
 <nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html" class="cur" aria-current="page">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html">Halloween</a></nav>
 <div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span></div>
 <div id="barTop"></div><div id="barBottom"></div>
-<div id="overlay"><h1>Rochelle's Photo Mission</h1><p>Photographer first, agent second. Kyle is on your earpiece.</p><button id="startBtn">Enter as Rochelle</button></div>
+<div id="overlay"><h1>Rochelle's Photo Mission</h1><p>Photographer first, agent second. Kyle is on your earpiece.</p><button id="startBtn">Enter as Rochelle</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X Talk / advance</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="joy"><div id="knob"></div></div>
 <button id="useBtn">USE</button>
@@ -46,6 +47,7 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { createGamepad, GP } from './assets/js/gamepad.js';
 
 // Human characters stand 5 cm off the floor (feet less likely to clip
 // into / sink below it). Added to every human character's standing Y:
@@ -1468,6 +1470,28 @@ addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 addEventListener('mousemove', (e) => {
   if (document.pointerLockElement && started) { yaw -= e.movementX * 0.003; pitch = Math.max(-0.4, Math.min(0.5, pitch - e.movementY * 0.003)); }
 });
+
+// ---------- Gamepad (PS4 DualShock 4, Bluetooth) ----------
+// Left stick moves, right stick looks, Cross talks / advances dialogue
+// — the same nearestTalk() the E key and the scene tap call.
+// pollGamepad(dt) runs once per frame from animate().
+const gp = createGamepad();
+function pollGamepad(dt) {
+  gp.update();
+  // Cross on the start overlay = Enter (controller-only start).
+  if (gp.pressed(GP.CROSS)) {
+    const ov = document.getElementById('overlay');
+    if (ov && getComputedStyle(ov).display !== 'none') { document.getElementById('startBtn').click(); return; }
+  }
+  if (!started || won) return;
+  // Right stick: camera look (same as pointer-lock mouse look).
+  if (gp.rx || gp.ry) {
+    yaw -= gp.rx * GP.LOOK_SPEED * dt;
+    pitch = Math.max(-0.4, Math.min(0.5, pitch - gp.ry * GP.LOOK_SPEED * dt));
+    noteActivity();
+  }
+  if (gp.pressed(GP.CROSS)) nearestTalk();
+}
 const joy = document.getElementById('joy'), knob = document.getElementById('knob');
 joy.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; joyId = t.identifier; moveJoy(t); e.preventDefault(); }, { passive: false });
 joy.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (t.identifier === joyId) moveJoy(t); e.preventDefault(); }, { passive: false });
@@ -1624,6 +1648,7 @@ function updateWallOcclusion() {
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05); const t = clock.elapsedTime;
+  pollGamepad(dt); // PS4 controller: sticks, look, Cross (no-op with no gamepad)
   if (cinematic) {
     cinematic.t += dt;
     const c = cinematic, ph = c.t / c.dur;
@@ -1639,6 +1664,7 @@ function animate() {
     let fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
     let fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
     if (joyId !== null) { fx += joyX; fz += -joyY; }
+    if (gp.connected) { fx += gp.lx; fz += -gp.ly; } // gamepad left stick
     const ml = Math.hypot(fx, fz);
     if (ml > 1) { fx /= ml; fz /= ml; }
     // Camera-forward movement (same fix as the courtyard game: forward = -sin/-cos)
