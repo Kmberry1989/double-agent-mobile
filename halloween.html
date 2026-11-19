@@ -68,16 +68,16 @@ const DOORS_WEST = HOUSES.filter(h => h.x < 0).map(h => ({ x: -11, z: h.z }));
 const DOORS_EAST = HOUSES.filter(h => h.x > 0).map(h => ({ x: 11, z: h.z }));
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050810);
-scene.fog = new THREE.Fog(0x050810, 35, 130);
+scene.background = new THREE.Color(0x0a0f1e);
+scene.fog = new THREE.Fog(0x0a0f1e, 35, 130);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 300);
-scene.add(new THREE.AmbientLight(0x8a7ab0, 0.35));
-scene.add(new THREE.HemisphereLight(0x3a4a6a, 0x1a1210, 0.4));
-const moonLight = new THREE.DirectionalLight(0xbfd0ff, 0.5);
+scene.add(new THREE.AmbientLight(0x8a7ab0, 0.6));
+scene.add(new THREE.HemisphereLight(0x3a4a6a, 0x1a1210, 0.9));
+const moonLight = new THREE.DirectionalLight(0xbfd0ff, 1.4);
 moonLight.position.set(40, 60, -80);
 scene.add(moonLight);
 
@@ -179,6 +179,7 @@ const PUMPKIN_VARIANTS = [
   'pumpkin_jackolantern_big_grin.glb', 'pumpkin_jackolantern_lopsided.glb',
   'pumpkin_jackolantern_skull.glb', 'pumpkin_jackolantern_squat.glb',
   'pumpkin_jackolantern_vines.glb', 'pumpkin_jackolantern_warty_grin.glb',
+  'pumpkin_jackolantern_warty_angry.glb', 'pumpkin_jackolantern_zigzag.glb',
 ];
 const porchMat = new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffb45e, emissiveIntensity: 1.8 });
 const poolMat = new THREE.MeshBasicMaterial({ color: 0xffb45e, transparent: true, opacity: 0.16, depthWrite: false });
@@ -227,6 +228,57 @@ loadProp('assets/props/cat_black_halloween.glb', 12.5, 0, -42, 0.4, 0.6, 0.5, -0
 });
 [[-7.5, -20], [7.5, 20]].forEach(([x, z]) => {
   const l = new THREE.PointLight(0xffc46b, 8, 10); l.position.set(x, 1.8, z); scene.add(l);
+});
+// More yard dressing (2026-11-19): the rest of the Halloween decorative
+// assets in the repo — tombstone graveyards, skeletons, autumn trees, bats,
+// bat lanterns, a sitting black cat, picket fence corners, harvest props.
+// All placed in yards and on porches, off the street and the door-to-door
+// walking routes, so they dress the scene without blocking play.
+// Graveyard clusters: far north-west yard and far south-east yard.
+[['tombstone_broken.glb', -14, -50], ['tombstone_cracked.glb', -16, -48],
+ ['tombstone_cross.glb', -13, -47], ['tombstone_obelisk.glb', -15.5, -52],
+ ['tombstone_skull_crossbones.glb', 14, 50], ['tombstone_skull_mushrooms.glb', 16, 48],
+ ['tombstone_skull_mushrooms_2.glb', 13, 52], ['tombstone_willow.glb', 15.5, 46]
+].forEach(([file, x, z], i) => {
+  loadProp('assets/props/' + file, x, 0, z, 0.7, 1.1, 0.3, (i % 2 ? 0.15 : -0.12) + (i % 3) * 0.1);
+});
+// Skeletons: rocking chair on a porch, one sitting on a porch step, one
+// knee-up and one crawling and one prone out in the yards.
+loadProp('assets/props/skeleton_rocking_chair.glb', -12, 0, 14, 0.9, 1.3, 0.9, Math.PI / 2);
+loadProp('assets/props/skeleton_sitting.glb', 12, 0, 28, 0.8, 1.1, 0.7, -Math.PI / 2);
+loadProp('assets/props/skeleton_sitting_knee_up.glb', -13, 0, -30, 0.8, 1.1, 0.7, 0.6);
+loadProp('assets/props/skeleton_crawling.glb', 13, 0, -18, 1.2, 0.7, 0.8, -0.7);
+loadProp('assets/props/skeleton_prone.glb', -13, 0, 30, 1.4, 0.5, 0.8, 1.2);
+// Autumn trees in the yards.
+loadProp('assets/props/tree_autumn_orange.glb', -14, 0, -8, 2.5, 3.5, 2.5, 0.3);
+loadProp('assets/props/tree_autumn_yellow.glb', 14, 0, 8, 2.5, 3.5, 2.5, -0.4);
+loadProp('assets/props/tree_autumn_orange.glb', -14, 0, 32, 2.2, 3.2, 2.2, 1.1);
+loadProp('assets/props/tree_autumn_yellow.glb', 14, 0, -42, 2.2, 3.2, 2.2, -0.9);
+// Bats up in the air over the street.
+loadProp('assets/props/bat_flying.glb', -5, 5, -10, 1.0, 0.4, 0.8, 0.5);
+loadProp('assets/props/bat_flying.glb', 4, 6, 15, 1.0, 0.4, 0.8, -0.8);
+loadProp('assets/props/bat_flying.glb', 0, 5.5, -35, 1.0, 0.4, 0.8, 1.9);
+// Bat lanterns on porches (emissive, like the tall lanterns).
+[['-11.5', -12.5], ['11.5', 1.5]].forEach(([x, z]) => {
+  loadProp('assets/props/lantern_bat.glb', +x, 0, +z, 0.4, 0.6, 0.4, 0, (holder, m) => {
+    m.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0xffc46b); o.material.emissiveIntensity = 0.8; } });
+  });
+});
+// Sitting black cat on a porch step.
+loadProp('assets/props/cat_black_sitting.glb', -12, 0, -40.5, 0.4, 0.6, 0.5, 1.0);
+// Picket fence corners at the far yard corners, out of the walking routes.
+loadProp('assets/props/fence_picket_corner.glb', -18, 0, -50, 1.5, 1.0, 1.5, 0);
+loadProp('assets/props/fence_picket_corner.glb', 18, 0, -50, 1.5, 1.0, 1.5, Math.PI / 2);
+loadProp('assets/props/fence_picket_corner.glb', -18, 0, 50, 1.5, 1.0, 1.5, -Math.PI / 2);
+loadProp('assets/props/fence_picket_corner.glb', 18, 0, 50, 1.5, 1.0, 1.5, Math.PI);
+// Harvest props: crow basket on a porch, corn/pumpkin sack and a bone
+// milk churn out in the yards.
+loadProp('assets/props/basket_harvest_crow.glb', -11.5, 0, 40.5, 0.7, 0.6, 0.7, 0.4);
+loadProp('assets/props/sack_harvest_corn_pumpkins.glb', 14, 0, 42, 0.8, 0.8, 0.8, -0.5);
+loadProp('assets/props/milk_churn_bones_corn.glb', -14, 0, 4, 0.6, 0.9, 0.6, 0.2);
+// Cream lantern on a porch (emissive).
+loadProp('assets/props/nightstand_lantern_cream.glb', 11.5, 0, -29.5, 0.5, 0.7, 0.5, 0, (holder, m) => {
+  m.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0xffc46b); o.material.emissiveIntensity = 0.8; } });
 });
 
 // ---- EXFIL: green glowing gate at the north end of the street ----
