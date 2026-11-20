@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Undercover: Double Agent — Main Menu</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; min-height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #eceff4;
+    background: linear-gradient(180deg, #0a0f1e 0%, #05070d 60%, #03040a 100%);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  #bgVideo {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    background: #05070d;
+  }
+  .shade {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, rgba(3,4,10,.55) 0%, rgba(3,4,10,.68) 55%, rgba(3,4,10,.82) 100%);
+    pointer-events: none;
+  }
+  main {
+    position: relative;
+    z-index: 2;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px 40px;
+  }
+  h1.title {
+    margin: 0 0 8px;
+    text-align: center;
+    font-size: clamp(2rem, 6vw, 4rem);
+    line-height: 1.05;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 18px rgba(0,0,0,.85), 0 0 42px rgba(80,110,200,.35);
+  }
+  h1.title span { display: block; }
+  h1.title .line2 { color: #ffd27a; }
+  .missions {
+    width: 100%;
+    max-width: 920px;
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+  }
+  a.mission {
+    display: block;
+    padding: 18px 18px 16px;
+    background: rgba(8, 12, 22, .72);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px;
+    color: inherit;
+    text-decoration: none;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    transition: border-color .15s ease, transform .15s ease, background .15s ease;
+  }
+  a.mission:hover, a.mission:focus-visible {
+    border-color: #ffd27a;
+    background: rgba(16, 22, 38, .85);
+    transform: translateY(-2px);
+    outline: none;
+  }
+  a.mission h2 {
+    margin: 0 0 6px;
+    font-size: 1.15rem;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+  a.mission p {
+    margin: 0;
+    font-size: .92rem;
+    line-height: 1.45;
+    color: #b9c1d1;
+  }
+  .extras {
+    margin-top: 22px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    justify-content: center;
+  }
+  .extras a {
+    color: #c8d0e0;
+    font-size: .95rem;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(255,255,255,.25);
+    padding-bottom: 2px;
+  }
+  .extras a:hover, .extras a:focus-visible {
+    color: #ffd27a;
+    border-bottom-color: #ffd27a;
+    outline: none;
+  }
+  @media (max-width: 520px) {
+    main { padding-top: 24px; justify-content: flex-start; }
+    h1.title { margin-top: 12px; }
+    .missions { margin-top: 20px; gap: 10px; }
+    a.mission { padding: 14px 14px 12px; }
+  }
+</style>
+</head>
+<body>
+  <video id="bgVideo" autoplay muted loop playsinline preload="auto">
+    <source src="assets/video/menu-background.mp4" type="video/mp4">
+  </video>
+  <div class="shade" aria-hidden="true"></div>
+  <main>
+    <h1 class="title"><span>Undercover:</span><span class="line2">Double Agent</span></h1>
+
+    <nav class="missions" aria-label="Missions">
+      <a class="mission" href="index.html">
+        <h2>Courtyard</h2>
+        <p>Collect 3 intel, stay unseen, reach the EXFIL.</p>
+      </a>
+      <a class="mission" href="ballroom.html">
+        <h2>Ballroom</h2>
+        <p>Find the three cats and photograph them.</p>
+      </a>
+      <a class="mission" href="ballroom-rochelle.html">
+        <h2>Rochelle</h2>
+        <p>Photographer — photo the cats in order: moon, note, rose.</p>
+      </a>
+      <a class="mission" href="ballroom-handoff.html">
+        <h2>Handoff</h2>
+        <p>Rendezvous, then the photo mission continues.</p>
+      </a>
+      <a class="mission" href="theater.html">
+        <h2>Theater</h2>
+        <p>Fight 8 enemies, chain combat.</p>
+      </a>
+      <a class="mission" href="halloween.html">
+        <h2>Halloween</h2>
+        <p>Sniper nest — stop the 5 terrorists.</p>
+      </a>
+    </nav>
+
+    <nav class="extras" aria-label="More">
+      <a href="viewer.html">Viewer</a>
+      <a href="wishlist.html">Wishlist</a>
+    </nav>
+  </main>
+
+  <script>
+    // Video background fallback: the video file (assets/video/menu-background.mp4)
+    // does not exist yet. If it fails to load, hide the <video> element so no
+    // broken-video icon or error text appears — the dark CSS gradient behind it
+    // becomes the menu background. Dropping the file into assets/video/ makes
+    // it play with no code change.
+    (function () {
+      var v = document.getElementById('bgVideo');
+      var hidden = false;
+      function hideVideo() {
+        if (hidden) return;
+        hidden = true;
+        v.style.display = 'none';
+      }
+      v.addEventListener('error', hideVideo);
+      var src = v.querySelector('source');
+      if (src) src.addEventListener('error', hideVideo);
+      // If nothing has loaded after a few seconds (e.g. a missing file that
+      // never fires an error event), hide it too.
+      setTimeout(function () {
+        if (v.readyState < 2) hideVideo();
+      }, 4000);
+      // Muted autoplay should succeed; swallow a rejection if the browser
+      // still blocks it so no console error surfaces.
+      var p = v.play();
+      if (p && p.catch) p.catch(function () {});
+    })();
+  </script>
+</body>
+</html>
