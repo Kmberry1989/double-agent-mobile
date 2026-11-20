@@ -18,20 +18,28 @@
   #mission{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5;max-width:min(480px,92vw)}
   #mission b{color:#ffb45e}
   #tagStatus{color:#ffb45e;min-height:1.2em}
-  #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5;touch-action:none}
-  #knob{position:absolute;left:37px;top:37px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.45)}
-  body.touch #joy{display:none} /* nest: fixed position, no movement stick */
-  #tagBtn{position:fixed;right:18px;bottom:24px;width:92px;height:92px;border-radius:50%;background:rgba(255,140,26,.85);border:2px solid rgba(255,255,255,.4);color:#111;font-size:17px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
-  body.touch #tagBtn{display:block}
+  #fireBtn{position:fixed;right:18px;bottom:24px;width:92px;height:92px;border-radius:50%;background:rgba(255,140,26,.85);border:2px solid rgba(255,255,255,.4);color:#111;font-size:17px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
+  #scopeBtn{position:fixed;left:18px;bottom:24px;width:92px;height:92px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:17px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
+  #scopeBtn.on{background:rgba(255,140,26,.9);color:#111}
+  #zoomBtn{position:fixed;right:26px;bottom:132px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:15px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
+  body.touch #fireBtn,body.touch #scopeBtn,body.touch #zoomBtn{display:block}
+  #scopeUI{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:none;z-index:6;pointer-events:none;text-align:center}
+  #scopeUI img{width:min(58vmin,400px);height:auto;display:block}
+  #zoomLabel{margin-top:10px;font-size:15px;font-weight:700;color:#fff;text-shadow:0 1px 4px #000}
+  #barTop,#barBottom{position:fixed;left:0;right:0;height:0;background:#000;z-index:4;pointer-events:none}
+  #barTop{top:0} #barBottom{bottom:0}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
 <nav class="levels"><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html" class="cur" aria-current="page">Halloween</a></nav>
 <div id="mission"><b>Terrorists stopped:</b> <span id="stopCount">0 / 5</span><div id="tagStatus"></div></div>
-<div id="joy"><div id="knob"></div></div>
-<button id="tagBtn">TAG</button>
-<div id="overlay"><h1>Trick or Treat</h1><p>Sniper nest — the street is yours to watch.</p><button id="startBtn">Enter the nest</button><p class="padControls">PS4 controller — Right stick look · X / R1 Tag</p></div>
+<button id="fireBtn">FIRE</button>
+<button id="scopeBtn">SCOPE</button>
+<button id="zoomBtn">ZOOM</button>
+<div id="scopeUI"><img id="crosshairImg" src="assets/ui/crosshair-sniper.png" alt=""><div id="zoomLabel">2x</div></div>
+<div id="barTop"></div><div id="barBottom"></div>
+<div id="overlay"><h1>Trick or Treat</h1><p>Sniper nest — the street is yours to watch.</p><button id="startBtn">Enter the nest</button><p class="padControls">PS4 controller — Right stick look · R2 Scope · L3 Zoom 2x/4x · X / R1 Shoot</p><p class="padControls">Mouse — look · Right-mouse Scope · Click Shoot · Wheel Zoom · F Scope · Touch — drag look · SCOPE / FIRE / ZOOM</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="fail"><h1>Mission failed</h1><p id="failText"></p><button onclick="location.reload()">Try again</button></div>
 <script type="module">
@@ -57,12 +65,17 @@ const STREET = { xMin: -20, xMax: 20, zMin: -58, zMax: 58 };
 const EXFIL = { x: 0, z: -56, r: 2.5 };
 // Sniper nest (Part 1, 2026-11-20): the player starts fixed in a nest
 // building at the south end (z +58..+64) and does NOT walk — NEST_MODE
-// zeroes the movement inputs in animate(). Look (yaw/pitch) still works;
-// TAG/shoot mechanics are untouched (Part 2 handles shooting).
+// zeroes the movement inputs in animate(). Look (yaw/pitch) still works.
+// Sniper mechanics (Part 2, 2026-11-20): scope (R2 / right-mouse /
+// SCOPE button), 2x/4x zoom cycle (L3 / wheel / ZOOM button), shoot
+// (Cross / R1 / click / E / FIRE button) with slow-mo bullet trails.
+// A sniper shoots across the whole street, so SHOOT_RANGE is ~the
+// street length, not the old 2.5 m tag range.
 const NEST_MODE = true;
 const NEST_SPAWN = { x: -3, z: 60.5 };
 const NEST_CAM_BACK = 2.2;
-const TAG_RANGE = 2.5;
+const SHOOT_RANGE = 200;
+const MUZZLE = new THREE.Vector3(-3, 1.25, 57.5); // rifle muzzle on the sill, north
 const TERRORIST_COUNT = 5;
 // Houses: [x, z] — west side x=-16 (front faces +X), east side x=+16
 // (front faces -X). Door is on the street-facing side at x=+-11.
@@ -702,7 +715,7 @@ function updateNpcs(dt) {
 
 // ---- Tag mechanic, win / fail ----
 let stopped = 0, won = false, failed = false, started = false, winShown = false, failShown = false;
-let yaw = 0, pitch = 0.15;
+let yaw = 0, pitch = -0.05; // near-level default: the street runs north, slightly below the nest
 let statusTimer = null;
 function updateStopCount() {
   const el = document.getElementById('stopCount');
@@ -720,28 +733,24 @@ function stopTerrorist(npc) {
   stopped++;
   updateStopCount();
   setStatus('Terrorist stopped');
-  if (stopped >= TERRORIST_COUNT) {
-    // EXFIL activates: brighter ring, disc and light.
-    exfilLight.intensity = 14;
-    exfilRing.material.opacity = 0.9;
-    exfilDisc.material.opacity = 0.3;
-  }
+  // Fixed nest: no walk to EXFIL — win the moment the 5th is stopped.
+  if (stopped >= TERRORIST_COUNT) showWin();
 }
 function showWin() {
   if (winShown) return;
   winShown = true; won = true;
-  document.getElementById('winText').textContent = 'All five terrorists are stopped. Kyle walks out in costume, blending back in.';
+  document.getElementById('winText').textContent = 'All five terrorists are stopped. Kyle slips away in costume, blending back in.';
   document.getElementById('win').style.display = 'flex';
   if (document.pointerLockElement) document.exitPointerLock();
 }
 function failMission() {
   if (failShown) return;
   failShown = true; failed = true;
-  document.getElementById('failText').textContent = 'You tagged a civilian.';
+  document.getElementById('failText').textContent = 'You shot a civilian.';
   document.getElementById('fail').style.display = 'flex';
   if (document.pointerLockElement) document.exitPointerLock();
 }
-// Nearest NPC in front of the player, within tag range.
+// Nearest NPC in front of the player, within sniper range.
 function nearestInFront() {
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   let best = null, bestD = Infinity;
@@ -749,30 +758,112 @@ function nearestInFront() {
     if (npc.stopped) continue;
     const dx = npc.outer.position.x - player.position.x, dz = npc.outer.position.z - player.position.z;
     const d = Math.hypot(dx, dz);
-    if (d > TAG_RANGE || d < 0.01) continue;
+    if (d > SHOOT_RANGE || d < 0.01) continue;
     if ((dx / d) * fx + (dz / d) * fz < 0.5) continue;
     if (d < bestD) { bestD = d; best = npc; }
   }
   return best;
 }
-const tagRay = new THREE.Raycaster();
+const shootRay = new THREE.Raycaster();
 function raycastNpc(ndcX, ndcY) {
-  tagRay.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-  const hits = tagRay.intersectObjects(npcHitMeshes, false);
+  shootRay.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+  const hits = shootRay.intersectObjects(npcHitMeshes, false);
   for (const h of hits) {
     const npc = h.object.userData.npc;
     if (!npc || npc.stopped) continue;
     const d = Math.hypot(npc.outer.position.x - player.position.x, npc.outer.position.z - player.position.z);
-    if (d <= TAG_RANGE) return npc;
+    if (d <= SHOOT_RANGE) return { npc, point: h.point };
   }
   return null;
 }
-function doTag(ndcX, ndcY) {
+// Bullet time + tracer: every shot dips the world to 0.25x for ~1 s of
+// real time and hangs a bright tracer in the air from the rifle muzzle
+// to the hit point (or far down the ray on a miss).
+let bulletTimeT = 0;
+const tracers = [];
+function spawnTracer(from, to) {
+  const dir = new THREE.Vector3().subVectors(to, from);
+  const len = dir.length();
+  if (len < 0.1) return;
+  const half = dir.clone().multiplyScalar(0.5);
+  const g = new THREE.Group();
+  g.position.addVectors(from, half);
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffe9a8, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, len, 8, 1, true), mat);
+  cyl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  g.add(cyl);
+  const glowMat = mat.clone();
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), glowMat);
+  glow.position.copy(half);
+  g.add(glow);
+  scene.add(g);
+  tracers.push({ g, cyl, mat, glowMat, life: 1 });
+}
+function updateTracers(rawDt) {
+  for (let i = tracers.length - 1; i >= 0; i--) {
+    const t = tracers[i];
+    t.life -= rawDt; // fades over ~1 s of real time, even in slow-mo
+    const o = Math.max(0, t.life);
+    t.mat.opacity = o;
+    t.glowMat.opacity = o;
+    if (t.life <= 0) {
+      scene.remove(t.g);
+      t.cyl.geometry.dispose(); t.mat.dispose(); t.glowMat.dispose();
+      tracers.splice(i, 1);
+    }
+  }
+}
+function doShoot(ndcX, ndcY) {
   if (!started || won || failed) return;
-  const target = (ndcX !== undefined ? raycastNpc(ndcX, ndcY) : null) || nearestInFront();
-  if (!target) return;
-  if (target.kind === 'terrorist') stopTerrorist(target);
-  else failMission();
+  const nx = ndcX === undefined ? 0 : ndcX;
+  const ny = ndcY === undefined ? 0 : ndcY;
+  bulletTimeT = 1.0; // slow-mo on every shot
+  const hit = raycastNpc(nx, ny);
+  const target = hit ? hit.npc : nearestInFront();
+  if (target) {
+    const end = hit ? hit.point.clone() : new THREE.Vector3(target.outer.position.x, target.outer.position.y + 1.2, target.outer.position.z);
+    spawnTracer(MUZZLE, end);
+    if (target.kind === 'terrorist') stopTerrorist(target);
+    else failMission();
+  } else {
+    // Miss: tracer far down the ray.
+    shootRay.setFromCamera(new THREE.Vector2(nx, ny), camera);
+    const end = new THREE.Vector3().copy(shootRay.ray.origin).addScaledVector(shootRay.ray.direction, 100);
+    spawnTracer(MUZZLE, end);
+  }
+}
+
+// ---- Scope + zoom (Part 2) ----
+// Scope sources: mouse right-hold, gamepad R2 hold (momentary), touch
+// SCOPE button and F key (latched toggles). Zoom: 2x/4x cycle via L3,
+// mouse wheel, or ZOOM button. FOV: 1x = 60, 2x = 30, 4x = 15.
+const BASE_FOV = 60;
+let scoped = false, zoomLevel = 2;
+const scopeSources = { mouse: false, pad: false, touch: false, key: false };
+function refreshScope() {
+  scoped = scopeSources.mouse || scopeSources.pad || scopeSources.touch || scopeSources.key;
+  camera.fov = scoped ? (zoomLevel === 2 ? 30 : 15) : BASE_FOV;
+  camera.updateProjectionMatrix();
+  const ui = document.getElementById('scopeUI');
+  if (ui) ui.style.display = scoped ? 'block' : 'none';
+  const zl = document.getElementById('zoomLabel');
+  if (zl) zl.textContent = zoomLevel + 'x';
+  const sb = document.getElementById('scopeBtn');
+  if (sb) sb.classList.toggle('on', scoped);
+  updateScopeBars();
+}
+// 16:9 letterbox while scoped: black bars top/bottom on taller screens
+// so the scope reads as a proper wide view. Full-screen when unscoped.
+function updateScopeBars() {
+  const targetH = innerWidth * 9 / 16;
+  const barH = scoped ? Math.max(0, (innerHeight - targetH) / 2) : 0;
+  const top = document.getElementById('barTop'), bot = document.getElementById('barBottom');
+  if (top) top.style.height = barH + 'px';
+  if (bot) bot.style.height = barH + 'px';
+}
+function cycleZoom() {
+  zoomLevel = zoomLevel === 2 ? 4 : 2;
+  refreshScope();
 }
 
 // ---- Input ----
@@ -786,7 +877,8 @@ document.getElementById('startBtn').onclick = () => {
 };
 addEventListener('keydown', (e) => {
   keys[e.key.toLowerCase()] = true;
-  if (e.key.toLowerCase() === 'e' && started && !e.repeat) { e.preventDefault(); doTag(0, 0); }
+  if (e.key.toLowerCase() === 'e' && started && !e.repeat) { e.preventDefault(); doShoot(0, 0); }
+  if (e.key.toLowerCase() === 'f' && started && !e.repeat) { e.preventDefault(); scopeSources.key = !scopeSources.key; refreshScope(); noteActivity(); }
 });
 addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 addEventListener('mousemove', (e) => {
@@ -796,11 +888,10 @@ addEventListener('mousemove', (e) => {
 });
 
 // ---------- Gamepad (PS4 DualShock 4, Bluetooth) ----------
-// Left stick moves, right stick looks, Cross / R1 tags, L3 toggles
-// sprint — the same doTag() the E key, click, tap and TAG button call.
+// Right stick looks, Cross / R1 shoot, R2 hold scopes in, L3 cycles
+// the 2x/4x zoom. Left stick is unmapped (fixed nest, no movement).
 // pollGamepad(dt) runs once per frame from animate().
 const gp = createGamepad();
-let gpSprint = false;
 function pollGamepad(dt) {
   gp.update();
   // Cross on the start overlay = Enter (controller-only start).
@@ -815,47 +906,39 @@ function pollGamepad(dt) {
     pitch = Math.max(-0.4, Math.min(0.5, pitch - gp.ry * GP.LOOK_SPEED * dt));
     noteActivity();
   }
-  if (gp.pressed(GP.CROSS) || gp.pressed(GP.R1)) doTag(0, 0);
-  if (gp.pressed(GP.L3)) { gpSprint = !gpSprint; noteActivity(); }
+  // R2 hold = scope in (momentary).
+  const r2 = gp.held(GP.R2);
+  if (r2 !== scopeSources.pad) { scopeSources.pad = r2; refreshScope(); }
+  if (gp.pressed(GP.CROSS) || gp.pressed(GP.R1)) doShoot(0, 0);
+  if (gp.pressed(GP.L3)) { cycleZoom(); noteActivity(); }
 }
-let lastPointerTag = 0;
+// Mouse: left click shoots (centre ray), right button hold scopes in.
 renderer.domElement.addEventListener('mousedown', (e) => {
-  lastPointerTag = performance.now();
-  if (started) doTag(0, 0);
+  if (!started) return;
+  if (e.button === 0) doShoot(0, 0);
+  else if (e.button === 2) { scopeSources.mouse = true; refreshScope(); }
 });
-renderer.domElement.addEventListener('click', (e) => {
-  const now = performance.now();
-  if (now - lastPointerTag < 300) return;
-  lastPointerTag = now;
-  if (started) doTag(0, 0);
+renderer.domElement.addEventListener('mouseup', (e) => {
+  if (e.button === 2 && scopeSources.mouse) { scopeSources.mouse = false; refreshScope(); }
 });
-document.getElementById('tagBtn').addEventListener('click', (e) => {
+// Mouse wheel cycles the 2x/4x zoom.
+addEventListener('wheel', (e) => { if (started && !won && !failed) cycleZoom(); }, { passive: true });
+// Touch buttons: FIRE shoots, SCOPE toggles the scope, ZOOM cycles 2x/4x.
+document.getElementById('fireBtn').addEventListener('click', (e) => {
   e.preventDefault(); e.stopPropagation();
-  if (started) doTag(0, 0);
+  if (started) doShoot(0, 0);
 });
-// Touch joystick (same pattern as theater.html): bottom-left stick moves,
-// drag on the canvas looks around, a quick tap tags.
-let joyId = null, joyX = 0, joyY = 0;
-const joy = document.getElementById('joy'), knob = document.getElementById('knob');
-function moveJoy(t) {
-  const r = joy.getBoundingClientRect();
-  const dx = (t.clientX - (r.left + 65)) / 50, dy = (t.clientY - (r.top + 65)) / 50;
-  const m = Math.min(1, Math.hypot(dx, dy)) || 1;
-  joyX = dx / Math.max(1, Math.hypot(dx, dy)) * m;
-  joyY = dy / Math.max(1, Math.hypot(dx, dy)) * m;
-  knob.style.left = (37 + joyX * 35) + 'px';
-  knob.style.top = (37 + joyY * 35) + 'px';
-}
-function endJoy(e) {
-  for (const t of e.changedTouches) if (t.identifier === joyId) {
-    joyId = null; joyX = joyY = 0;
-    knob.style.left = '37px'; knob.style.top = '37px';
-  }
-}
-joy.addEventListener('touchstart', (e) => { if (!started) return; const t = e.changedTouches[0]; joyId = t.identifier; moveJoy(t); e.preventDefault(); }, { passive: false });
-joy.addEventListener('touchmove', (e) => { for (const t of e.changedTouches) if (t.identifier === joyId) moveJoy(t); e.preventDefault(); }, { passive: false });
-joy.addEventListener('touchend', endJoy);
-joy.addEventListener('touchcancel', endJoy);
+document.getElementById('scopeBtn').addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  if (!started) return;
+  scopeSources.touch = !scopeSources.touch; refreshScope(); noteActivity();
+});
+document.getElementById('zoomBtn').addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  if (started) cycleZoom();
+});
+// Touch look (Part 2): drag on the canvas looks around, a quick tap
+// shoots at the tap point. No joystick — fixed nest, no movement.
 let lookId = null, lastLX = 0, lastLY = 0, lookStartX = 0, lookStartY = 0, lookStartT = 0;
 renderer.domElement.addEventListener('touchstart', (e) => {
   if (!started) return;
@@ -872,7 +955,7 @@ renderer.domElement.addEventListener('touchend', (e) => {
     const dx = t.clientX - lookStartX, dy = t.clientY - lookStartY;
     if (performance.now() - lookStartT < 500 && Math.hypot(dx, dy) < 15) {
       const nx = (t.clientX / innerWidth) * 2 - 1, ny = -((t.clientY / innerHeight) * 2 - 1);
-      doTag(nx, ny);
+      doShoot(nx, ny);
     }
     lookId = null;
   }
@@ -919,21 +1002,24 @@ function orbitCamPos(out) {
 // ---- Loop ----
 function animate() {
   requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-  pollGamepad(dt); // PS4 controller: sticks, look, tag, sprint (no-op with no gamepad)
+  const rawDt = Math.min(clock.getDelta(), 0.05);
+  // Bullet time: every shot dips the world to 0.25x for ~1 s of real time.
+  let dt = rawDt;
+  if (bulletTimeT > 0) { bulletTimeT -= rawDt; dt = rawDt * 0.25; }
+  pollGamepad(rawDt); // PS4 controller: look stays responsive in slow-mo
   updateNpcs(dt);
+  updateTracers(rawDt); // tracers fade in real time, even in slow-mo
   if (started && !won && !failed) {
     let ml = 0, fx = 0, fz = 0;
     fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
     fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
-    if (joyId !== null) { fx += joyX; fz += -joyY; }
-    if (gp.connected) { fx += gp.lx; fz += -gp.ly; } // gamepad left stick
+    if (gp.connected) { fx += gp.lx; fz += -gp.ly; } // gamepad left stick (neutralised below)
     if (NEST_MODE) { fx = 0; fz = 0; } // sniper nest: fixed position, no walking
     ml = Math.hypot(fx, fz);
     if (ml > 1) { fx /= ml; fz /= ml; }
     const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);
     const dz = -fx * Math.sin(yaw) - fz * Math.cos(yaw);
-    const speed = ((keys['shift'] || gpSprint) ? 5.5 : 4) * dt;
+    const speed = (keys['shift'] ? 5.5 : 4) * dt;
     player.position.x = Math.max(STREET.xMin, Math.min(STREET.xMax, player.position.x + dx * speed));
     player.position.z = Math.max(STREET.zMin, Math.min(STREET.zMax, player.position.z + dz * speed));
     player.position.y = CHAR_LIFT;
@@ -946,11 +1032,7 @@ function animate() {
       mixer.update(dt);
       playPlayerClip(ml > 0.1 ? 'walk' : 'idle');
     }
-    // Win: all 5 stopped, walk into the EXFIL gate at the north end.
-    if (stopped >= TERRORIST_COUNT) {
-      const ed = Math.hypot(player.position.x - EXFIL.x, player.position.z - EXFIL.z);
-      if (ed < EXFIL.r) showWin();
-    }
+    // Win is immediate on the 5th stop (see stopTerrorist) — no EXFIL walk.
   } else if (mixer) {
     mixer.update(dt);
   }
@@ -960,23 +1042,37 @@ function animate() {
     camera.position.lerp(op, Math.min(1, dt * 3));
     camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
   } else {
-    const camBack = NEST_MODE ? NEST_CAM_BACK : 5; // nest: camera stays inside the room
-    camera.position.set(player.position.x + back.x * camBack, player.position.y + 2.6, player.position.z + back.z * camBack);
-    camera.lookAt(player.position.x - back.x * 3, player.position.y + 1.6, player.position.z - back.z * 3);
+    // Aim follows pitch (Part 2): the old code tracked pitch but never
+    // applied it, so the crosshair always pointed at the ground ~8 m out.
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const fwdX = -Math.sin(yaw) * cp, fwdY = sp, fwdZ = -Math.cos(yaw) * cp;
+    if (scoped) {
+      // First-person at the nest window: the player model would fill the
+      // zoomed view, so hide it and put the camera at the rifle.
+      player.visible = false;
+      camera.position.set(-3, 1.7, 58.5);
+    } else {
+      player.visible = true;
+      const camBack = NEST_MODE ? NEST_CAM_BACK : 5; // nest: camera stays inside the room
+      camera.position.set(player.position.x + back.x * camBack, player.position.y + 2.6, player.position.z + back.z * camBack);
+    }
+    camera.lookAt(camera.position.x + fwdX * 10, camera.position.y + fwdY * 10, camera.position.z + fwdZ * 10);
   }
   renderer.render(scene, camera);
 }
 updateStopCount();
 if (new URLSearchParams(location.search).has('test')) {
   window.__halloween = {
-    player, npcs, colliders, EXFIL,
+    player, npcs, colliders, EXFIL, camera,
     get stopped() { return stopped; }, get won() { return won; }, get failed() { return failed; },
     get started() { return started; },
-    doTag, stopTerrorist, failMission, showWin, nearestInFront, updateStopCount,
+    get scoped() { return scoped; }, get zoomLevel() { return zoomLevel; },
+    get bulletTimeT() { return bulletTimeT; }, tracers,
+    doShoot, cycleZoom, refreshScope, stopTerrorist, failMission, showWin, nearestInFront, updateStopCount,
   };
 }
 animate();
-addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); updateScopeBars(); });
 addEventListener('contextmenu', e => e.preventDefault());
 </script>
 </body>
