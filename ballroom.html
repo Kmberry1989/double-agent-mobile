@@ -30,6 +30,20 @@
   .levels{position:fixed;top:10px;right:10px;z-index:11;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:46vw}
   .levels a{background:rgba(0,0,0,.55);border:1px solid #8a6b3a;color:#ffd97a;border-radius:8px;padding:6px 10px;font-size:13px;text-decoration:none}
   .levels a.cur{opacity:.45;pointer-events:none}
+  /* 16:9 landscape (2026-11-20): on a short landscape screen the
+     bottom-centre dialog (92vw) would sit on top of the joystick
+     (left) and the USE button (right), and the top-left mission box
+     would meet the top-right level menu. Narrow the dialog so it
+     clears both controls, raise the prompt above it, and cap the
+     mission box and the level menu so they stay apart. */
+  @media (orientation: landscape) and (max-height: 600px){
+    #dialog{width:min(520px,56vw)}
+    #prompt{bottom:170px}
+    #mission{max-width:min(360px,44vw)}
+    .levels{max-width:40vw}
+    #overlay h1{font-size:26px}
+    .padControls{font-size:12px;margin-top:8px}
+  }
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>

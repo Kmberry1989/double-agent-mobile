@@ -41,6 +41,19 @@
     #objectives p{font-size:11px}
     body.touch-on #hud{bottom:184px}
   }
+  /* 16:9 landscape (2026-11-20): short landscape screens wider than
+     760px (e.g. a phone rotated to landscape) miss the rules above,
+     so the touch HUD at bottom-left would sit on top of the joystick.
+     Move it to bottom-centre, clear of the stick (left) and the action
+     grid (right), and tighten the objectives the same way. Desktop
+     16:9 (tall screens, no touch) is untouched. */
+  @media (orientation: landscape) and (max-height: 600px) and (min-width: 761px){
+    #objectives p.small{display:none}
+    #objectives p{font-size:11px}
+    body.touch-on #hud{left:50%;right:auto;transform:translateX(-50%);bottom:10px;width:min(300px,44vw)}
+    body.touch-on #hud .bar{width:100%}
+    body.touch-on #hud p{font-size:12px}
+  }
   #hud{position:fixed;left:16px;bottom:16px;z-index:5;pointer-events:none}
   .bar{width:260px;height:14px;background:rgba(0,0,0,.55);border:1px solid #556; margin:4px 0}
   .bar>i{display:block;height:100%;background:#57d977}

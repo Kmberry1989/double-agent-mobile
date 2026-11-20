@@ -29,6 +29,16 @@
   #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5;touch-action:none}
   #knob{position:absolute;left:37px;top:37px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.45)}
   body.touch #joy{display:block}
+  /* 16:9 landscape (2026-11-20): on a short landscape screen the
+     top-left mission box (480px) would meet the top-right level menu
+     (46vw). Cap both so they stay apart, and shrink the overlay
+     title so the start screen fits a short viewport. */
+  @media (orientation: landscape) and (max-height: 600px){
+    #mission{max-width:min(360px,44vw)}
+    .levels{max-width:40vw}
+    #overlay h1{font-size:26px}
+    .padControls{font-size:12px;margin-top:8px}
+  }
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>

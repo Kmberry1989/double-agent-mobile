@@ -31,6 +31,20 @@
   .levels a{min-height:44px;display:inline-flex;align-items:center;padding:0 16px;font-size:15px;border-radius:8px;border:1px solid #555;background:#2a2a2a;color:#eee;text-decoration:none}
   .levels a.cur{opacity:.45;pointer-events:none}
   #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #333; color: #eee; padding: 12px 20px; border-radius: 8px; font-size: 15px; display: none; z-index: 10; }
+  /* 16:9 / wide screens (2026-11-20): single-column cards stretch to
+     full width and read as one long line. Use the wider space — two
+     columns from 900px, three from 1400px — and cap the page width so
+     it stays centred instead of stretching. Portrait phones keep the
+     single column. */
+  @media (min-width: 900px){
+    body{max-width:1680px;margin:0 auto}
+    section{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .sec-head{grid-column:1/-1}
+    .card{margin-bottom:0}
+  }
+  @media (min-width: 1400px){
+    section{grid-template-columns:repeat(3,1fr)}
+  }
 </style>
 </head>
 <body>
