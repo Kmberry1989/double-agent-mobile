@@ -839,6 +839,13 @@ placeGLB('assets/props/security-wall-panels.glb', 7.2, 0.05, 0.9, 14, 2.25, -31,
 // Control panel on the north wall's interior face (dials-switches-wall.glb,
 // 0.708 x 1.001 x 0.2 raw). 5 cm proud of the wall face, no overlap.
 placeGLB('assets/props/dials-switches-wall.glb', 0.8, 1.1, 0.1, 16, 1.5, -30.5, 0);
+// Control console strip on the north wall's interior face (2026-11-20,
+// new intake), east of the monitor wall and west of the dials panel —
+// not below the monitor wall, which would hide it behind the desk. 1.5 m
+// long at y 1.0 (spans 0.82..1.18): below the pipe run (y 1.96), clear of
+// the monitor wall (ends x 13.5) and the dials panel (starts x 15.6).
+// 2.5 cm proud of the wall face.
+placeGLB('assets/props/console_control_panel.glb', 1.5, 0.36, 0.25, 14.55, 1.0, -30.45, 0);
 // Pipe run along the north wall's interior face (pipe.glb, 1 m long in Z;
 // rotated so the length runs along X). Overhead at y=2.0, visual-only.
 [11, 13, 15, 17].forEach((x)=>{
@@ -867,19 +874,33 @@ addGLBToObstacle(secBrickE, 'assets/props/brick-industrial-hollow.glb', 2, 0.5, 
 // existing office desks (chair on the south side, facing north).
 const secDesk = box(12.5, -29, 1.6, 0.8, 0.75, 0x6a4a2a, undefined, { material: 'wood' });
 addGLBToObstacle(secDesk, 'assets/props/security-desk.glb', 1.6, 0.75, 0.8);
-// Surveillance monitors on the desk's back edge, facing the chair (south).
-// PHONE CHECK: the monitor bank's screen must face the chair — if it
-// faces the building instead, this needs rotY = Math.PI.
-gltfLoader.load('assets/props/surveillance-monitors-on.glb', (gltf)=>{
-  const c = fitPropChild(gltf.scene, 1.2, 0.7, 0.1); if (!c) return;
-  const g = new THREE.Group(); g.add(c); g.position.set(0, 0.725, -0.28); secDesk.mesh.add(g);
-}, undefined, ()=>{});
+// CCTV monitor wall on the north wall's interior face, facing south into
+// the office (2026-11-20, new intake: monitor_wall_cctv.glb replaces the
+// old desk-top monitor bank that sat on the desk's back edge).
+// 2.0 m wide, centre y 1.3 (spans 0.67..1.94) — top stays below the pipe
+// run (bottom y 1.96) and clear of the dials panel (x 15.6..16.4). 2 cm
+// proud of the wall face (z -30.6) so it does not sit coplanar with it.
+placeGLB('assets/props/monitor_wall_cctv.glb', 2.0, 1.27, 0.2, 12.5, 1.3, -30.48, 0);
 const secChair = box(12.5, -27.5, 0.6, 0.6, 1.0, 0x333333, undefined, {});
-addGLBToObstacle(secChair, 'assets/props/office-chair.glb', 0.6, 1.0, 0.6, [[0, 0, 0, Math.PI]]);
-// Server rack: three server units stacked (servers.glb, 1.0 x 0.451 x
-// 0.174 raw), each fitted to one rack slot.
-const secServers = box(15, -29, 1.0, 0.6, 1.4, 0x333333, undefined, { material: 'metal' });
-addGLBToObstacle(secServers, 'assets/props/servers.glb', 1.0, 0.45, 0.5, [[0, -0.45, 0, 0], [0, 0, 0, 0], [0, 0.45, 0, 0]]);
+addGLBToObstacle(secChair, 'assets/props/chair_office_gray.glb', 0.6, 1.0, 0.6, [[0, 0, 0, Math.PI]]);
+// Server racks (2026-11-20, new intake): real rack GLBs replace the three
+// stacked server units. Rack 1 (glass front door) at the old rack
+// position; rack 2 (slatted front, glass rear) beside it. Both 2.0 m tall,
+// doors facing south (+Z) into the room so they read from the south
+// entrance. Neither blocks the east-exit path (z -28): both end at
+// z -28.65, 0.65 m clear. Rack 2 clears the (16.5,-30) crate by 0.15 m
+// in z and the east wall by 0.65 m in x.
+const secServers = box(15, -29, 0.9, 0.7, 2.0, 0x333333, undefined, { material: 'metal' });
+addGLBToObstacle(secServers, 'assets/props/server_rack_black.glb', 0.85, 2.0, 0.65, [[0, 0, 0, 0]]);
+const secServers2 = box(16.5, -29, 0.9, 0.7, 2.0, 0x333333, undefined, { material: 'metal' });
+addGLBToObstacle(secServers2, 'assets/props/server_rack_black_slatted.glb', 0.85, 2.0, 0.65, [[0, 0, 0, 0]]);
+// Storage cabinet along the west wall interior (2026-11-20, new intake),
+// doors facing east into the room. rotY +PI/2: the cabinet's front is +Z
+// and +PI/2 turns it to +X/east (a -PI/2 would face it west into the
+// wall). 1.6 m wide in the gap between the duct post (z -28.8) and the
+// south crate (z -27.0), 0.1 m clear each side.
+const secCabinet = box(10.68, -27.9, 0.55, 1.6, 1.5, 0x8a8a8a, undefined, { material: 'metal' });
+addGLBToObstacle(secCabinet, 'assets/props/cabinet_storage_4door_gray.glb', 1.6, 1.49, 0.51, [[0, 0, 0, Math.PI / 2]]);
 // Desk items sit on the security desk's top (local y = 0.375 is the top
 // surface; each item's centre is top + half its fitted height, same
 // pattern as the existing desk_keyboard / desk_mouse / desk_binders).
@@ -898,6 +919,13 @@ gltfLoader.load('assets/props/mouse-computer.glb', (gltf)=>{
 gltfLoader.load('assets/props/clipboard.glb', (gltf)=>{
   const c = fitPropChild(gltf.scene, 0.25, 0.02, 0.35); if (!c) return;
   const g = new THREE.Group(); g.add(c); g.position.set(-0.1, 0.385, 0.15); secDesk.mesh.add(g);
+}, undefined, ()=>{});
+// All-in-one computer on the desk top (2026-11-20, new intake), screen
+// facing the chair (south). Back-right of the desk top, clear of the radio
+// (x -0.55), the mousepad/mouse (z +0.15) and the clipboard (x -0.1).
+gltfLoader.load('assets/props/computer_allinone_silver.glb', (gltf)=>{
+  const c = fitPropChild(gltf.scene, 0.58, 0.58, 0.33); if (!c) return;
+  const g = new THREE.Group(); g.add(c); g.position.set(0.45, 0.67, -0.18); secDesk.mesh.add(g);
 }, undefined, ()=>{});
 // --- Vents ---
 // Real vent on the blue building's south face, beside the existing vent
@@ -936,10 +964,26 @@ addGLBToObstacle(secCrates, 'assets/props/crates.glb', 1.0, 0.6, 1.0);
 // --- Spare doors stored flat against the east wall's interior face ---
 // (heavy-door / metal-door / metal-door-simple, each ~0.5 x 1.0 x 0.1 raw).
 // Fitted wide-in-Z then rotated so the face points west into the office.
-[[17.5, -30, 'assets/props/heavy-door.glb'], [17.5, -29, 'assets/props/metal-door.glb'], [17.5, -26, 'assets/props/metal-door-simple.glb']].forEach(([x, z, path])=>{
+// (2026-11-20: the two doors that were at (17.5,-30) and (17.5,-29) moved
+// to the south wall section so the warehouse shelf below gets the whole
+// north section. All three doors are kept.)
+// Warehouse shelf along the east wall interior, north of the east exit
+// (2026-11-20, new intake). 2.0 m long, open shelves facing west into
+// the room (rotY PI/2 turns the open ±Z faces to ±X). Spans z -30.55..
+// -28.55, 0.05 m clear of the north wall and the exit gap.
+const secShelf = box(17.44, -29.55, 0.3, 2.0, 0.8, 0x6a5a3a, undefined, { material: 'wood' });
+addGLBToObstacle(secShelf, 'assets/props/shelf_warehouse_3tier.glb', 2.0, 0.8, 0.284, [[0, 0, 0, Math.PI / 2]]);
+[[17.5, -27.15, 'assets/props/heavy-door.glb'], [17.5, -26, 'assets/props/metal-door.glb'], [17.5, -25.65, 'assets/props/metal-door-simple.glb']].forEach(([x, z, path])=>{
   const o = box(x, z, 0.15, 0.6, 2.0, 0x444444, undefined, { material: 'metal' });
   addGLBToObstacle(o, path, 0.6, 2.0, 0.1, [[0, 0, 0, Math.PI / 2]]);
 });
+// SKIPPED (2026-11-20, new intake): grille_vent_strip.glb and
+// server_rack_door_glass.glb. The vent grille has no clean spot — the
+// north wall ends at y 2.2 (nothing to mount it on above the pipes), and
+// the floor already has a mesh grate at the south entrance. The glass
+// door panel has no clean spot on the west wall — the cabinet, both
+// crates and the duct post fill it (the panel would overlap the (11,-30)
+// or (11,-26.5) crate from either end).
 // --- Floor pieces (visual-only, flush on the ground, no collision) ---
 // Floor slab under the workstation (floor-white.glb, 0.999 x 0.229 x
 // 0.919 raw) and two pallets + a floor grate by the south entrance.
