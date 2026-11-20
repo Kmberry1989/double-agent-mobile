@@ -20,7 +20,7 @@
   #tagStatus{color:#ffb45e;min-height:1.2em}
   #joy{position:fixed;left:18px;bottom:18px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);display:none;z-index:5;touch-action:none}
   #knob{position:absolute;left:37px;top:37px;width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.45)}
-  body.touch #joy{display:block}
+  body.touch #joy{display:none} /* nest: fixed position, no movement stick */
   #tagBtn{position:fixed;right:18px;bottom:24px;width:92px;height:92px;border-radius:50%;background:rgba(255,140,26,.85);border:2px solid rgba(255,255,255,.4);color:#111;font-size:17px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
   body.touch #tagBtn{display:block}
 </style>
@@ -31,7 +31,7 @@
 <div id="mission"><b>Terrorists stopped:</b> <span id="stopCount">0 / 5</span><div id="tagStatus"></div></div>
 <div id="joy"><div id="knob"></div></div>
 <button id="tagBtn">TAG</button>
-<div id="overlay"><h1>Trick or Treat</h1><button id="startBtn">Enter the neighborhood</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / R1 Tag · L3 Sprint</p></div>
+<div id="overlay"><h1>Trick or Treat</h1><p>Sniper nest — the street is yours to watch.</p><button id="startBtn">Enter the nest</button><p class="padControls">PS4 controller — Right stick look · X / R1 Tag</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="fail"><h1>Mission failed</h1><p id="failText"></p><button onclick="location.reload()">Try again</button></div>
 <script type="module">
@@ -49,12 +49,19 @@ const texLoader = new THREE.TextureLoader();
 
 // ---- Layout ----
 // Residential street, Halloween night. The street runs north-south along
-// Z: south end z=+60 (spawn), north end z=-60 (EXFIL). Street x -6..6,
-// sidewalks x +-6..9, front yards x +-9..21, houses at x=+-16 facing the
-// street. Ground is flat (y=0) everywhere the player walks.
+// Z: south end z=+60 (nest building z +58..+64), north end z=-60 (EXFIL).
+// Street x -6..6, sidewalks x +-6..9, front yards x +-9..21, houses at
+// x=+-16 facing the street. Ground is flat (y=0) everywhere the player walks.
 const CHAR_LIFT = 0.05;
 const STREET = { xMin: -20, xMax: 20, zMin: -58, zMax: 58 };
 const EXFIL = { x: 0, z: -56, r: 2.5 };
+// Sniper nest (Part 1, 2026-11-20): the player starts fixed in a nest
+// building at the south end (z +58..+64) and does NOT walk — NEST_MODE
+// zeroes the movement inputs in animate(). Look (yaw/pitch) still works;
+// TAG/shoot mechanics are untouched (Part 2 handles shooting).
+const NEST_MODE = true;
+const NEST_SPAWN = { x: -3, z: 60.5 };
+const NEST_CAM_BACK = 2.2;
 const TAG_RANGE = 2.5;
 const TERRORIST_COUNT = 5;
 // Houses: [x, z] — west side x=-16 (front faces +X), east side x=+16
@@ -300,6 +307,54 @@ loadProp('assets/props/nightstand_lantern_cream.glb', 11.5, 0, -29.5, 0.5, 0.7, 
   m.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0xffc46b); o.material.emissiveIntensity = 0.8; } });
 });
 
+// ---- Sniper nest building (Part 1, 2026-11-20) ----
+// A nest at the south end of the street, z +58..+64, x -7..+7, walls
+// 3.5 m tall. The north wall (z=58) has a wide window opening x -6..0,
+// y 1.0..2.6 — the sightline down the street. The player stands at
+// (-3, 60.5), centred in the opening. The facade panel covers the east
+// pier (x +1..+6) so the window stays clear. All props are real GLBs
+// from the Nov 20 intake; the rifle rests on the window sill, muzzle
+// north. The motorcycle is parked at the south end of the street,
+// clear of the terrorist lanes (x -3..+3, z <= 50) and the civilian
+// doors (x +-11). loadProp centres a model on its bbox, so each prop's
+// y is half its fitted height (base on the floor / sill).
+// Floor (0.03 above the base slab, so it is not coplanar).
+flatPlane(0, 0.03, 61, 14, 6, 0x2a2a30);
+// Walls: dark slate. North wall is piers + sill + lintel around the window.
+box(-6.5, 1.75, 58, 1, 3.5, 0.4, 0x33303a); // west pier x -7..-6
+box(3.5, 1.75, 58, 7, 3.5, 0.4, 0x33303a); // east pier x 0..+7
+box(-3, 0.5, 58, 6, 1.0, 0.4, 0x33303a); // sill below the window, y 0..1.0
+box(-3, 3.05, 58, 6, 0.9, 0.4, 0x33303a); // lintel above the window, y 2.6..3.5
+box(0, 1.75, 64, 14, 3.5, 0.4, 0x33303a); // south wall
+box(-7, 1.75, 61, 0.4, 3.5, 6, 0x33303a); // west wall
+box(7, 1.75, 61, 0.4, 3.5, 6, 0x33303a); // east wall
+box(0, 3.6, 61, 14.4, 0.2, 6.4, 0x1e1a22); // roof, slight overhang
+// Warm light inside the nest so the hide reads at night.
+const nestLight = new THREE.PointLight(0xffc46b, 8, 10); nestLight.position.set(0, 2.8, 61); scene.add(nestLight);
+// Facade: lit-window building front on the north face, east pier only —
+// the window opening stays clear. Window side is +Z, so rotY PI faces
+// it north. 0.05 m proud of the wall face (z 57.8).
+loadProp('assets/props/facade_building_windows.glb', 3.5, 1.65, 57.65, 5, 3.3, 0.2, Math.PI);
+// Desks: a sniper's hide. West desk against the west wall (drawers east),
+// double-pedestal desk at the back east (drawers north), corner desk
+// north-east (monitor north). None in the sightline.
+loadProp('assets/props/desk_office_gray.glb', -6.35, 0.37, 62.8, 1.5, 0.73, 0.86, Math.PI / 2);
+loadProp('assets/props/desk_office_double_pedestal.glb', 5.5, 0.38, 63.2, 1.1, 0.76, 0.61, Math.PI);
+loadProp('assets/props/desk_corner_monitor.glb', 5.3, 0.36, 59.8, 1.3, 0.72, 0.96, Math.PI);
+// Chair behind the player, facing the window.
+loadProp('assets/props/chair_office_gray.glb', -5.5, 0.5, 61, 0.63, 1.0, 0.62, Math.PI);
+// Vent grille strip flat on the floor by the south wall, slots up.
+loadProp('assets/props/grille_vent_strip.glb', 0, 0.065, 63.5, 1.5, 0.07, 0.17, 0);
+// Glass server-rack door leaned against the west wall, glass facing east.
+loadProp('assets/props/server_rack_door_glass.glb', -6.7, 1.0, 59.5, 1.03, 2.0, 0.17, Math.PI / 2);
+// Sniper rifle on the window sill, muzzle north down the street. The
+// sill top is y 1.0; the rifle centre sits at 1.2 so the bipod rests on
+// it. Barrel pokes ~0.4 m out the window, stock stays in the room.
+loadProp('assets/weapons/sniper_rifle.glb', -3, 1.2, 58, 0.29, 0.41, 1.15, Math.PI);
+// Motorcycle parked at the south end of the street, east edge, facing
+// the building — visible from the nest, clear of every NPC route.
+loadProp('assets/vehicles/motorcycle_sport_black.glb', 5.5, 0.57, 52, 0.79, 1.14, 2.0, 0.1);
+
 // ---- EXFIL: green glowing gate at the north end of the street ----
 // Inert until all 5 terrorists are stopped, then it brightens. Walking
 // into it with all 5 stopped wins the mission.
@@ -420,7 +475,7 @@ function clipsFitModel(model) {
 }
 
 // ---- Player (Kyle_undercover, Mixamo) ----
-const player = new THREE.Group(); player.position.set(0, CHAR_LIFT, 54); scene.add(player);
+const player = new THREE.Group(); player.position.set(NEST_SPAWN.x, CHAR_LIFT, NEST_SPAWN.z); scene.add(player);
 let playerModel = null, mixer = null;
 const playerChar = { mixer: null, model: null, isTripo: false, _cur: null, _tripoClips: {} };
 fbxLoader.load('assets/characters/Kyle_undercover.fbx', (obj) => {
@@ -873,6 +928,7 @@ function animate() {
     fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
     if (joyId !== null) { fx += joyX; fz += -joyY; }
     if (gp.connected) { fx += gp.lx; fz += -gp.ly; } // gamepad left stick
+    if (NEST_MODE) { fx = 0; fz = 0; } // sniper nest: fixed position, no walking
     ml = Math.hypot(fx, fz);
     if (ml > 1) { fx /= ml; fz /= ml; }
     const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);
@@ -899,12 +955,13 @@ function animate() {
     mixer.update(dt);
   }
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  if (idleOrbitActive(dt, started && !won && !failed)) {
+  if (idleOrbitActive(dt, started && !won && !failed && !NEST_MODE)) {
     const op = orbitCamPos(new THREE.Vector3());
     camera.position.lerp(op, Math.min(1, dt * 3));
     camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
   } else {
-    camera.position.set(player.position.x + back.x * 5, player.position.y + 2.6, player.position.z + back.z * 5);
+    const camBack = NEST_MODE ? NEST_CAM_BACK : 5; // nest: camera stays inside the room
+    camera.position.set(player.position.x + back.x * camBack, player.position.y + 2.6, player.position.z + back.z * camBack);
     camera.lookAt(player.position.x - back.x * 3, player.position.y + 1.6, player.position.z - back.z * 3);
   }
   renderer.render(scene, camera);
