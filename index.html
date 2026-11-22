@@ -14,8 +14,8 @@
   #joyKnob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.55);border:2px solid rgba(0,0,0,.4)}
   /* Movement cluster (left, with the joystick): crouch / sneak / sprint / roll. */
   #moveGrid{position:absolute;left:20px;bottom:172px;display:grid;grid-template-columns:repeat(4,52px);gap:8px;pointer-events:auto}
-  /* Action cluster (right): melee / aim / fire / use / carry. */
-  #actionGrid{position:absolute;right:16px;bottom:20px;display:grid;grid-template-columns:repeat(2,52px);grid-template-rows:repeat(2,52px);gap:8px;pointer-events:auto}
+  /* Action cluster (right): melee / aim / fire / use / carry / reload. */
+  #actionGrid{position:absolute;right:16px;bottom:20px;display:grid;grid-template-columns:repeat(2,52px);grid-template-rows:repeat(3,52px);gap:8px;pointer-events:auto}
   .tbtn{width:52px;height:52px;border-radius:12px;border:2px solid rgba(255,255,255,.4);background:rgba(0,0,0,.55);color:#fff;font-size:13px;font-weight:700;cursor:pointer;touch-action:none;padding:0}
   .tbtn:active,.tbtn.on{background:rgba(87,217,119,.55)}
   /* Button icons (2026-11-14): white transparent PNGs, no text labels. */
@@ -104,12 +104,13 @@
     <button class="tbtn" id="btnFire" type="button" aria-label="Fire"><img src="assets/ui/icon-fire.png" alt=""></button>
     <button class="tbtn" id="btnInteract" type="button" aria-label="Use"><img src="assets/ui/icon-use.png" alt=""></button>
     <button class="tbtn" id="btnCarry" type="button" aria-label="Carry"><img src="assets/ui/icon-carry.png" alt=""></button>
+    <button class="tbtn" id="btnReload" type="button" aria-label="Reload"><img src="assets/ui/icon-reload.png" alt=""></button>
   </div>
 </div>
 <div id="overlay"><div class="box">
   <h1>DOUBLE AGENT</h1>
   <button id="startBtn">Click to infiltrate</button>
-  <p class="padControls">PS4 controller — Left stick move · Right stick look · X Use · Square Melee · Circle Roll · Triangle Loadout · L2 Aim (hold) · R2 Fire (hold) · L1 Melee · R1 Sneak · L3 Sprint · D-pad Wave / Kick / Lean</p>
+  <p class="padControls">PS4 controller — Left stick move · Right stick look · X Use · Square Melee · Circle Roll · Triangle Loadout · L2 Aim (hold) · R2 Fire (hold) · L1 Melee · R1 Sneak · R3 Reload · L3 Sprint · D-pad Wave / Kick / Lean</p>
   <nav class="levels"><a href="menu.html">Main Menu</a><a href="index.html" class="cur" aria-current="page">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html">Halloween</a><a href="mall.html">Mall</a></nav>
 </div></div>
 <script type="module">
@@ -252,7 +253,13 @@ const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sn
   // action ran before its clip arrived over the network. They are core
   // combat/movement, so they preload with the rest and are ready the
   // moment the player acts.
-  'roll','aimPistol','aimIdle','aimWalk','pistolWalkArc','firePistol','fireRifle','fireRifleCrouch'];
+  'roll','aimPistol','aimIdle','aimWalk','pistolWalkArc','firePistol','fireRifle','fireRifleCrouch',
+  // Reload + cover (2026-11-22, Kyle: reload animation missing, take
+  // cover with back against the wall): the reload clips had the same
+  // on-demand bug as roll/aim/fire — the first reload played with no
+  // animation. The cover loop (Taking_Cover_Idle) would too, the first
+  // time the player took cover. All three preload with the rest.
+  'reloadRifle','reloadPistol','cover'];
 let playerMixer = null, playerActions = {}, playerCurrentLoop = null, playerOneShot = null, playerOneShotName = null,
     playerOneShotHold = false, playerHeldPose = null, playerDesiredLoop = 'idle',
     playerRigOk = false, playerRigChecked = false, fbxPlaying = false;
@@ -1659,6 +1666,12 @@ let yaw = -Math.PI/4, pitch = 0.12, vy = 0, grounded = true, crouching = false, 
 // the smoothed lean (-1 left .. +1 right, applied as a body tilt + camera
 // shift in animate()); touchLean is the touch lean-button state (-1/0/+1).
 let crawling = false, sneaking = false, rolling = false, leanAmt = 0, touchLean = 0;
+// Take cover (2026-11-22, Kyle: take cover with back against the wall):
+// inCover = pressed flat to a wall, back to it, facing out into the room.
+// coverNx/coverNz = the wall face's outward normal (into the room);
+// coverYaw = the yaw that faces along that normal. See findCoverWall /
+// tryEnterCover / exitCover near tryInteract.
+let inCover = false, coverNx = 0, coverNz = 0, coverYaw = 0;
 let rollT = 0, rollDirX = 0, rollDirZ = 1;
 const ROLL_MOVE_T = 1.0, ROLL_SPEED = 5.5; // roll travels ~5.5 m over 1 s
 function cycleStance(){
@@ -1674,10 +1687,13 @@ let health = 100, detection = 0, intel = 0, gameOver = false, won = false;
 let weapon = 'pistol'; // pistol | rifle
 const weapons = { pistol:{mag:12, max:12, dmg:34, rate:0.28}, rifle:{mag:30, max:30, dmg:50, rate:0.11} };
 let ammoInMag = 12, lastShot = 0, reloadUntil = 0, currentAnim = 'idle';
-// Reload is automatic: when the mag runs dry the reload starts on its
-// own (no key, no button, no "press R" message). startReload is the one
-// place that begins a reload — KeyR, the RELOAD button, and the
-// auto-reload in tryShoot all call it.
+// Reload: ammo requires reloading — when the mag runs dry the reload
+// starts on its own, and the player can also reload early. startReload
+// is the one place that begins a reload — KeyR, the RELOAD touch button,
+// R3 on the gamepad, and the auto-reload in tryShoot all call it. The
+// reload animation is the real Reloading_Rifle / Reloading_Walking clip
+// (one-shot, preloaded in CORE_PRELOAD); in crouch/crawl it falls back
+// to the standing reload (no crouch reload clip exists).
 function startReload() {
   if (performance.now() > reloadUntil) {
     reloadUntil = performance.now() + 1500;
@@ -2736,6 +2752,7 @@ function pollGamepad(dt) {
   if (gp.pressed(GP.TRIANGLE)) { playerLoadout = playerLoadout === 'white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
   if (gp.pressed(GP.L3)) { gpSprintToggle = !gpSprintToggle; noteActivity(); }
   if (gp.pressed(GP.R1)) { sneaking = !sneaking; noteActivity(); }
+  if (gp.pressed(GP.R3)) { startReload(); noteActivity(); } // R3 (right-stick press) = reload — the free shoulder button after the L2/R2 trigger swap
   if (gp.pressed(GP.DPAD_UP)) playPlayerOneShot('wave');
   if (gp.pressed(GP.DPAD_DOWN)) playPlayerOneShot('kick');
   // D-pad Left/Right: lean (held, while aiming — read in animate()).
@@ -2861,6 +2878,7 @@ function doMelee(){
   bindBtn('btnMelee', doMelee);
   bindBtn('btnInteract', tryInteract);
   bindBtn('btnCarry', toggleCarryDrop);
+  bindBtn('btnReload', startReload); // RELOAD (2026-11-22): reload had no touch button — R / auto-reload only
   bindBtn('btnCrouch', ()=>{ cycleStance(); document.getElementById('btnCrouch').classList.toggle('on', crouching); });
   bindBtn('btnSneak', ()=>{ sneaking = !sneaking; noteActivity(); document.getElementById('btnSneak').classList.toggle('on', sneaking); });
   bindBtn('btnSprint', ()=>{ touchSprintToggle = !touchSprintToggle; noteActivity(); document.getElementById('btnSprint').classList.toggle('on', touchSprintToggle); });
@@ -3461,8 +3479,67 @@ function updateStealthButtons(){
   // highlight is the state, since the button no longer has a text label).
   cb.classList.toggle('on', !!carriedBody);
 }
+// ---------- Take cover (back against the wall, 2026-11-22) ----------
+// Cover works against any tall obstacle (building walls, broken brick
+// walls, the security office): the player presses USE (E / X / Cross)
+// near a wall face and snaps in, back to the wall, facing out into the
+// room. In cover the player slides along the wall (A/D), cannot move
+// away from it except by walking forward out of cover (W) or pressing
+// USE again, and guards cannot see or shoot them (detection blocked in
+// updateGuard, stealth factor near 0 for the cameras). The cover pose is
+// the real Taking_Cover_Idle clip ('cover'), preloaded in CORE_PRELOAD.
+// The wall face is found from the obstacles AABBs — no new walls.
+// findCoverWall returns { nx, nz, face } for the nearest face within
+// ~1 m, or null. nx/nz is the outward normal (into the room); face is
+// the face's coordinate (x for a minX/maxX face, z for minZ/maxZ).
+function findCoverWall(){
+  const p = player.position;
+  let best = null, bestD = 1.0;
+  for (const o of obstacles){
+    if ((o.oh || 0) < 1.5) continue; // too short to hide behind
+    // minX face: player on the -x side, normal points -x.
+    if (p.x < o.minX && p.z > o.minZ - 0.3 && p.z < o.maxZ + 0.3){
+      const d = o.minX - p.x; if (d <= bestD){ bestD = d; best = { nx: -1, nz: 0, face: o.minX }; }
+    }
+    // maxX face: player on the +x side, normal points +x.
+    if (p.x > o.maxX && p.z > o.minZ - 0.3 && p.z < o.maxZ + 0.3){
+      const d = p.x - o.maxX; if (d <= bestD){ bestD = d; best = { nx: 1, nz: 0, face: o.maxX }; }
+    }
+    // minZ face: player on the -z side, normal points -z.
+    if (p.z < o.minZ && p.x > o.minX - 0.3 && p.x < o.maxX + 0.3){
+      const d = o.minZ - p.z; if (d <= bestD){ bestD = d; best = { nx: 0, nz: -1, face: o.minZ }; }
+    }
+    // maxZ face: player on the +z side, normal points +z.
+    if (p.z > o.maxZ && p.x > o.minX - 0.3 && p.x < o.maxX + 0.3){
+      const d = p.z - o.maxZ; if (d <= bestD){ bestD = d; best = { nx: 0, nz: 1, face: o.maxZ }; }
+    }
+  }
+  return best;
+}
+function tryEnterCover(){
+  if (gameOver || won || rolling || crawling) return false;
+  const w = findCoverWall();
+  if (!w) return false;
+  inCover = true; coverNx = w.nx; coverNz = w.nz;
+  // Snap flat to the wall, 0.55 m off its face, and face out into the room.
+  if (w.nx !== 0) player.position.x = w.face + w.nx * 0.55;
+  else player.position.z = w.face + w.nz * 0.55;
+  // Face away from the wall: forward (-sin yaw, -cos yaw) = the outward normal.
+  coverYaw = Math.atan2(-w.nx, -w.nz);
+  yaw = coverYaw; modelYaw = coverYaw;
+  noteActivity();
+  return true;
+}
+function exitCover(){
+  if (!inCover) return;
+  inCover = false; coverNx = 0; coverNz = 0;
+}
 function tryInteract(){
   if (gameOver || won) return;
+  // In cover, USE exits cover first (a second press then collects intel
+  // or exfils) — predictable, and the pickingUp animation never has to
+  // fight the cover pose.
+  if (inCover){ exitCover(); return; }
   for (const o of intelObjs){
     if (!o.taken && player.position.distanceTo(new THREE.Vector3(o.x,0,o.z))<2.5){
       o.taken=true; intel++; o.mesh.visible=false; showMsg('Intel collected: '+intel+' / 3',1800); playPlayerOneShot('pickingUp'); updateObjectives(); return;
@@ -3471,7 +3548,11 @@ function tryInteract(){
   if (player.position.distanceTo(new THREE.Vector3(38,0,-38))<5){
     if (intel>=3){ won=true; endScreen('MISSION COMPLETE — you exfiltrated with all 3 intel.'); }
     else showMsg('Exfil locked — collect all 3 intel first ('+intel+'/3)',2000);
+    return;
   }
+  // Nothing to pick up or exfil — near a wall, USE takes cover (back
+  // against the wall, facing out). tryEnterCover is a no-op away from a wall.
+  tryEnterCover();
 }
 function updateObjectives(){
   for (let i=0;i<3;i++){ const el=document.getElementById('obj'+(i+1)); if(!el) continue; el.textContent = (intelObjs[i].taken?'✓ ':'○ ')+'Collect intel '+(i+1)+' / 3'; if (intelObjs[i].taken) el.className='done'; }
@@ -3489,6 +3570,7 @@ function endScreen(text){
 // the one vision-rate call site. (Security cameras still use their own
 // inline 0.55 crouch factor; see report.)
 function playerStealthFactor(){
+  if (inCover) return 0.05; // pressed flat to a wall — near-invisible (also feeds the security cameras)
   if (crawling) return 0.4;
   if (sneaking) return crouching ? 0.35 : 0.5;
   if (crouching) return 0.55;
@@ -3506,7 +3588,7 @@ function updateGuard(g, dt, now){
   const fwd = new THREE.Vector3(Math.sin(g.yaw),0,Math.cos(g.yaw));
   const angle = Math.acos(Math.max(-1,Math.min(1,fwd.dot(toP))));
   const eye = new THREE.Vector3(gp.x,1.6,gp.z), target = new THREE.Vector3(p.x,1.4,p.z);
-  const seen = dist<19 && angle<0.65 && hasLOS(eye,target);
+  const seen = dist<19 && angle<0.65 && hasLOS(eye,target) && !inCover; // in cover the player is hidden — guards cannot see or shoot them
   const crouchFactor = playerStealthFactor();
   const sprinting = (keys['ShiftLeft'] || keys['ShiftRight'] || touchSprint || touchSprintToggle) && !sneaking && !crouching;
   if (seen){
@@ -3603,6 +3685,9 @@ function animStateName(moving, sprinting, fx, fz, turnDir){
   if (!grounded) return vy>0?'jump':'fall';
   // Prone beats aim: a crawling player stays prone even while aiming.
   if (crawling) return moving?(fz<0?'crawlBack':'crawl'):'crawlIdle';
+  // Take cover: pressed flat to a wall, back to it — the Taking_Cover_Idle
+  // loop plays whether still or sliding along the wall.
+  if (inCover) return 'cover';
   if (aiming) return moving?'aimWalk':'aimIdle';
   // Sneak mode (Z): the quiet walk. It shares the Sneaking_Forward clip
   // with crouch-walk (resolveLoopClip maps crouchWalk -> 'sneak'), so
@@ -3729,7 +3814,8 @@ function animate(){
   const dt = rawDt * timeScale;
   if (!gameOver && !won && (locked || touchMode || gp.seen)){
     const sprinting = ((keys['ShiftLeft']||keys['ShiftRight']) || touchSprint || touchSprintToggle || gpSprintToggle) && !crouching && !sneaking && !rolling;
-    let speed = crawling?1.2:(sneaking?1.5:(crouching?2:(sprinting?7:(aiming?2.5:4.2))));
+    // In cover the player slides along the wall slowly (1.5 m/s, sneak pace).
+    let speed = inCover?1.5:(crawling?1.2:(sneaking?1.5:(crouching?2:(sprinting?7:(aiming?2.5:4.2)))));
     let fx=0, fz=0;
     if (keys['KeyW']) fz+=1; if (keys['KeyS']) fz-=1; if (keys['KeyA']) fx-=1; if (keys['KeyD']) fx+=1;
     // Touch joystick overrides/adds to keys when active (analog vector).
@@ -3747,6 +3833,32 @@ function animate(){
       if (!collides(nx,player.position.z)) player.position.x=nx;
       if (!collides(player.position.x,nz)) player.position.z=nz;
       if (rollT <= 0) rolling = false;
+    } else if (inCover){
+      // Take cover: slide along the wall (tangent only). The input is
+      // camera-relative, so it is projected onto the wall tangent —
+      // whichever way the camera looks, the player only slides along the
+      // wall. Walking away from the wall (into the room) exits cover;
+      // pushing into the wall is blocked. Sliding past the end of the
+      // wall exits cover (re-enter on the next wall with USE).
+      if (moving){
+        const len=Math.hypot(fx,fz); const nfx=fx/len, nfz=fz/len;
+        const sin=Math.sin(yaw), cos=Math.cos(yaw);
+        const dx=(nfx*cos-nfz*sin)*speed*dt, dz=(-nfx*sin-nfz*cos)*speed*dt;
+        const alongN = dx*coverNx + dz*coverNz;
+        const tx = -coverNz, tz = coverNx; // wall tangent (90° from the normal)
+        const alongT = dx*tx + dz*tz;
+        if (alongN > 0.01){
+          exitCover();
+          const nx=player.position.x+dx, nz=player.position.z+dz;
+          if (!collides(nx,player.position.z)) player.position.x=nx;
+          if (!collides(player.position.x,nz)) player.position.z=nz;
+        } else {
+          const nx=player.position.x+tx*alongT, nz=player.position.z+tz*alongT;
+          if (!collides(nx,player.position.z)) player.position.x=nx;
+          if (!collides(player.position.x,nz)) player.position.z=nz;
+          if (!findCoverWall()) exitCover();
+        }
+      }
     } else if (moving){ const len=Math.hypot(fx,fz); fx/=len; fz/=len;
       const sin=Math.sin(yaw), cos=Math.cos(yaw);
       // REVERSED-FORWARD FIX (playtest): camera forward is (-sin,-cos)
@@ -3828,7 +3940,10 @@ function animate(){
     prevYawTurn = yaw;
     const turnDir = _yawDelta > 0.01 ? 1 : (_yawDelta < -0.01 ? -1 : 0);
     { let dyaw = yaw - modelYaw; while (dyaw>Math.PI) dyaw-=Math.PI*2; while (dyaw<-Math.PI) dyaw+=Math.PI*2;
-      modelYaw += dyaw * Math.min(1, dt*10); }
+      // In cover the body stays facing out from the wall (coverYaw) even
+      // while the camera looks around — only the camera yaw moves.
+      if (inCover) modelYaw = coverYaw;
+      else modelYaw += dyaw * Math.min(1, dt*10); }
     player.rotation.y = modelYaw;
     // Lean / peek (movement stream): hold Q/E while aiming to lean the
     // body sideways and shift the camera around a corner. Touch lean
@@ -3838,7 +3953,9 @@ function animate(){
     // so a clip lean could not mirror to both sides. Lean never changes
     // collision or the loop clip — the current loop keeps playing.
     let leanTarget = 0;
-    if (aiming && !crawling && !rolling){
+    // Lean works while aiming, and from cover to peek out (in cover the
+    // player is not necessarily aiming, so cover counts as a lean stance).
+    if ((aiming || inCover) && !crawling && !rolling){
       if (touchLean !== 0) leanTarget = touchLean;
       else if (gpLean !== 0) leanTarget = gpLean;
       else if (keys['KeyQ'] && !keys['KeyE']) leanTarget = -1;
