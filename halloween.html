@@ -813,8 +813,19 @@ function updateTracers(rawDt) {
     }
   }
 }
+// Sniper shot — Kyle's pick from the sound comparison (2026-11-22):
+// the video extract, trimmed to a tight 0.7 s shot. Mono AAC like the
+// rest of the game's audio. A plain Audio element is enough here — the
+// sniper fires one shot at a time, not auto-fire, so no overlap handling
+// is needed. The play() promise is caught so a blocked autoplay never
+// throws.
+const SNIPER_SHOT = 'assets/audio/sniper-shot.m4a';
+function playSniperShot(){
+  try { new Audio(SNIPER_SHOT).play().catch(()=>{}); } catch(e){}
+}
 function doShoot(ndcX, ndcY) {
   if (!started || won || failed) return;
+  playSniperShot();
   const nx = ndcX === undefined ? 0 : ndcX;
   const ny = ndcY === undefined ? 0 : ndcY;
   bulletTimeT = 1.0; // slow-mo on every shot

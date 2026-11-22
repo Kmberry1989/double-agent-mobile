@@ -3064,11 +3064,20 @@ const SFX_FILES = {
   pistol: 'assets/audio/pistol-gunshot.m4a',
   suppressedPistol: 'assets/audio/suppressed-pistol.m4a',
   suppressedWalther: 'assets/audio/suppressedwalther.m4a',
-  ak74: 'assets/audio/ak74.m4a',
-  rifle: 'assets/audio/rifle-gunshots.m4a',
-  // Revolver reload (2026-11-22): one metallic click per chamber, six
-  // in a row. Shotgun pump (2026-11-22): two-part racking after every
-  // shot. Both synthesised (Python + ffmpeg), mono AAC like the rest.
+  // Weapon sounds — Kyle's picks from the sound comparison
+  // (2026-11-22). Video extracts: Glock, Revolver, AKS74U, Shotgun.
+  // Real recordings: MP5K, RPG, suppressed pistol, bullet-load click,
+  // shotgun pump rack. Each trimmed to a tight shot (0.4–0.7 s) so it
+  // repeats cleanly at auto-fire rates. The MP5K is the first shot of
+  // the burst; the bullet-load is a single click cut from the full
+  // loading sequence. The suppressed pistol, bullet-load, and pump are
+  // real recordings replacing the earlier synthesised files.
+  glock: 'assets/audio/glock-shot.m4a',
+  revolver: 'assets/audio/revolver-shot.m4a',
+  mp5k: 'assets/audio/mp5k-burst.m4a',
+  aks74u: 'assets/audio/aks74u-shot.m4a',
+  shotgun: 'assets/audio/shotgun-blast.m4a',
+  rpg: 'assets/audio/rpg-launch.m4a',
   bulletLoad: 'assets/audio/bullet-load.m4a',
   shotgunPump: 'assets/audio/shotgun-pump.m4a',
   hit: ['assets/audio/gunshot-hit.m4a', 'assets/audio/gunshot-hit2.m4a'],
@@ -3145,12 +3154,17 @@ function playSfx(file){
 function pickSfx(arr){ return arr[(Math.random()*arr.length)|0]; }
 function playShotSound(){
   if (weapon === 'rifle'){
-    if (weaponVariant === 'AKS74U') playSfx(SFX_FILES.ak74);
-    else playSfx(SFX_FILES.rifle); // MP5K, and RPG7 (no RPG sound in the set)
+    if (weaponVariant === 'AKS74U') playSfx(SFX_FILES.aks74u);
+    else if (weaponVariant === 'MP5K') playSfx(SFX_FILES.mp5k);
+    else if (weaponVariant === 'Shotgun') playSfx(SFX_FILES.shotgun);
+    else if (weaponVariant === 'RPG7') playSfx(SFX_FILES.rpg);
+    else playSfx(SFX_FILES.aks74u);
   } else {
     if (weaponVariant === 'Walther') playSfx(SFX_FILES.suppressedWalther);
     else if (weaponVariant === 'Glock' && playerLoadout === 'black') playSfx(SFX_FILES.suppressedPistol);
-    else playSfx(SFX_FILES.pistol);
+    else if (weaponVariant === 'Glock') playSfx(SFX_FILES.glock);
+    else if (weaponVariant === 'Revolver') playSfx(SFX_FILES.revolver);
+    else playSfx(SFX_FILES.pistol); // Makarov
   }
 }
 // ---------- Procedural ambient + footstep audio (Web Audio, no files) ----------
