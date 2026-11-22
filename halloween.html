@@ -66,9 +66,9 @@ const EXFIL = { x: 0, z: -56, r: 2.5 };
 // Sniper nest (Part 1, 2026-11-20): the player starts fixed in a nest
 // building at the south end (z +58..+64) and does NOT walk — NEST_MODE
 // zeroes the movement inputs in animate(). Look (yaw/pitch) still works.
-// Sniper mechanics (Part 2, 2026-11-20): scope (R2 / right-mouse /
+// Sniper mechanics (Part 2, 2026-11-20): scope (L2 / right-mouse /
 // SCOPE button), 2x/4x zoom cycle (L3 / wheel / ZOOM button), shoot
-// (Cross / R1 / click / E / FIRE button) with slow-mo bullet trails.
+// (Cross / R1 / R2 / click / E / FIRE button) with slow-mo bullet trails.
 // A sniper shoots across the whole street, so SHOOT_RANGE is ~the
 // street length, not the old 2.5 m tag range.
 const NEST_MODE = true;
@@ -834,7 +834,7 @@ function doShoot(ndcX, ndcY) {
 }
 
 // ---- Scope + zoom (Part 2) ----
-// Scope sources: mouse right-hold, gamepad R2 hold (momentary), touch
+// Scope sources: mouse right-hold, gamepad L2 hold (momentary), touch
 // SCOPE button and F key (latched toggles). Zoom: 2x/4x cycle via L3,
 // mouse wheel, or ZOOM button. FOV: 1x = 60, 2x = 30, 4x = 15.
 const BASE_FOV = 60;
@@ -888,7 +888,7 @@ addEventListener('mousemove', (e) => {
 });
 
 // ---------- Gamepad (PS4 DualShock 4, Bluetooth) ----------
-// Right stick looks, Cross / R1 shoot, R2 hold scopes in, L3 cycles
+// Right stick looks, Cross / R1 / R2 shoot, L2 hold scopes in, L3 cycles
 // the 2x/4x zoom. Left stick is unmapped (fixed nest, no movement).
 // pollGamepad(dt) runs once per frame from animate().
 const gp = createGamepad();
