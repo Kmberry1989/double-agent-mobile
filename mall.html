@@ -56,11 +56,18 @@ const texLoader = new THREE.TextureLoader();
 // ---- Layout ----
 // Christmas shopping mall, Mission 6 "The Mall". A rectangular atrium,
 // 60 m long (north-south, z -30..+30) x 40 m wide (east-west, x -20..+20),
-// ceiling 8 m. The player spawns at the south entrance and walks the
-// atrium; storefronts line both sides (openings in the walls at x=+-14,
-// stores 6 m deep behind them). Central Christmas tree at (0, 0, 0).
-// Ground is flat (y=0) everywhere the player walks.
+// ceiling 12 m. Two stories: the ground floor (y=0) and an upper floor
+// (y=4.5) forming a ring around the central atrium opening (x -8..8,
+// z -12..12) so the player can look down at the tree. Two escalators
+// (UP at x=4, DOWN at x=8) carry the player between floors, rising
+// through the opening to the south end strip. The player spawns at the
+// south entrance and walks the atrium; storefronts line both sides
+// (openings in the walls at x=+-14, stores 6 m deep behind them, on
+// both floors). Central Christmas tree at (0, 0, 0). Ground is flat
+// (y=0) everywhere the player walks; the upper floor is flat at y=4.5.
 const CHAR_LIFT = 0.05;
+const UPPER_Y = 4.5; // second-story floor height
+const VOID = { x: 8, z: 12 }; // central atrium opening, half-extents
 const MALL = { xMin: -19, xMax: 19, zMin: -29, zMax: 29 };
 const SPAWN = { x: 0, z: 26 };
 const BOMB_COUNT = 4;
@@ -130,44 +137,56 @@ flatPlane(0, 0, 0, 40, 60, 0x9a8a72);
 flatPlane(0, 0.02, 0, 6, 56, 0x7a1a1a);
 flatPlane(-3.1, 0.03, 0, 0.2, 56, 0xc9a227);
 flatPlane(3.1, 0.03, 0, 0.2, 56, 0xc9a227);
-// Ceiling at y=8 (faces down) with two bright skylight strips 0.02 below it.
-flatPlane(0, 8, 0, 40, 60, 0x2a2018, null, 0, 0, Math.PI / 2);
+// Ceiling at y=12 (faces down) with two bright skylight strips 0.02 below it.
+flatPlane(0, 12, 0, 40, 60, 0x2a2018, null, 0, 0, Math.PI / 2);
 [[-6], [6]].forEach(([x]) => {
   const sky = new THREE.Mesh(new THREE.PlaneGeometry(6, 20), new THREE.MeshBasicMaterial({ color: 0xfff6dd }));
-  sky.rotation.x = Math.PI / 2; sky.position.set(x, 7.98, 0); scene.add(sky);
+  sky.rotation.x = Math.PI / 2; sky.position.set(x, 11.98, 0); scene.add(sky);
 });
-// Perimeter walls, 8 m tall. North wall solid; south wall has the entrance
+// Perimeter walls, 12 m tall. North wall solid; south wall has the entrance
 // (x -2..2, y 0..3.5) the player walks in through.
-box(0, 4, -30, 40, 8, 0.4, 0x7a6a58); // north
-box(-11, 4, 30, 18, 8, 0.4, 0x7a6a58); // south, west of entrance
-box(11, 4, 30, 18, 8, 0.4, 0x7a6a58); // south, east of entrance
-box(0, 5.75, 30, 4, 4.5, 0.4, 0x7a6a58); // lintel above the entrance
-box(20, 4, 0, 0.4, 8, 60, 0x7a6a58); // east outer wall
-box(-20, 4, 0, 0.4, 8, 60, 0x7a6a58); // west outer wall
+box(0, 6, -30, 40, 12, 0.4, 0x7a6a58); // north
+box(-11, 6, 30, 18, 12, 0.4, 0x7a6a58); // south, west of entrance
+box(11, 6, 30, 18, 12, 0.4, 0x7a6a58); // south, east of entrance
+box(0, 7.75, 30, 4, 8.5, 0.4, 0x7a6a58); // lintel above the entrance, y 3.5..12
+box(20, 6, 0, 0.4, 12, 60, 0x7a6a58); // east outer wall
+box(-20, 6, 0, 0.4, 12, 60, 0x7a6a58); // west outer wall
 // Entrance mat just inside the doors.
 flatPlane(0, 0.04, 28, 4, 2, 0x4a1a1a);
-// Storefront walls at x=+-14: piers between the bays and lintels above
-// the openings (openings 8 m wide, y 0..4; bays centred z=-20,-10,0,10,20).
+// Storefront walls at x=+-14, two levels: piers (full 12 m height)
+// between the bays, a ground lintel (y 4..4.5) over the ground openings
+// (8 m wide, y 0..4), and an upper lintel (y 8.5..12) over the upper
+// openings (8 m wide, y 4.5..8.5). Bays centred z=-20,-10,0,10,20.
 // The stores are the 6 m of floor between the storefront wall and the
-// outer wall; the player walks in through the openings.
+// outer wall, on both floors; the player walks in through the openings.
+// Pier colliders apply on both floors (floor: 2).
 [-25, -15, -5, 5, 15, 25].forEach((z) => {
-  box(-14, 4, z, 0.4, 8, 2, 0x8a7a68); colliders.push({ x: -14, z, r: 1 });
-  box(14, 4, z, 0.4, 8, 2, 0x8a7a68); colliders.push({ x: 14, z, r: 1 });
+  box(-14, 6, z, 0.4, 12, 2, 0x8a7a68); colliders.push({ x: -14, z, r: 1, floor: 2 });
+  box(14, 6, z, 0.4, 12, 2, 0x8a7a68); colliders.push({ x: 14, z, r: 1, floor: 2 });
 });
 [-20, -10, 0, 10, 20].forEach((z) => {
-  box(-14, 6, z, 0.4, 4, 8, 0x8a7a68); // lintel, y 4..8
-  box(14, 6, z, 0.4, 4, 8, 0x8a7a68);
-  // Plain coloured fascia band over each storefront (no sign text).
+  box(-14, 4.25, z, 0.4, 0.5, 8, 0x8a7a68); // ground lintel, y 4..4.5
+  box(14, 4.25, z, 0.4, 0.5, 8, 0x8a7a68);
+  box(-14, 10.25, z, 0.4, 3.5, 8, 0x8a7a68); // upper lintel, y 8.5..12
+  box(14, 10.25, z, 0.4, 3.5, 8, 0x8a7a68);
+  // Plain coloured fascia bands over each storefront (no sign text).
   box(-14, 4.4, z, 0.5, 0.8, 8.4, 0xb03a2e);
   box(14, 4.4, z, 0.5, 0.8, 8.4, 0x2e5d8a);
+  box(-14, 8.9, z, 0.5, 0.8, 8.4, 0xb03a2e);
+  box(14, 8.9, z, 0.5, 0.8, 8.4, 0x2e5d8a);
 });
 // Ceiling lights: warm fixtures down the atrium (emissive spheres +
-// real PointLights so the mall reads bright and festive).
+// real PointLights so the mall reads bright and festive), hung just
+// below the 12 m ceiling so they light both floors through the opening.
 [[-24], [-12], [0], [12], [24]].forEach(([z]) => {
   const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8),
     new THREE.MeshStandardMaterial({ color: 0xfff6dd, emissive: 0xffe0b0, emissiveIntensity: 2 }));
-  bulb.position.set(0, 6.5, z); scene.add(bulb);
-  const l = new THREE.PointLight(0xffe0b0, 20, 20); l.position.set(0, 6.5, z); scene.add(l);
+  bulb.position.set(0, 10.5, z); scene.add(bulb);
+  const l = new THREE.PointLight(0xffe0b0, 20, 20); l.position.set(0, 10.5, z); scene.add(l);
+});
+// Upper-walkway lights (warm, modest) so the second story reads bright.
+[[-16, -15], [-16, 15], [16, -15], [16, 15]].forEach(([x, z]) => {
+  const l = new THREE.PointLight(0xffe0b0, 10, 14); l.position.set(x, 7, z); scene.add(l);
 });
 
 // ---- Christmas tree (centre of the atrium) ----
@@ -224,9 +243,10 @@ loadProp('assets/props/trash_bin_green.glb', 13, 0.45, -26, 0.5, 0.9, 0.5, 0);
   const l = new THREE.PointLight(0xffc46b, 6, 8); l.position.set(x, 1.8, z); scene.add(l);
 });
 // Display tables with candles and a cream lantern (real GLBs on
-// procedural tables) near the tree.
-box(3, 0.35, 4, 1.2, 0.7, 0.6, 0x6a4a2a); colliders.push({ x: 3, z: 4, r: 0.9 });
-loadProp('assets/props/candles_pair_holders.glb', 3, 0.85, 4, 0.5, 0.3, 0.3, 0.4);
+// procedural tables) near the tree. The candle table sits south of the
+// tree (z=-8) so it does not block the UP escalator's ground end (x=4, z=4).
+box(3, 0.35, -8, 1.2, 0.7, 0.6, 0x6a4a2a); colliders.push({ x: 3, z: -8, r: 0.9 });
+loadProp('assets/props/candles_pair_holders.glb', 3, 0.85, -8, 0.5, 0.3, 0.3, 0.4);
 box(-3, 0.35, -4, 1.0, 0.7, 0.5, 0x6a4a2a); colliders.push({ x: -3, z: -4, r: 0.8 });
 loadProp('assets/props/nightstand_lantern_cream.glb', -3, 1.05, -4, 0.5, 0.7, 0.5, 0, (holder, m) => {
   m.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0xffc46b); o.material.emissiveIntensity = 0.8; } });
@@ -264,20 +284,192 @@ STORE_FIXTURES.forEach((f) => {
   colliders.push({ x: f.x, z: f.z, r: 1.2 });
 });
 
+// ---- Second story (upper floor at y = 4.5 m) ----
+// Four floor slabs (tops at y=4.5) forming a ring around the central
+// atrium opening (x -8..8, z -12..12), so the player can look down at
+// the tree. The escalators land on the south end strip (z 12..30) —
+// they rise through the opening, so no hole is cut for them.
+const UPPER_FLOOR_COLOR = 0x8a7a62;
+box(-14, 4.35, 0, 12, 0.3, 60, UPPER_FLOOR_COLOR); // west walkway
+box(14, 4.35, 0, 12, 0.3, 60, UPPER_FLOOR_COLOR); // east walkway
+box(0, 4.35, 21, 16, 0.3, 18, UPPER_FLOOR_COLOR); // south end strip
+box(0, 4.35, -21, 16, 0.3, 18, UPPER_FLOOR_COLOR); // north end strip
+// Gold edge strips along the balcony inner edge (0.01 above the slab top).
+box(-8, 4.52, 0, 0.2, 0.02, 24, 0xc9a227);
+box(8, 4.52, 0, 0.2, 0.02, 24, 0xc9a227);
+box(0, 4.52, -12, 16, 0.02, 0.2, 0xc9a227);
+box(-2.5, 4.52, 12, 11, 0.02, 0.2, 0xc9a227); // south strip, x -8..3 (gap for escalators)
+// Railings around the atrium opening: a low parapet (1.1 m, y 4.5..5.6)
+// + gold top rail. The south railing (z=12) has a gap at x 3..9 where
+// the two escalators cross it; the other three sides run the full opening.
+box(-2.5, 5.05, 12, 11, 1.1, 0.12, 0x3a3a3a); // south parapet, x -8..3
+box(-2.5, 5.62, 12, 11.2, 0.08, 0.2, 0xc9a227); // south top rail
+box(0, 5.05, -12, 16, 1.1, 0.12, 0x3a3a3a); // north parapet, x -8..8
+box(0, 5.62, -12, 16.2, 0.08, 0.2, 0xc9a227); // north top rail
+box(-8, 5.05, 0, 0.12, 1.1, 24, 0x3a3a3a); // west parapet, z -12..12
+box(-8, 5.62, 0, 0.2, 0.08, 24.2, 0xc9a227); // west top rail
+box(8, 5.05, 0, 0.12, 1.1, 24, 0x3a3a3a); // east parapet, z -12..12
+box(8, 5.62, 0, 0.2, 0.08, 24.2, 0xc9a227); // east top rail
+// Upper store fixtures: the same real shelf / rack GLBs as the ground
+// floor, mirrored on the upper level (sitting on the y=4.5 floor).
+// Colliders are upper-floor only (floor: 1).
+const UPPER_STORE_FIXTURES = [
+  { file: 'shelf_wall_cubbies.glb', x: -17.5, z: -20, ry: Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
+  { file: 'shelf_warehouse_3tier.glb', x: -17.5, z: -10, ry: Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
+  { file: 'shelf_wall_cubbies.glb', x: -17.5, z: 0, ry: Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
+  { file: 'shelf_warehouse_3tier.glb', x: -17.5, z: 10, ry: Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
+  { file: 'shelf_wall_cubbies.glb', x: -17.5, z: 20, ry: Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
+  { file: 'shelf_warehouse_3tier.glb', x: 17.5, z: -20, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
+  { file: 'shelf_wall_cubbies.glb', x: 17.5, z: -10, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
+  { file: 'wine_rack_bottles.glb', x: 17.5, z: 0, ry: -Math.PI / 2, tw: 1.5, th: 1.8, td: 0.6 },
+  { file: 'shelf_warehouse_3tier.glb', x: 17.5, z: 10, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
+  { file: 'shelf_wall_cubbies.glb', x: 17.5, z: 20, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
+];
+UPPER_STORE_FIXTURES.forEach((f) => {
+  loadProp('assets/props/' + f.file, f.x, UPPER_Y + f.th / 2, f.z, f.tw, f.th, f.td, f.ry);
+  colliders.push({ x: f.x, z: f.z, r: 1.2, floor: 1 });
+});
+
+// ---- Escalators (UP at x=4, DOWN at x=8; ground z=4 -> upper z=12) ----
+// Two moving inclined walkways side by side in the atrium, rising
+// through the central opening to the south end strip. UP carries the
+// player from the ground floor to y=4.5; DOWN carries them back down.
+// Green trim = UP, red trim = DOWN, and the steps move, so the direction
+// reads from the motion as well as the colour. Procedural — no escalator
+// GLB exists in the repo. The player boards at the entry end, rides the
+// incline (they can still walk/steer while on it), and steps off at the
+// far end; walking back out the near end cancels the ride.
+const ESC = { rise: UPPER_Y, run: 8, z0: 4, z1: 12, speed: 1.0 };
+ESC.angle = Math.atan2(ESC.rise, ESC.run);
+ESC.slopeLen = Math.hypot(ESC.run, ESC.rise);
+ESC.zSpeed = ESC.speed * ESC.run / ESC.slopeLen; // z-component of the ride
+const escalators = [];
+// Floor state: 0 = ground (y=0), 1 = upper (y=4.5). `riding` is the
+// escalator being ridden, or null.
+let playerFloor = 0;
+let riding = null;
+function makeEscalator(cx, dir, trimColor) {
+  const g = new THREE.Group();
+  // Truss: sloped box under the steps (its top surface is the incline).
+  const truss = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, ESC.slopeLen),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a }));
+  truss.position.set(cx, ESC.rise / 2 - 0.22, (ESC.z0 + ESC.z1) / 2 + 0.12);
+  truss.rotation.x = -ESC.angle;
+  truss.castShadow = true; truss.receiveShadow = true;
+  g.add(truss);
+  // Balustrades: sloped side panels, one each side, with a handrail
+  // on top in the trim colour.
+  [-0.65, 0.65].forEach((dx) => {
+    const bal = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.0, ESC.slopeLen),
+      new THREE.MeshStandardMaterial({ color: 0x3a3a3a }));
+    bal.position.set(cx + dx, ESC.rise / 2 + 0.35, (ESC.z0 + ESC.z1) / 2);
+    bal.rotation.x = -ESC.angle;
+    bal.castShadow = true;
+    g.add(bal);
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, ESC.slopeLen),
+      new THREE.MeshStandardMaterial({ color: trimColor, emissive: trimColor, emissiveIntensity: 0.4 }));
+    rail.position.set(cx + dx, ESC.rise / 2 + 0.9, (ESC.z0 + ESC.z1) / 2);
+    rail.rotation.x = -ESC.angle;
+    g.add(rail);
+  });
+  // End plates: ground end (y=0.04) and upper end (y=4.54), both 0.01+
+  // above the floor they sit on.
+  const plateG = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 1.0),
+    new THREE.MeshStandardMaterial({ color: 0x4a4a4a }));
+  plateG.position.set(cx, 0.04, ESC.z0 - 0.3);
+  g.add(plateG);
+  const plateU = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 1.0),
+    new THREE.MeshStandardMaterial({ color: trimColor, emissive: trimColor, emissiveIntensity: 0.3 }));
+  plateU.position.set(cx, UPPER_Y + 0.04, ESC.z1 + 0.3);
+  g.add(plateU);
+  scene.add(g);
+  // Steps: level boxes that cycle along the incline (they stay flat,
+  // like real escalator steps, and translate along the slope).
+  const steps = [];
+  const N_STEPS = 14;
+  for (let i = 0; i < N_STEPS; i++) {
+    const step = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.18, 0.35),
+      new THREE.MeshStandardMaterial({ color: 0x555555 }));
+    step.castShadow = true;
+    scene.add(step);
+    const s0 = i / N_STEPS;
+    step.position.set(cx, s0 * ESC.rise + 0.09, ESC.z0 + s0 * ESC.run);
+    steps.push({ mesh: step, t: s0 });
+  }
+  const esc = { cx, dir, trimColor, steps, xMin: cx - 0.6, xMax: cx + 0.6 };
+  escalators.push(esc);
+  return esc;
+}
+makeEscalator(4, 1, 0x33cc66); // UP (green trim)
+makeEscalator(8, -1, 0xff5533); // DOWN (red trim)
+function escalatorInclineY(z) {
+  const y = CHAR_LIFT + ((z - ESC.z0) / ESC.run) * ESC.rise;
+  return Math.max(CHAR_LIFT, Math.min(UPPER_Y + CHAR_LIFT, y));
+}
+function updateEscalatorRide(dt) {
+  if (!riding) {
+    // Board: UP from the ground floor at its ground end, DOWN from the
+    // upper floor at its upper end.
+    for (const e of escalators) {
+      if (e.dir === 1 && playerFloor === 0 &&
+          Math.abs(player.position.x - e.cx) < 0.7 &&
+          player.position.z > ESC.z0 - 0.8 && player.position.z < ESC.z0 + 0.8) {
+        riding = e; break;
+      }
+      if (e.dir === -1 && playerFloor === 1 &&
+          Math.abs(player.position.x - e.cx) < 0.7 &&
+          player.position.z > ESC.z1 - 0.8 && player.position.z < ESC.z1 + 0.8) {
+        riding = e; break;
+      }
+    }
+    return;
+  }
+  // Riding: the escalator carries the player along the incline; the
+  // player's own walk input (already applied) still steers them.
+  const e = riding;
+  player.position.z += e.dir * ESC.zSpeed * dt;
+  player.position.x = Math.max(e.cx - 0.5, Math.min(e.cx + 0.5, player.position.x));
+  player.position.y = escalatorInclineY(player.position.z);
+  // Exit at the far end (floor flips) or walk back out the near end.
+  if (e.dir === 1 && player.position.z >= ESC.z1 + 0.2) {
+    riding = null; playerFloor = 1; player.position.y = UPPER_Y + CHAR_LIFT;
+  } else if (e.dir === -1 && player.position.z <= ESC.z0 - 0.2) {
+    riding = null; playerFloor = 0; player.position.y = CHAR_LIFT;
+  } else if (e.dir === 1 && player.position.z <= ESC.z0 - 0.5) {
+    riding = null; playerFloor = 0; player.position.y = CHAR_LIFT;
+  } else if (e.dir === -1 && player.position.z >= ESC.z1 + 0.5) {
+    riding = null; playerFloor = 1; player.position.y = UPPER_Y + CHAR_LIFT;
+  }
+}
+function updateEscalatorSteps(dt) {
+  // Steps cycle along the incline (UP steps rise, DOWN steps fall),
+  // in game time so they stay in sync with the ride.
+  for (const e of escalators) {
+    for (const s of e.steps) {
+      s.t += e.dir * (dt * ESC.speed) / ESC.slopeLen;
+      if (s.t > 1) s.t -= 1;
+      if (s.t < 0) s.t += 1;
+      s.mesh.position.set(e.cx, s.t * ESC.rise + 0.09, ESC.z0 + s.t * ESC.run);
+    }
+  }
+}
+
 // ---- C4 bombs (real C4 models, alternating black/white) ----
 // Four spread-out, visible, reachable spots — none inside a wall or
-// behind a collider. Each has a blinking red light (emissive sphere +
+// behind a collider. Two are upstairs (west + east upper stores) so the
+// second story matters to the mission; two stay on the ground floor
+// (tree, food court). Each has a blinking red light (emissive sphere +
 // PointLight, procedural) that turns green when defused.
 const BOMB_SPOTS = [
-  { file: 'black_c4.glb', x: 2.5, z: -3.5 },   // by the Christmas tree
-  { file: 'white_c4.glb', x: -16, z: -8 },    // west store, bay z=-10
-  { file: 'black_c4.glb', x: 16, z: 8 },      // east store, bay z=10
-  { file: 'white_c4.glb', x: -8, z: -25 },    // north end, food court
+  { file: 'black_c4.glb', x: 2.5, z: -3.5, y: 0 },   // by the Christmas tree (ground)
+  { file: 'white_c4.glb', x: -16, z: -8, y: UPPER_Y }, // upper west store, bay z=-10
+  { file: 'black_c4.glb', x: 16, z: 8, y: UPPER_Y },   // upper east store, bay z=10
+  { file: 'white_c4.glb', x: -8, z: -25, y: 0 },    // north end, food court (ground)
 ];
 const bombs = [];
 function makeBomb(spec, idx) {
-  const bomb = { x: spec.x, z: spec.z, live: true, defused: false, blinkMat: null, blinkLight: null, group: null };
-  loadProp('assets/weapons/' + spec.file, spec.x, 0.14, spec.z, 0.5, 0.28, 0.5, idx * 0.7, (holder) => {
+  const bomb = { x: spec.x, z: spec.z, y: spec.y || 0, live: true, defused: false, blinkMat: null, blinkLight: null, group: null };
+  loadProp('assets/weapons/' + spec.file, spec.x, (spec.y || 0) + 0.14, spec.z, 0.5, 0.28, 0.5, idx * 0.7, (holder) => {
     bomb.group = holder;
     const mat = new THREE.MeshStandardMaterial({ color: 0xff2222, emissive: 0xff2222, emissiveIntensity: 2 });
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), mat);
@@ -467,10 +659,11 @@ function makeShopper(spec, idx) {
 SHOPPER_ROSTER.forEach((spec, i) => makeShopper(spec, i));
 // Terrorists: 5 real enemy FBXs in Christmas disguises. They patrol /
 // stand guard near the bombs. They do not attack. Shooting one stops it
-// (same tip-over/sink/fade outcome as the Halloween shoot).
+// (same tip-over/sink/fade outcome as the Halloween shoot). The elf
+// guards the upstairs west-store bomb (upper floor).
 const TERRORIST_ROSTER = [
   { file: 'enemy-santa.fbx', speed: 1.4, waypoints: [[3, 3], [3, -3], [-3, -3], [-3, 3]], pauses: [1, 1, 1, 1] },
-  { file: 'enemy-elf.fbx', speed: 1.4, waypoints: [[-15, -6], [-15, -10]], pauses: [2, 2] },
+  { file: 'enemy-elf.fbx', speed: 1.4, y: UPPER_Y, waypoints: [[-15, -6], [-15, -10]], pauses: [2, 2] },
   { file: 'enemy-reindeer.fbx', speed: 1.4, waypoints: [[15, 6], [15, 10]], pauses: [2, 2] },
   { file: 'enemy-xmassweater.fbx', speed: 1.5, waypoints: [[-8, -22], [8, -22]], pauses: [1, 1] },
   { file: 'enemy-lights.fbx', speed: 1.5, waypoints: [[-5, 20], [-5, -20]], pauses: [0, 0] },
@@ -478,7 +671,7 @@ const TERRORIST_ROSTER = [
 function makeTerrorist(spec) {
   const start = spec.waypoints[0];
   const outer = new THREE.Group();
-  outer.position.set(start[0], CHAR_LIFT, start[1]);
+  outer.position.set(start[0], (spec.y || 0) + CHAR_LIFT, start[1]);
   scene.add(outer);
   const inner = new THREE.Group(); outer.add(inner);
   const npc = {
@@ -614,6 +807,8 @@ function nearestLiveBomb() {
   let best = null, bestD = Infinity;
   for (const b of bombs) {
     if (!b.live) continue;
+    // Same floor only — the player cannot defuse a bomb on the other floor.
+    if (Math.abs((b.y || 0) - (player.position.y - CHAR_LIFT)) > 2) continue;
     const d = Math.hypot(b.x - player.position.x, b.z - player.position.z);
     if (d < DEFUSE_RANGE && d < bestD) { bestD = d; best = b; }
   }
@@ -644,6 +839,7 @@ function nearestInFront() {
   let best = null, bestD = Infinity;
   for (const npc of npcs) {
     if (npc.stopped) continue;
+    if (Math.abs(npc.outer.position.y - player.position.y) > 2) continue; // cannot shoot through a floor
     const dx = npc.outer.position.x - player.position.x, dz = npc.outer.position.z - player.position.z;
     const d = Math.hypot(dx, dz);
     if (d > SHOOT_RANGE || d < 0.01) continue;
@@ -659,6 +855,7 @@ function raycastNpc(ndcX, ndcY) {
   for (const h of hits) {
     const npc = h.object.userData.npc;
     if (!npc || npc.stopped) continue;
+    if (Math.abs(npc.outer.position.y - player.position.y) > 2) continue; // cannot shoot through a floor
     const d = Math.hypot(npc.outer.position.x - player.position.x, npc.outer.position.z - player.position.z);
     if (d <= SHOOT_RANGE) return { npc, point: h.point };
   }
@@ -872,6 +1069,7 @@ function animate() {
   pollGamepad(rawDt); // PS4 controller: look stays responsive in slow-mo
   updateNpcs(dt);
   updateTracers(rawDt); // tracers fade in real time, even in slow-mo
+  updateEscalatorSteps(dt); // escalator steps cycle along the incline
   // Bomb blink lights (live bombs only; defused ones stay green).
   blinkT += rawDt;
   const blinkOn = Math.sin(blinkT * 6) > 0;
@@ -898,10 +1096,38 @@ function animate() {
     const speed = (keys['shift'] ? 5.5 : 4) * dt;
     player.position.x = Math.max(MALL.xMin, Math.min(MALL.xMax, player.position.x + dx * speed));
     player.position.z = Math.max(MALL.zMin, Math.min(MALL.zMax, player.position.z + dz * speed));
-    player.position.y = CHAR_LIFT;
-    for (const c of colliders) {
-      const ddx = player.position.x - c.x, ddz = player.position.z - c.z, d = Math.hypot(ddx, ddz);
-      if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
+    // Escalators: board at the entry end, ride the incline, step off.
+    updateEscalatorRide(dt);
+    // Upper floor: the central atrium opening (x -8..8, z -12..12) is a
+    // void — push the player back onto the ring (the railing is visual;
+    // this is the real constraint). Not while riding the escalator.
+    if (playerFloor === 1 && !riding) {
+      const px = player.position.x, pz = player.position.z;
+      if (Math.abs(px) < VOID.x && Math.abs(pz) < VOID.z) {
+        const pushX = VOID.x - Math.abs(px), pushZ = VOID.z - Math.abs(pz);
+        if (pushX < pushZ) player.position.x = (px < 0 ? -1 : 1) * VOID.x;
+        else player.position.z = (pz < 0 ? -1 : 1) * VOID.z;
+      }
+    }
+    if (!riding) player.position.y = playerFloor === 1 ? UPPER_Y + CHAR_LIFT : CHAR_LIFT;
+    // Escalator sides: the balustrades block walking through from the
+    // side on the ground floor (boarding is only at the ends).
+    if (!riding && playerFloor === 0) {
+      for (const e of escalators) {
+        const px = player.position.x, pz = player.position.z;
+        if (pz > ESC.z0 + 0.8 && pz < ESC.z1 - 0.8 && Math.abs(px - e.cx) < 0.7) {
+          player.position.x = e.cx + (px < e.cx ? -0.7 : 0.7);
+        }
+      }
+    }
+    // Colliders: floor-aware (no `floor` = ground only; 1 = upper only;
+    // 2 = both). Skipped while riding (the escalator is a controlled path).
+    if (!riding) {
+      for (const c of colliders) {
+        if ((c.floor || 0) !== playerFloor && c.floor !== 2) continue;
+        const ddx = player.position.x - c.x, ddz = player.position.z - c.z, d = Math.hypot(ddx, ddz);
+        if (d < c.r && d > 0.01) { player.position.x = c.x + ddx / d * c.r; player.position.z = c.z + ddz / d * c.r; }
+      }
     }
     player.rotation.y = yaw;
     if (mixer) {
@@ -947,7 +1173,9 @@ updateBombCount();
 updateTimer();
 if (new URLSearchParams(location.search).has('test')) {
   window.__mall = {
-    player, npcs, bombs, camera,
+    player, npcs, bombs, camera, escalators, UPPER_Y,
+    get playerFloor() { return playerFloor; },
+    get riding() { return riding; },
     get defused() { return defused; }, get won() { return won; }, get failed() { return failed; },
     get started() { return started; }, get timeLeft() { return timeLeft; },
     set timeLeft(v) { timeLeft = v; },
