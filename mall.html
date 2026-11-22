@@ -153,6 +153,9 @@ box(20, 6, 0, 0.4, 12, 60, 0x7a6a58); // east outer wall
 box(-20, 6, 0, 0.4, 12, 60, 0x7a6a58); // west outer wall
 // Entrance mat just inside the doors.
 flatPlane(0, 0.04, 28, 4, 2, 0x4a1a1a);
+// A wreath laid flat on the floor beside the entrance mat (the wreath
+// model is built flat — it lies on the ground, it does not hang).
+loadProp('assets/props/mall/wreath_christmas.glb', -2.5, 0.06, 26.5, 0.9, 0.12, 0.9, 0);
 // Storefront walls at x=+-14, two levels: piers (full 12 m height)
 // between the bays, a ground lintel (y 4..4.5) over the ground openings
 // (8 m wide, y 0..4), and an upper lintel (y 8.5..12) over the upper
@@ -190,46 +193,51 @@ flatPlane(0, 0.04, 28, 4, 2, 0x4a1a1a);
 });
 
 // ---- Christmas tree (centre of the atrium) ----
-// tree_bare.glb is the real tree base — decorated procedurally with
-// coloured light spheres in a spiral and a glowing star on top. It is
-// NOT left bare.
-loadProp('assets/props/tree_bare.glb', 0, 1.7, 0, 1.2, 3.4, 1.2, 0);
+// The real decorated tree from the new models — it already carries
+// ornaments and a gold star on top (verified in the scan render), so the
+// old procedural ornament spiral and star are gone. The two warm
+// PointLights stay: the model itself does not glow.
+loadProp('assets/props/mall/tree_christmas_decorated.glb', 0, 1.7, 0, 1.2, 3.4, 1.2, 0);
 colliders.push({ x: 0, z: 0, r: 1.6 });
-const ORNAMENT_COLORS = [0xff2222, 0xffd27a, 0x33cc66, 0x4488ff, 0xff88cc];
-for (let i = 0; i < 24; i++) {
-  const y = 0.4 + i * 0.12;
-  const radius = 1.0 - y * 0.28;
-  const a = i * 2.4;
-  const c = ORNAMENT_COLORS[i % ORNAMENT_COLORS.length];
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8),
-    new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.8 }));
-  orb.position.set(Math.cos(a) * radius, y, Math.sin(a) * radius);
-  scene.add(orb);
-}
-const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.25),
-  new THREE.MeshStandardMaterial({ color: 0xffd27a, emissive: 0xffd27a, emissiveIntensity: 2 }));
-star.position.set(0, 3.6, 0); scene.add(star);
 const treeLight = new THREE.PointLight(0xffd27a, 6, 8); treeLight.position.set(0, 3.5, 0); scene.add(treeLight);
 const treeLight2 = new THREE.PointLight(0xffd27a, 4, 8); treeLight2.position.set(0, 1.5, 0); scene.add(treeLight2);
+// Secondary real trees elsewhere in the atrium — clear of the escalators
+// (x 4 and 8, z 4..12), the tree bomb (2.5, -3.5), and the terrorist lanes.
+loadProp('assets/props/mall/tree_christmas_small_ornaments.glb', -10, 0.9, -18, 0.9, 1.8, 0.9, 0.5);
+colliders.push({ x: -10, z: -18, r: 0.5 });
+loadProp('assets/props/mall/tree_christmas_small_ornaments_2.glb', 10, 0.9, 18, 0.9, 1.8, 0.9, -0.4);
+colliders.push({ x: 10, z: 18, r: 0.5 });
+loadProp('assets/props/mall/tree_christmas_small.glb', -6, 0.85, 22, 0.8, 1.7, 0.8, 0.9);
+colliders.push({ x: -6, z: 22, r: 0.5 });
 
 // ---- Atrium dressing ----
-// Benches (procedural seat + legs) at four spots around the tree.
-[[-6, -10], [6, -10], [-6, 10], [6, 10]].forEach(([x, z]) => {
-  box(x, 0.45, z, 2.2, 0.12, 0.7, 0x6a4a2a);
-  box(x - 0.9, 0.2, z, 0.12, 0.4, 0.6, 0x4a3220);
-  box(x + 0.9, 0.2, z, 0.12, 0.4, 0.6, 0x4a3220);
+// Benches: real wooden benches from the new models (one variant per
+// spot, no duplicates) at the same four spots around the tree.
+[['bench_wood.glb', -6, -10], ['bench_wood_2.glb', 6, -10], ['bench_wood_3.glb', -6, 10], ['bench_wood_4.glb', 6, 10]].forEach(([file, x, z]) => {
+  loadProp('assets/props/mall/' + file, x, 0.25, z, 2.0, 0.5, 0.7, 0);
   colliders.push({ x, z, r: 1 });
 });
+// Lounge armchairs near the south end, facing the tree.
+loadProp('assets/props/mall/armchair_gray.glb', -12, 0.5, 22, 0.9, 1.0, 0.9, Math.PI / 4);
+colliders.push({ x: -12, z: 22, r: 0.6 });
+loadProp('assets/props/mall/armchair_velvet_red.glb', 12, 0.5, 22, 0.9, 1.0, 0.9, -Math.PI / 4);
+colliders.push({ x: 12, z: 22, r: 0.6 });
 // Planters (real desk_plant GLBs) near the storefronts.
 [[-12, -15], [12, -15], [-12, 15], [12, 15]].forEach(([x, z]) => {
   loadProp('assets/props/desk_plant.glb', x, 0.45, z, 0.8, 0.9, 0.8, 0);
   colliders.push({ x, z, r: 0.6 });
 });
-// Bins (real trash_bin GLBs) at the four corners of the atrium.
-loadProp('assets/props/trash_bin_green.glb', -13, 0.45, 26, 0.5, 0.9, 0.5, 0);
-loadProp('assets/props/trash_bin_blue.glb', 13, 0.45, 26, 0.5, 0.9, 0.5, 0);
-loadProp('assets/props/trash_bin_navy.glb', -13, 0.45, -26, 0.5, 0.9, 0.5, 0);
-loadProp('assets/props/trash_bin_green.glb', 13, 0.45, -26, 0.5, 0.9, 0.5, 0);
+// Real potted plants from the new models alongside the desk_plant planters.
+[['plant_potted_gold.glb', -12, -18], ['plant_potted_gold_2.glb', 12, -18], ['plant_potted_gold_3.glb', -10, 20], ['planter_poinsettia.glb', 12, 18]].forEach(([file, x, z]) => {
+  loadProp('assets/props/mall/' + file, x, 0.4, z, 0.7, 0.8, 0.7, 0);
+  colliders.push({ x, z, r: 0.5 });
+});
+// Bins: real mall bins from the new models at the four corners of the
+// atrium. The black cylinder repeats once, on opposite corners, 52 m apart.
+loadProp('assets/props/mall/bin_trash_black_cyl.glb', -13, 0.45, 26, 0.5, 0.9, 0.5, 0);
+loadProp('assets/props/mall/bin_recycling_green.glb', 13, 0.45, 26, 0.5, 0.9, 0.5, 0);
+loadProp('assets/props/mall/bin_recycling_3comp.glb', -13, 0.45, -26, 0.5, 0.9, 0.5, 0);
+loadProp('assets/props/mall/bin_trash_black_cyl.glb', 13, 0.45, -26, 0.5, 0.9, 0.5, 0);
 [[-13, 26], [13, 26], [-13, -26], [13, -26]].forEach(([x, z]) => colliders.push({ x, z, r: 0.5 }));
 // Tall lanterns (real lantern_tall GLBs, emissive) along the atrium,
 // two with real lights.
@@ -251,7 +259,9 @@ box(-3, 0.35, -4, 1.0, 0.7, 0.5, 0x6a4a2a); colliders.push({ x: -3, z: -4, r: 0.
 loadProp('assets/props/nightstand_lantern_cream.glb', -3, 1.05, -4, 0.5, 0.7, 0.5, 0, (holder, m) => {
   m.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.emissive = new THREE.Color(0xffc46b); o.material.emissiveIntensity = 0.8; } });
 });
-// Food court at the north end: two procedural tables with stools.
+// Food court at the north end: two procedural tables with stools. The
+// tables stay procedural (no food-court table set in the batch); the
+// food on them is real. Table tops are at y=0.45.
 [[8, -25], [8, -22]].forEach(([x, z]) => {
   box(x, 0.4, z, 1.6, 0.1, 1.6, 0x8a7a68);
   box(x, 0.2, z, 0.15, 0.4, 0.15, 0x4a3220);
@@ -262,6 +272,19 @@ loadProp('assets/props/nightstand_lantern_cream.glb', -3, 1.05, -4, 0.5, 0.7, 0.
     stool.position.set(x + dx, 0.22, z + dz); scene.add(stool);
   });
 });
+// Real food & drink on the tables, plus a wreath centrepiece on the
+// south table. The food-court bomb stays at (-8, -25), on the far side
+// of the atrium from these tables.
+loadProp('assets/props/mall/wreath_christmas.glb', 8, 0.5, -25, 0.7, 0.1, 0.7, 0);
+loadProp('assets/props/mall/drink_coffee_takeout.glb', 8.45, 0.58, -24.6, 0.18, 0.26, 0.18, 0);
+loadProp('assets/props/mall/food_cake_choc_slice.glb', 7.55, 0.55, -25.4, 0.3, 0.2, 0.25, 0.6);
+loadProp('assets/props/mall/bag_takeout_white_cutlery.glb', 7.6, 0.6, -24.6, 0.3, 0.3, 0.2, -0.4);
+loadProp('assets/props/mall/drink_milkshake_pink.glb', 8.45, 0.58, -21.6, 0.18, 0.26, 0.18, 0);
+loadProp('assets/props/mall/food_hamburger.glb', 7.55, 0.55, -22.4, 0.3, 0.2, 0.3, 0.3);
+loadProp('assets/props/mall/food_fries_red.glb', 7.6, 0.58, -21.6, 0.25, 0.26, 0.25, 0.5);
+// Deli display counter on the west side of the food court.
+loadProp('assets/props/mall/deli_display_counter_table_glass_top.glb', -2, 0.7, -27, 2.2, 1.4, 0.9, 0);
+colliders.push({ x: -2, z: -27, r: 1.2 });
 
 // ---- Store fixtures (real shelf / rack GLBs as merchandise) ----
 // One fixture per store bay, facing the atrium (west stores face +X,
@@ -282,6 +305,58 @@ const STORE_FIXTURES = [
 STORE_FIXTURES.forEach((f) => {
   loadProp('assets/props/' + f.file, f.x, f.th / 2, f.z, f.tw, f.th, f.td, f.ry);
   colliders.push({ x: f.x, z: f.z, r: 1.2 });
+});
+
+// ---- Store dressing (real mall props, ground floor) ----
+// Small merchandise on top of a store shelf. `topY` is the shelf-top
+// height (2.0 for the 2 m shelves, 1.8 for the wine rack). Two items per
+// shelf, offset along z so they do not sit on each other. Every item is
+// a distinct model — no look-alike repeats in this list.
+function shelfTop(file, x, topY, z, tw, th, td, rotY) {
+  loadProp('assets/props/mall/' + file, x, topY + th / 2, z, tw, th, td, rotY || 0);
+}
+const GROUND_SHELF_TOP = [
+  // West bays (x=-17.5): books / electronics / clothing / gifts / jewelry
+  ['books_stack_color.glb', -17.5, 2.0, -20.6, 0.5, 0.35, 0.4, 0],
+  ['books_stack_tall.glb', -17.5, 2.0, -19.4, 0.4, 0.4, 0.35, 0.4],
+  ['monitor_desktop_bluewave.glb', -17.5, 2.0, -10.6, 0.6, 0.45, 0.1, Math.PI / 2],
+  ['box_headphones.glb', -17.5, 2.0, -9.4, 0.35, 0.3, 0.3, 0],
+  ['clothes_folded_dark.glb', -17.5, 2.0, -0.6, 0.5, 0.25, 0.4, 0],
+  ['blankets_folded_stack.glb', -17.5, 2.0, 0.6, 0.5, 0.35, 0.4, 0.3],
+  ['giftbox_beige_bow.glb', -17.5, 2.0, 9.4, 0.4, 0.35, 0.4, 0],
+  ['giftbow_red_large.glb', -17.5, 2.0, 10.6, 0.45, 0.15, 0.45, 0],
+  ['black_jewelry_display_tray.glb', -17.5, 2.0, 19.4, 0.5, 0.15, 0.4, 0],
+  ['stand_jewelry_gold.glb', -17.5, 2.0, 20.6, 0.35, 0.45, 0.35, 0],
+  // East bays (x=17.5): electronics / clothing / wine-rack drinks / gifts / books
+  ['laptop_computer_open_purple_screen.glb', 17.5, 2.0, -20.6, 0.5, 0.35, 0.4, -Math.PI / 2],
+  ['controller_game_white.glb', 17.5, 2.0, -19.4, 0.35, 0.15, 0.3, 0],
+  ['shirt_denim_blue.glb', 17.5, 2.0, -10.6, 0.5, 0.3, 0.4, 0],
+  ['tshirt_black.glb', 17.5, 2.0, -9.4, 0.4, 0.45, 0.15, -Math.PI / 2],
+  ['drink_coffee_takeout_2.glb', 17.5, 1.8, -0.5, 0.18, 0.26, 0.18, 0],
+  ['food_cake_choc_slice_2.glb', 17.5, 1.8, 0.5, 0.3, 0.2, 0.25, 0.6],
+  ['giftbox_beige_bow_2.glb', 17.5, 2.0, 9.4, 0.4, 0.35, 0.4, 0],
+  ['giftbag_black_gold.glb', 17.5, 2.0, 10.6, 0.35, 0.4, 0.25, 0],
+  ['book_open.glb', 17.5, 2.0, 19.4, 0.45, 0.15, 0.35, 0],
+  ['display_stand_tiered_books.glb', 17.5, 2.0, 20.6, 0.45, 0.4, 0.4, 0],
+];
+GROUND_SHELF_TOP.forEach((s) => shelfTop(...s));
+// Standing merchandise on the store floor in front of the shelves —
+// never within 2 m of a bomb spot, never blocking a bomb approach. The
+// west bay z=-10 (ground bomb at -16,-8) gets shelf-top items only; the
+// east bay z=10 (reindeer patrol) gets a display case beside the patrol,
+// not on it. Dressmaker torsos only — no full-body mannequins.
+const GROUND_FLOOR_ITEMS = [
+  // file, x, z, tw, th, td, rotY, colliderR
+  ['mannequin_dressmaker.glb', -16.2, 0.8, 0.6, 1.5, 0.6, Math.PI / 2, 0.5],
+  ['giftbag_red_goldbow.glb', -16.2, 10, 0.4, 0.45, 0.3, 0, 0.4],
+  ['displaycase_glass_blackgold.glb', -16.2, 20, 0.7, 1.2, 0.5, Math.PI / 2, 0.5],
+  ['mannequin_dressmaker_2.glb', 16.2, -10, 0.6, 1.5, 0.6, -Math.PI / 2, 0.5],
+  ['displaycase_glass_brown.glb', 16.2, 10, 0.7, 1.2, 0.5, -Math.PI / 2, 0.5],
+  ['cabinet_display_black_tall.glb', 16.2, 20, 0.7, 1.8, 0.6, -Math.PI / 2, 0.5],
+];
+GROUND_FLOOR_ITEMS.forEach(([file, x, z, tw, th, td, ry, r]) => {
+  loadProp('assets/props/mall/' + file, x, th / 2, z, tw, th, td, ry);
+  colliders.push({ x, z, r });
 });
 
 // ---- Second story (upper floor at y = 4.5 m) ----
@@ -328,6 +403,52 @@ const UPPER_STORE_FIXTURES = [
 UPPER_STORE_FIXTURES.forEach((f) => {
   loadProp('assets/props/' + f.file, f.x, UPPER_Y + f.th / 2, f.z, f.tw, f.th, f.td, f.ry);
   colliders.push({ x: f.x, z: f.z, r: 1.2, floor: 1 });
+});
+
+// ---- Store dressing (real mall props, upper floor) ----
+// Same pattern as the ground floor, shelf tops at y=6.5 (wine rack 6.3).
+// Distinct models from the ground floor in the same bay — the same
+// object does not repeat on both floors of one bay.
+const UPPER_SHELF_TOP = [
+  // West bays (x=-17.5)
+  ['display_stand_tiered_books_2.glb', -17.5, 6.5, -20.6, 0.45, 0.4, 0.4, 0],
+  ['table_display_wood_books.glb', -17.5, 6.5, -19.4, 0.5, 0.3, 0.4, 0],
+  ['monitor_desktop_pinkwave.glb', -17.5, 6.5, -10.6, 0.6, 0.45, 0.1, Math.PI / 2],
+  ['box_earbuds_white.glb', -17.5, 6.5, -9.4, 0.3, 0.25, 0.25, 0],
+  ['clothes_folded_stack_dark.glb', -17.5, 6.5, -0.6, 0.5, 0.3, 0.4, 0],
+  ['scarf_folded_darkred.glb', -17.5, 6.5, 0.6, 0.4, 0.2, 0.3, 0],
+  ['giftbox_black_redbow.glb', -17.5, 6.5, 9.4, 0.4, 0.35, 0.4, 0],
+  ['giftbow_red_large_2.glb', -17.5, 6.5, 10.6, 0.45, 0.15, 0.45, 0],
+  ['vase_white_round.glb', -17.5, 6.5, 19.4, 0.3, 0.4, 0.3, 0],
+  ['poinsettia_goldvase.glb', -17.5, 6.5, 20.6, 0.35, 0.4, 0.35, 0],
+  // East bays (x=17.5)
+  ['headphones_black.glb', 17.5, 6.5, -20.6, 0.35, 0.3, 0.3, 0],
+  ['controller_game_black.glb', 17.5, 6.5, -19.4, 0.35, 0.15, 0.3, 0],
+  ['folded_black_clothes.glb', 17.5, 6.5, -10.6, 0.5, 0.25, 0.4, 0],
+  ['shirt_dress_blue_light_folded.glb', 17.5, 6.5, -9.4, 0.45, 0.2, 0.35, 0],
+  ['drink_milkshake_whipped.glb', 17.5, 6.3, -0.5, 0.18, 0.26, 0.18, 0],
+  ['drink_lemonade_yellow.glb', 17.5, 6.3, 0.5, 0.18, 0.26, 0.18, 0],
+  ['handbag_beige.glb', 17.5, 6.5, 9.4, 0.4, 0.35, 0.25, 0],
+  ['handbag_black_quilted.glb', 17.5, 6.5, 10.6, 0.4, 0.35, 0.25, 0],
+  ['bookshelf_wood_lit.glb', 17.5, 6.5, 19.4, 0.5, 0.4, 0.35, 0],
+  ['vase_white_round_2.glb', 17.5, 6.5, 20.6, 0.3, 0.4, 0.3, 0],
+];
+UPPER_SHELF_TOP.forEach((s) => shelfTop(...s));
+// Standing merchandise on the upper store floor (floor: 1 colliders).
+// The west bay z=-10 (upstairs bomb at -16,-8) and the east bay z=10
+// (upstairs bomb at 16,8) get shelf-top items only.
+const UPPER_FLOOR_ITEMS = [
+  // file, x, z, tw, th, td, rotY, colliderR
+  ['mannequin_dressmaker_3.glb', -16.2, 0.8, 0.6, 1.5, 0.6, Math.PI / 2, 0.5],
+  ['black_gift_bag.glb', -16.2, 10, 0.4, 0.45, 0.3, 0, 0.4],
+  ['cube_display_black.glb', -16.2, 20, 0.7, 0.7, 0.7, Math.PI / 2, 0.5],
+  ['counter_display_black_light.glb', 16.2, -20, 1.0, 1.1, 0.6, -Math.PI / 2, 0.5],
+  ['mannequin_dressmaker_4.glb', 16.2, -10, 0.6, 1.5, 0.6, -Math.PI / 2, 0.5],
+  ['platform_display_round.glb', 16.2, 20, 0.9, 0.5, 0.9, -Math.PI / 2, 0.6],
+];
+UPPER_FLOOR_ITEMS.forEach(([file, x, z, tw, th, td, ry, r]) => {
+  loadProp('assets/props/mall/' + file, x, UPPER_Y + th / 2, z, tw, th, td, ry);
+  colliders.push({ x, z, r, floor: 1 });
 });
 
 // ---- Escalators (UP at x=4, DOWN at x=8; ground z=4 -> upper z=12) ----
