@@ -12,8 +12,8 @@
   body.touch-on #touchUI{display:block}
   #joyBase{position:absolute;left:20px;bottom:20px;width:140px;height:140px;border-radius:50%;background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.35);pointer-events:auto;touch-action:none}
   #joyKnob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:rgba(255,255,255,.55);border:2px solid rgba(0,0,0,.4)}
-  /* Movement cluster (left, with the joystick): crouch / sneak / sprint. */
-  #moveGrid{position:absolute;left:20px;bottom:172px;display:grid;grid-template-columns:repeat(3,52px);gap:8px;pointer-events:auto}
+  /* Movement cluster (left, with the joystick): crouch / sneak / sprint / roll. */
+  #moveGrid{position:absolute;left:20px;bottom:172px;display:grid;grid-template-columns:repeat(4,52px);gap:8px;pointer-events:auto}
   /* Action cluster (right): melee / aim / fire / use / carry. */
   #actionGrid{position:absolute;right:16px;bottom:20px;display:grid;grid-template-columns:repeat(2,52px);grid-template-rows:repeat(2,52px);gap:8px;pointer-events:auto}
   .tbtn{width:52px;height:52px;border-radius:12px;border:2px solid rgba(255,255,255,.4);background:rgba(0,0,0,.55);color:#fff;font-size:13px;font-weight:700;cursor:pointer;touch-action:none;padding:0}
@@ -97,6 +97,7 @@
     <button class="tbtn" id="btnCrouch" type="button" aria-label="Crouch"><img src="assets/ui/icon-crouch.png" alt=""></button>
     <button class="tbtn" id="btnSneak" type="button" aria-label="Sneak"><img src="assets/ui/icon-sneak.png" alt=""></button>
     <button class="tbtn" id="btnSprint" type="button" aria-label="Sprint"><img src="assets/ui/icon-sprint.png" alt=""></button>
+    <button class="tbtn" id="btnRoll" type="button" aria-label="Roll"><img src="assets/ui/icon-roll.png" alt=""></button>
   </div>
   <div id="actionGrid">
     <button class="tbtn" id="btnMelee" type="button" aria-label="Melee"><img src="assets/ui/icon-melee.png" alt=""></button>
@@ -243,7 +244,15 @@ function playGuardDeath(g, action){
   });
   return 'pending';
 }
-const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','crawlBack','crawlIdle','meleeHook','leadJab','hook','takedownChokeholdAttacker','takedownChokeholdVictim'];
+const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sneak','crawl','crawlBack','crawlIdle','meleeHook','leadJab','hook','takedownChokeholdAttacker','takedownChokeholdVictim',
+  // Roll / aim / fire (2026-11-22, Kyle: roll, aim and fire animations are
+  // broken): these clips were loaded on demand the first time the player
+  // used them, so the first roll slid with no animation, the first aim
+  // stayed in the idle pose, and the first shot had no recoil — the
+  // action ran before its clip arrived over the network. They are core
+  // combat/movement, so they preload with the rest and are ready the
+  // moment the player acts.
+  'roll','aimPistol','aimIdle','aimWalk','pistolWalkArc','firePistol','fireRifle','fireRifleCrouch'];
 let playerMixer = null, playerActions = {}, playerCurrentLoop = null, playerOneShot = null, playerOneShotName = null,
     playerOneShotHold = false, playerHeldPose = null, playerDesiredLoop = 'idle',
     playerRigOk = false, playerRigChecked = false, fbxPlaying = false;
@@ -2855,6 +2864,7 @@ function doMelee(){
   bindBtn('btnCrouch', ()=>{ cycleStance(); document.getElementById('btnCrouch').classList.toggle('on', crouching); });
   bindBtn('btnSneak', ()=>{ sneaking = !sneaking; noteActivity(); document.getElementById('btnSneak').classList.toggle('on', sneaking); });
   bindBtn('btnSprint', ()=>{ touchSprintToggle = !touchSprintToggle; noteActivity(); document.getElementById('btnSprint').classList.toggle('on', touchSprintToggle); });
+  bindBtn('btnRoll', tryRoll); // ROLL (2026-11-22): the roll had no touch button — X / Circle only
   // Prevent iOS double-tap zoom / page scroll while playing on touch.
   document.addEventListener('touchmove', (e)=>{
     if (touchMode && !gameOver && !won && document.getElementById('overlay').style.display === 'none') e.preventDefault();
