@@ -259,7 +259,11 @@ const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sn
   // on-demand bug as roll/aim/fire — the first reload played with no
   // animation. The cover loop (Taking_Cover_Idle) would too, the first
   // time the player took cover. All three preload with the rest.
-  'reloadRifle','reloadPistol','cover'];
+  'reloadRifle','reloadPistol','cover',
+  // Heavy kick (2026-11-22, Kyle: slow strong and heavy kick): the kick
+  // is a combat move now, not an emote — it preloads with the rest so
+  // the first kick plays with animation, not on demand.
+  'kick'];
 let playerMixer = null, playerActions = {}, playerCurrentLoop = null, playerOneShot = null, playerOneShotName = null,
     playerOneShotHold = false, playerHeldPose = null, playerDesiredLoop = 'idle',
     playerRigOk = false, playerRigChecked = false, fbxPlaying = false;
@@ -365,7 +369,7 @@ function playPlayerOneShot(action, opts){
     const prev = playerCurrentLoop ? playerActions[playerCurrentLoop] : null;
     if (prev) prev.fadeOut(0.06);
     playerOneShot = a; playerOneShotName = action; playerOneShotHold = !!(opts && opts.hold);
-    a.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(0.06).play();
+    a.reset().setEffectiveTimeScale(opts && opts.rate ? opts.rate : 1).setEffectiveWeight(1).fadeIn(0.06).play();
     return true;
   };
   if (fbxClips[action]) return run();
@@ -1710,6 +1714,12 @@ function startReload() {
 // the idle orbit keep real-time timing and are not scaled.
 let timeScale = 1, timeScaleTarget = 1, lastGunfireT = 0, headshotSlowT = 0;
 const SLOWMO_SCALE = 0.4, SLOWMO_RAMP = 5;
+// Hit-stop (heavy kick impact, 2026-11-22): a brief freeze on connect so
+// the hit lands with weight. HITSTOP_SCALE is near-frozen; HITSTOP_T is
+// the freeze length in real seconds. It wins over the battle slow-mo
+// while it runs (the takedown cinematic still wins over it).
+const HITSTOP_SCALE = 0.05, HITSTOP_T = 0.12;
+let hitStopT = 0;
 const BATTLE_RANGE = 25, BATTLE_MIN_GUARDS = 2, BATTLE_SHOT_WINDOW = 3000, HEADSHOT_HOLD = 1.5;
 // Bullet-time takedown cinematic (Kyle's pick 2026-11-16): the takedown
 // killshot is a Max Payne-style bullet-time moment — time drops to 0.25x,
@@ -1988,7 +1998,7 @@ function makeGuard(x,z,waypoints){
   const coneMat = new THREE.MeshBasicMaterial({color:0xffff00, transparent:true, opacity:0.13, side:THREE.DoubleSide, depthWrite:false});
   const cone = new THREE.Mesh(coneGeo, coneMat); cone.rotation.x = -Math.PI/2; cone.rotation.z = Math.PI/2; cone.position.set(0,1.2,5); g.add(cone);
   g.position.set(x, CHAR_LIFT, z); scene.add(g);
-  return { group:g, mesh:b, capsuleBody:b, capsuleHead:h, cone, coneMat, waypoints, wp:0, yaw:0, hp:100, state:'PATROL', meter:0, lastKnown:null, searchT:0, alertT:0, shotT:0, ammo:30, reloadUntil:0, dead:false, realModel:null, enemyWeapon:null,
+  return { group:g, mesh:b, capsuleBody:b, capsuleHead:h, cone, coneMat, waypoints, wp:0, yaw:0, hp:100, state:'PATROL', meter:0, lastKnown:null, searchT:0, alertT:0, shotT:0, ammo:30, reloadUntil:0, staggerT:0, kbX:0, kbZ:0, dead:false, realModel:null, enemyWeapon:null,
     // Body-hiding (stealth): hidden = dropped where no live guard could see
     // the spot and the spot is a stash zone or near cover (see
     // isHiddenDropSpot); carried = the player is carrying this body now;
@@ -2745,7 +2755,7 @@ addEventListener('keydown', e=>{
   if (e.code==='KeyE' && !aiming) tryInteract();
   // Animation-only keys.
   if (e.code==='KeyH') doMelee(); // melee combo (takedown if available, else the chained punches)
-  if (e.code==='KeyK') playPlayerOneShot('kick');
+  if (e.code==='KeyK') doKick(); // heavy kick (slow, strong, heavy — see doKick)
   if (e.code==='KeyJ') playPlayerOneShot('wave');
   if (e.code==='KeyT') playPlayerOneShot('talk');
   if (e.code==='KeyN') playPlayerOneShot('talkPhone');
@@ -2821,7 +2831,7 @@ function pollGamepad(dt) {
   if (gp.pressed(GP.R1)) { sneaking = !sneaking; noteActivity(); }
   if (gp.pressed(GP.R3)) { startReload(); noteActivity(); } // R3 (right-stick press) = reload — the free shoulder button after the L2/R2 trigger swap
   if (gp.pressed(GP.DPAD_UP)) playPlayerOneShot('wave');
-  if (gp.pressed(GP.DPAD_DOWN)) playPlayerOneShot('kick');
+  if (gp.pressed(GP.DPAD_DOWN)) doKick(); // heavy kick
   // D-pad Left/Right: lean (held, while aiming — read in animate()).
   gpLean = (gp.held(GP.DPAD_RIGHT) ? 1 : 0) - (gp.held(GP.DPAD_LEFT) ? 1 : 0);
 }
@@ -2845,8 +2855,8 @@ function pollGamepad(dt) {
 const MELEE_COMBO = ['leadJab', 'hook', 'meleeHook'];
 const MELEE_COMBO_DMG = [34, 34, 50];
 let meleeComboStep = 0, meleeComboUntil = 0;
-function meleeHit(dmg){
-  const range = 2.0;
+function meleeHit(dmg, range){
+  range = range || 2.0;
   const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
   let best = null, bestD = range;
   for (const g of guards){
@@ -2857,7 +2867,7 @@ function meleeHit(dmg){
     if (to.dot(fwd) < 0.5) continue; // must be in front (~60 deg arc)
     if (d < bestD){ best = g; bestD = d; }
   }
-  if (!best) return false;
+  if (!best) return null;
   best.hp -= dmg; best.meter = 100; best.state = 'ALERT'; best.lastKnown = player.position.clone();
   const chest = best.group.position.clone(); chest.y += 1.3;
   spawnBloodMist(chest); spawnBloodSpatter(chest);
@@ -2867,7 +2877,7 @@ function meleeHit(dmg){
     if (playGuardDeath(best, pickRandomDeath()) === false) tipGuardOver(best);
     showMsg('Guard down', 1400);
   }
-  return true;
+  return best;
 }
 function doMelee(){
   if (takedownAvailable()){ tryTakedown(); return; }
@@ -2879,6 +2889,49 @@ function doMelee(){
   meleeHit(MELEE_COMBO_DMG[step]);
   meleeComboStep = (meleeComboStep + 1) % MELEE_COMBO.length;
   meleeComboUntil = now + 900; // 0.9 s to chain the next hit
+}
+// ---- Heavy kick (2026-11-22, Kyle: "Slow strong and heavy kick") ----
+// The kick is a combat move, not an emote. SLOW: Side_Kick plays at
+// 0.6x (the clip is 2.0 s of real leg motion — the leg swings 0.10–
+// 1.60 s, full extension ~0.63 s — so at 0.6x the wind-up and the leg
+// extension read as deliberate and weighty, 3.33 s total). STRONG: 60
+// damage, more than the melee combo's 50 finisher — two kicks kill a
+// guard. HEAVY: the guard is knocked back ~1.6 m and staggered ~0.8 s,
+// plus a ~0.12 s hit-stop so the impact lands with weight. The damage
+// lands at the impact moment (clip time KICK_HIT_T, full leg
+// extension), not on the press — the leg has to arrive first. The
+// impact is checked in the animate loop against the one-shot's own
+// time, so slow-mo and hit-stop do not shift the impact pose. Same
+// trigger as before: K key + D-pad Down. Works standing, crouched,
+// and in cover; not while crawling or rolling (the player is on the
+// ground / mid-roll), and not while reloading.
+const KICK_DMG = 60, KICK_RANGE = 2.5, KICK_RATE = 0.6, KICK_HIT_T = 0.65;
+const KICK_RECOVER = 2.0 / KICK_RATE + 0.2; // clip length at 0.6x + recovery
+let kickUntil = 0, kickHitDone = true;
+function doKick(){
+  if (gameOver || won) return;
+  const now = performance.now();
+  if (now < kickUntil) return; // still recovering from the last kick
+  if (now < reloadUntil) return; // cannot kick while reloading
+  if (rolling || crawling) return; // not from the ground or mid-roll
+  noteActivity();
+  kickUntil = now + KICK_RECOVER * 1000;
+  kickHitDone = false;
+  playPlayerOneShot('kick', { rate: KICK_RATE });
+}
+function kickHit(){
+  // Impact moment: the leg is at full extension. Same guard damage path
+  // as the melee combo (meleeHit), at kick range. A whiff (no guard in
+  // range) is just a whiff — no damage, no hit-stop.
+  const g = meleeHit(KICK_DMG, KICK_RANGE);
+  if (!g) return;
+  hitStopT = HITSTOP_T; timeScale = HITSTOP_SCALE; // impact beat, even on a kill
+  if (g.dead) return; // the death animation handles a killed guard
+  // Knockback: ~1.6 m away from the player (8 m/s decaying at 5/s),
+  // applied in updateGuard with collision. Stagger: ~0.8 s frozen.
+  const away = g.group.position.clone().sub(player.position).setY(0).normalize();
+  g.kbX = away.x * 8; g.kbZ = away.z * 8;
+  g.staggerT = 0.8;
 }
 (function setupTouch(){
   const joyBase = document.getElementById('joyBase'), joyKnob = document.getElementById('joyKnob');
@@ -3653,6 +3706,20 @@ function updateGuard(g, dt, now){
   // chokehold branch; here we only stop the AI from moving/seeing him.
   if (g.inChokehold) return;
   const p = player.position, gp = g.group.position;
+  // Heavy kick knockback: the guard slides away from the player,
+  // decaying (8 m/s at 5/s ≈ 1.6 m total), with collision so it cannot
+  // slide through a wall. Applied even while staggered — the slide is
+  // the stagger's visible half.
+  if (g.kbX || g.kbZ){
+    const k = Math.exp(-5 * dt);
+    const nx = gp.x + g.kbX * dt, nz = gp.z + g.kbZ * dt;
+    if (!collides(nx, nz)){ gp.x = nx; gp.z = nz; }
+    g.kbX *= k; g.kbZ *= k;
+    if (Math.hypot(g.kbX, g.kbZ) < 0.1){ g.kbX = 0; g.kbZ = 0; }
+  }
+  // Heavy kick stagger: frozen ~0.8 s — no patrol, no detection, no
+  // movement, no shooting. The knockback above still applies.
+  if (g.staggerT > 0){ g.staggerT -= dt; return; }
   const toP = new THREE.Vector3().subVectors(p,gp); const dist = toP.length(); toP.y=0; toP.normalize();
   const fwd = new THREE.Vector3(Math.sin(g.yaw),0,Math.cos(g.yaw));
   const angle = Math.acos(Math.max(-1,Math.min(1,fwd.dot(toP))));
@@ -3842,6 +3909,7 @@ function animate(){
   // orbit keep real-time timing.
   if (headshotSlowT > 0) headshotSlowT -= rawDt;
   if (takedownSlowT > 0) takedownSlowT -= rawDt;
+  if (hitStopT > 0) hitStopT -= rawDt;
   // Bullet-time takedown cinematic: the timer runs on real time (the
   // gameplay dt is slowed). The shot fires once the pistol is up, then
   // the cinematic holds until the guard has dropped in slow motion.
@@ -3878,7 +3946,7 @@ function animate(){
   }
   // The takedown cinematic uses the deeper bullet-time scale (0.25x);
   // it wins over the headshot/battle slow-mo while it runs.
-  timeScaleTarget = takedownSlowT > 0 ? TAKEDOWN_SLOWMO : ((headshotSlowT > 0 || nearBattle) ? SLOWMO_SCALE : 1);
+  timeScaleTarget = takedownSlowT > 0 ? TAKEDOWN_SLOWMO : (hitStopT > 0 ? HITSTOP_SCALE : ((headshotSlowT > 0 || nearBattle) ? SLOWMO_SCALE : 1));
   timeScale += (timeScaleTarget - timeScale) * Math.min(1, rawDt * SLOWMO_RAMP);
   if (Math.abs(timeScaleTarget - timeScale) < 0.002) timeScale = timeScaleTarget;
   const dt = rawDt * timeScale;
@@ -4051,6 +4119,12 @@ function animate(){
   // Advance real FBX playback (player + experimental guards are updated
   // in their own mixers; player mixer runs even on the menu so idle plays).
   if (playerMixer && fbxPlaying){ try { playerMixer.update(dt); } catch (e) {} }
+  // Heavy kick impact: the damage lands when the leg reaches full
+  // extension (clip time KICK_HIT_T), not on the press — the leg has
+  // to arrive first. Tied to the one-shot's own time, so slow-mo and
+  // hit-stop do not shift the impact pose. If the kick was interrupted
+  // (another one-shot took over), the hit never fires.
+  if (!kickHitDone && !gameOver && !won && playerOneShotName === 'kick' && playerOneShot && playerOneShot.time >= KICK_HIT_T){ kickHitDone = true; kickHit(); }
   updateEffects(dt);
   // Over-the-shoulder camera. While idle the orbit takes over the view
   // (lerped, like the over-shoulder position, so the transition is
