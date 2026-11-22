@@ -37,7 +37,7 @@
 <button id="defuseBtn">DEFUSE</button>
 <div id="joy"><div id="joyKnob"></div></div>
 <div id="defuseUI">Hold to defuse<div id="defuseBar"><div id="defuseFill"></div></div></div>
-<div id="overlay"><h1>The Mall</h1><p>Christmas shopping. Four bombs. Five minutes.<br>Rochelle is on the radio.</p><button id="startBtn">Enter the mall</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / R1 Shoot · Square hold Defuse</p><p class="padControls">Mouse — look · Click Shoot · E hold Defuse · F Shoot · Touch — joystick · FIRE / DEFUSE</p></div>
+<div id="overlay"><h1>The Mall</h1><p>Christmas shopping. Four bombs. Five minutes.<br>Rochelle is on the radio.</p><button id="startBtn">Enter the mall</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / R2 Shoot · Square hold Defuse</p><p class="padControls">Mouse — look · Click Shoot · E hold Defuse · F Shoot · Touch — joystick · FIRE / DEFUSE</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="fail"><h1>Mission failed</h1><p id="failText"></p><button onclick="location.reload()">Try again</button></div>
 <script type="module">
@@ -1178,7 +1178,7 @@ addEventListener('mousemove', (e) => {
 });
 
 // ---------- Gamepad (PS4 DualShock 4, Bluetooth) ----------
-// Left stick moves, right stick looks, Cross / R1 shoot, Square hold
+// Left stick moves, right stick looks, Cross / R2 shoot, Square hold
 // defuses. pollGamepad(dt) runs once per frame from animate().
 const gp = createGamepad();
 function pollGamepad(dt) {
@@ -1195,7 +1195,7 @@ function pollGamepad(dt) {
     pitch = Math.max(-0.4, Math.min(0.5, pitch - gp.ry * GP.LOOK_SPEED * dt));
     noteActivity();
   }
-  if (gp.pressed(GP.CROSS) || gp.pressed(GP.R1)) doShoot(0, 0);
+  if (gp.pressed(GP.CROSS) || gp.pressed(GP.R2)) doShoot(0, 0);
 }
 // Mouse: left click shoots (centre ray).
 renderer.domElement.addEventListener('mousedown', (e) => {

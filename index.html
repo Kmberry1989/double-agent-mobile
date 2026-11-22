@@ -108,7 +108,7 @@
 <div id="overlay"><div class="box">
   <h1>DOUBLE AGENT</h1>
   <button id="startBtn">Click to infiltrate</button>
-  <p class="padControls">PS4 controller — Left stick move · Right stick look · X Use · Square Melee · Circle Roll · Triangle Loadout · R1 Fire (hold) · R2 Aim + fire · L1 Melee · L2 Sneak · L3 Sprint · D-pad Wave / Kick / Lean</p>
+  <p class="padControls">PS4 controller — Left stick move · Right stick look · X Use · Square Melee · Circle Roll · Triangle Loadout · L2 Aim (hold) · R2 Fire (hold) · L1 Melee · R1 Sneak · L3 Sprint · D-pad Wave / Kick / Lean</p>
   <nav class="levels"><a href="menu.html">Main Menu</a><a href="index.html" class="cur" aria-current="page">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html">Halloween</a><a href="mall.html">Mall</a></nav>
 </div></div>
 <script type="module">
@@ -2707,27 +2707,26 @@ function pollGamepad(dt) {
     pitch = Math.max(-0.9, Math.min(0.9, pitch - gp.ry * GP.LOOK_SPEED * dt));
     noteActivity();
   }
-  // R1 held = fire (aim + shoot, auto-fire every 180 ms, like FIRE).
-  if (gp.held(GP.R1) && !gpFireTimer) {
+  // R2 held = fire (aim + shoot, auto-fire every 180 ms, like FIRE).
+  if (gp.held(GP.R2) && !gpFireTimer) {
     aiming = true;
     const fb = document.getElementById('btnFire'); if (fb) fb.classList.add('on');
     tryShoot();
     gpFireTimer = setInterval(() => { if (!gameOver && !won) tryShoot(); }, 180);
-  } else if (!gp.held(GP.R1) && gpFireTimer) {
+  } else if (!gp.held(GP.R2) && gpFireTimer) {
     clearInterval(gpFireTimer); gpFireTimer = null;
     const fb = document.getElementById('btnFire'); if (fb) fb.classList.remove('on');
-    if (!gp.held(GP.R2)) aiming = false;
+    if (!gp.held(GP.L2)) aiming = false;
   }
-  // R2: aim while held, one shot on press.
-  if (gp.pressed(GP.R2)) { aiming = true; tryShoot(); }
-  if (gp.held(GP.R1) || gp.held(GP.R2)) aiming = true;
-  if (gp.released(GP.R2) && !gp.held(GP.R1)) aiming = false;
+  // L2: aim while held.
+  if (gp.held(GP.R2) || gp.held(GP.L2)) aiming = true;
+  if (gp.released(GP.L2) && !gp.held(GP.R2)) aiming = false;
   if (gp.pressed(GP.CROSS)) tryInteract();
   if (gp.pressed(GP.SQUARE) || gp.pressed(GP.L1)) doMelee();
   if (gp.pressed(GP.CIRCLE)) tryRoll();
   if (gp.pressed(GP.TRIANGLE)) { playerLoadout = playerLoadout === 'white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
   if (gp.pressed(GP.L3)) { gpSprintToggle = !gpSprintToggle; noteActivity(); }
-  if (gp.pressed(GP.L2)) { sneaking = !sneaking; noteActivity(); }
+  if (gp.pressed(GP.R1)) { sneaking = !sneaking; noteActivity(); }
   if (gp.pressed(GP.DPAD_UP)) playPlayerOneShot('wave');
   if (gp.pressed(GP.DPAD_DOWN)) playPlayerOneShot('kick');
   // D-pad Left/Right: lean (held, while aiming — read in animate()).

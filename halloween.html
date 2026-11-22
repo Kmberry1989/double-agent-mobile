@@ -39,7 +39,7 @@
 <button id="zoomBtn">ZOOM</button>
 <div id="scopeUI"><img id="crosshairImg" src="assets/ui/crosshair-sniper.png" alt=""><div id="zoomLabel">2x</div></div>
 <div id="barTop"></div><div id="barBottom"></div>
-<div id="overlay"><h1>Trick or Treat</h1><p>Sniper nest — the street is yours to watch.</p><button id="startBtn">Enter the nest</button><p class="padControls">PS4 controller — Right stick look · R2 Scope · L3 Zoom 2x/4x · X / R1 Shoot</p><p class="padControls">Mouse — look · Right-mouse Scope · Click Shoot · Wheel Zoom · F Scope · Touch — drag look · SCOPE / FIRE / ZOOM</p></div>
+<div id="overlay"><h1>Trick or Treat</h1><p>Sniper nest — the street is yours to watch.</p><button id="startBtn">Enter the nest</button><p class="padControls">PS4 controller — Right stick look · L2 Scope · L3 Zoom 2x/4x · X / R1 / R2 Shoot</p><p class="padControls">Mouse — look · Right-mouse Scope · Click Shoot · Wheel Zoom · F Scope · Touch — drag look · SCOPE / FIRE / ZOOM</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="fail"><h1>Mission failed</h1><p id="failText"></p><button onclick="location.reload()">Try again</button></div>
 <script type="module">
@@ -906,10 +906,10 @@ function pollGamepad(dt) {
     pitch = Math.max(-0.4, Math.min(0.5, pitch - gp.ry * GP.LOOK_SPEED * dt));
     noteActivity();
   }
-  // R2 hold = scope in (momentary).
-  const r2 = gp.held(GP.R2);
-  if (r2 !== scopeSources.pad) { scopeSources.pad = r2; refreshScope(); }
-  if (gp.pressed(GP.CROSS) || gp.pressed(GP.R1)) doShoot(0, 0);
+  // L2 hold = scope in (momentary).
+  const l2 = gp.held(GP.L2);
+  if (l2 !== scopeSources.pad) { scopeSources.pad = l2; refreshScope(); }
+  if (gp.pressed(GP.CROSS) || gp.pressed(GP.R1) || gp.pressed(GP.R2)) doShoot(0, 0);
   if (gp.pressed(GP.L3)) { cycleZoom(); noteActivity(); }
 }
 // Mouse: left click shoots (centre ray), right button hold scopes in.
