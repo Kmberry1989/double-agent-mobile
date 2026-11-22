@@ -1850,7 +1850,11 @@ function loadPlayerModel(file){
   });
 }
 loadPlayerModel('Agent_Kyle.fbx');
-let playerLoadout = 'white'; // 'white' | 'black' — two distinct player sets
+let playerLoadout = 'black'; // 'white' | 'black' — two distinct player sets.
+// Default is 'black' (2026-11-22, Kyle): the player begins the courtyard
+// with a suppressed pistol equipped — the black Glock (threaded barrel)
+// with the black suppressor attached, firing the quiet suppressed-pistol
+// sound. L / Triangle still switches to the white (loud) set.
 // WIRED WEAPONS (2026-10-30): every white_/black_ weapon GLB in assets/
 // is now wired. WEAPON cycles the full list; SET still toggles white/black.
 // Damage / fire-rate stay on the CLASS (pistol 34, rifle 50) — a variant
