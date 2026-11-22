@@ -61,9 +61,11 @@ const texLoader = new THREE.TextureLoader();
 // z -12..12) so the player can look down at the tree. Two escalators
 // (UP at x=4, DOWN at x=8) carry the player between floors, rising
 // through the opening to the south end strip. The player spawns at the
-// south entrance and walks the atrium; storefronts line both sides
-// (openings in the walls at x=+-14, stores 6 m deep behind them, on
-// both floors). Central Christmas tree at (0, 0, 0). Ground is flat
+// south entrance and walks the atrium. OPEN PLAN — no storefront walls:
+// the four stores (tech east, clothing west, book upper-west, boutique
+// upper-east) are open bays defined by their shelving and merchandise,
+// 6 m deep on both floors. Central Christmas tree at (0, 0, 0). Ground
+// is flat
 // (y=0) everywhere the player walks; the upper floor is flat at y=4.5.
 const CHAR_LIFT = 0.05;
 const UPPER_Y = 4.5; // second-story floor height
@@ -85,8 +87,12 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 300);
 // Warm, bright, festive mall lighting — Christmas shopping, not a dark street.
-scene.add(new THREE.AmbientLight(0xfff2dd, 0.9));
-scene.add(new THREE.HemisphereLight(0xffe8c0, 0x3a2a1a, 0.7));
+// Lighting: the mall read nearly black on a real screen (Kyle, 2026-11-22).
+// Base lights roughly doubled, ceiling/walkway lights raised, plus a warm
+// point light inside each store and fill lights at the food court, the
+// south entrance, and above the tree. Warm festive tone kept throughout.
+scene.add(new THREE.AmbientLight(0xfff2dd, 1.8));
+scene.add(new THREE.HemisphereLight(0xffe8c0, 0x3a2a1a, 1.4));
 
 function flatPlane(x, y, z, w, d, color, path, rx, ry, rotX) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color }));
@@ -156,28 +162,13 @@ flatPlane(0, 0.04, 28, 4, 2, 0x4a1a1a);
 // A wreath laid flat on the floor beside the entrance mat (the wreath
 // model is built flat — it lies on the ground, it does not hang).
 loadProp('assets/props/mall/wreath_christmas.glb', -2.5, 0.06, 26.5, 0.9, 0.12, 0.9, 0);
-// Storefront walls at x=+-14, two levels: piers (full 12 m height)
-// between the bays, a ground lintel (y 4..4.5) over the ground openings
-// (8 m wide, y 0..4), and an upper lintel (y 8.5..12) over the upper
-// openings (8 m wide, y 4.5..8.5). Bays centred z=-20,-10,0,10,20.
-// The stores are the 6 m of floor between the storefront wall and the
-// outer wall, on both floors; the player walks in through the openings.
-// Pier colliders apply on both floors (floor: 2).
-[-25, -15, -5, 5, 15, 25].forEach((z) => {
-  box(-14, 6, z, 0.4, 12, 2, 0x8a7a68); colliders.push({ x: -14, z, r: 1, floor: 2 });
-  box(14, 6, z, 0.4, 12, 2, 0x8a7a68); colliders.push({ x: 14, z, r: 1, floor: 2 });
-});
-[-20, -10, 0, 10, 20].forEach((z) => {
-  box(-14, 4.25, z, 0.4, 0.5, 8, 0x8a7a68); // ground lintel, y 4..4.5
-  box(14, 4.25, z, 0.4, 0.5, 8, 0x8a7a68);
-  box(-14, 10.25, z, 0.4, 3.5, 8, 0x8a7a68); // upper lintel, y 8.5..12
-  box(14, 10.25, z, 0.4, 3.5, 8, 0x8a7a68);
-  // Plain coloured fascia bands over each storefront (no sign text).
-  box(-14, 4.4, z, 0.5, 0.8, 8.4, 0xb03a2e);
-  box(14, 4.4, z, 0.5, 0.8, 8.4, 0x2e5d8a);
-  box(-14, 8.9, z, 0.5, 0.8, 8.4, 0xb03a2e);
-  box(14, 8.9, z, 0.5, 0.8, 8.4, 0x2e5d8a);
-});
+// OPEN PLAN (Kyle, 2026-11-22): the storefront walls are gone — no piers,
+// no lintels, no fascia bands, and no pier colliders (they were the
+// invisible walls). The four stores are defined by their merchandise and
+// shelving, not by walls: the player walks freely from the atrium into
+// any store and can see across the entire mall. The shelving units at
+// x=+-17.5 mark where one store ends and the next begins. The outer
+// walls, the ceiling, and the balcony ring + railings stay.
 // Ceiling lights: warm fixtures down the atrium (emissive spheres +
 // real PointLights so the mall reads bright and festive), hung just
 // below the 12 m ceiling so they light both floors through the opening.
@@ -185,11 +176,29 @@ loadProp('assets/props/mall/wreath_christmas.glb', -2.5, 0.06, 26.5, 0.9, 0.12, 
   const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8),
     new THREE.MeshStandardMaterial({ color: 0xfff6dd, emissive: 0xffe0b0, emissiveIntensity: 2 }));
   bulb.position.set(0, 10.5, z); scene.add(bulb);
-  const l = new THREE.PointLight(0xffe0b0, 20, 20); l.position.set(0, 10.5, z); scene.add(l);
+  const l = new THREE.PointLight(0xffe0b0, 32, 28); l.position.set(0, 10.5, z); scene.add(l);
 });
 // Upper-walkway lights (warm, modest) so the second story reads bright.
 [[-16, -15], [-16, 15], [16, -15], [16, 15]].forEach(([x, z]) => {
-  const l = new THREE.PointLight(0xffe0b0, 10, 14); l.position.set(x, 7, z); scene.add(l);
+  const l = new THREE.PointLight(0xffe0b0, 20, 20); l.position.set(x, 7, z); scene.add(l);
+});
+// Store lights: two warm point lights inside each of the four stores,
+// above the merchandise (ground stores y=3, upper stores y=7.5), so the
+// shelves and mannequins are lit from the front/above — the stores were
+// the darkest part of the mall, the atrium lights did not reach into them.
+const STORE_LIGHTS = [
+  [17, 3, -15], [17, 3, 15],       // tech (ground east)
+  [-17, 3, -15], [-17, 3, 15],     // clothing (ground west)
+  [-17, 7.5, -15], [-17, 7.5, 15], // book (upper west)
+  [17, 7.5, -15], [17, 7.5, 15],   // boutique (upper east)
+];
+STORE_LIGHTS.forEach(([x, y, z]) => {
+  const l = new THREE.PointLight(0xffe0b0, 14, 15); l.position.set(x, y, z); scene.add(l);
+});
+// Atrium fill lights: the food court (north end) and the south entrance
+// were nearly black; the tree gets a light from above as well.
+[[0, 8, -25], [0, 8, 25], [0, 9, 0]].forEach(([x, y, z]) => {
+  const l = new THREE.PointLight(0xffe0b0, 16, 16); l.position.set(x, y, z); scene.add(l);
 });
 
 // ---- Christmas tree (centre of the atrium) ----
@@ -298,7 +307,7 @@ const STORE_FIXTURES = [
   { file: 'shelf_wall_cubbies.glb', x: -17.5, z: 20, ry: Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
   { file: 'shelf_warehouse_3tier.glb', x: 17.5, z: -20, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
   { file: 'shelf_wall_cubbies.glb', x: 17.5, z: -10, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
-  { file: 'wine_rack_bottles.glb', x: 17.5, z: 0, ry: -Math.PI / 2, tw: 1.5, th: 1.8, td: 0.6 },
+  { file: 'shelf_warehouse_3tier.glb', x: 17.5, z: 0, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
   { file: 'shelf_warehouse_3tier.glb', x: 17.5, z: 10, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
   { file: 'shelf_wall_cubbies.glb', x: 17.5, z: 20, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
 ];
@@ -309,48 +318,54 @@ STORE_FIXTURES.forEach((f) => {
 
 // ---- Store dressing (real mall props, ground floor) ----
 // Small merchandise on top of a store shelf. `topY` is the shelf-top
-// height (2.0 for the 2 m shelves, 1.8 for the wine rack). Two items per
-// shelf, offset along z so they do not sit on each other. Every item is
-// a distinct model — no look-alike repeats in this list.
+// height (2.0 for the 2 m shelves). Two items per shelf, offset along z
+// so they do not sit on each other.
 function shelfTop(file, x, topY, z, tw, th, td, rotY) {
   loadProp('assets/props/mall/' + file, x, topY + th / 2, z, tw, th, td, rotY || 0);
 }
 const GROUND_SHELF_TOP = [
-  // West bays (x=-17.5): books / electronics / clothing / gifts / jewelry
-  ['books_stack_color.glb', -17.5, 2.0, -20.6, 0.5, 0.35, 0.4, 0],
-  ['books_stack_tall.glb', -17.5, 2.0, -19.4, 0.4, 0.4, 0.35, 0.4],
-  ['monitor_desktop_bluewave.glb', -17.5, 2.0, -10.6, 0.6, 0.45, 0.1, Math.PI / 2],
-  ['box_headphones.glb', -17.5, 2.0, -9.4, 0.35, 0.3, 0.3, 0],
-  ['clothes_folded_dark.glb', -17.5, 2.0, -0.6, 0.5, 0.25, 0.4, 0],
-  ['blankets_folded_stack.glb', -17.5, 2.0, 0.6, 0.5, 0.35, 0.4, 0.3],
-  ['giftbox_beige_bow.glb', -17.5, 2.0, 9.4, 0.4, 0.35, 0.4, 0],
-  ['giftbow_red_large.glb', -17.5, 2.0, 10.6, 0.45, 0.15, 0.45, 0],
-  ['black_jewelry_display_tray.glb', -17.5, 2.0, 19.4, 0.5, 0.15, 0.4, 0],
-  ['stand_jewelry_gold.glb', -17.5, 2.0, 20.6, 0.35, 0.45, 0.35, 0],
-  // East bays (x=17.5): electronics / clothing / wine-rack drinks / gifts / books
-  ['laptop_computer_open_purple_screen.glb', 17.5, 2.0, -20.6, 0.5, 0.35, 0.4, -Math.PI / 2],
-  ['controller_game_white.glb', 17.5, 2.0, -19.4, 0.35, 0.15, 0.3, 0],
-  ['shirt_denim_blue.glb', 17.5, 2.0, -10.6, 0.5, 0.3, 0.4, 0],
-  ['tshirt_black.glb', 17.5, 2.0, -9.4, 0.4, 0.45, 0.15, -Math.PI / 2],
-  ['drink_coffee_takeout_2.glb', 17.5, 1.8, -0.5, 0.18, 0.26, 0.18, 0],
-  ['food_cake_choc_slice_2.glb', 17.5, 1.8, 0.5, 0.3, 0.2, 0.25, 0.6],
-  ['giftbox_beige_bow_2.glb', 17.5, 2.0, 9.4, 0.4, 0.35, 0.4, 0],
-  ['giftbag_black_gold.glb', 17.5, 2.0, 10.6, 0.35, 0.4, 0.25, 0],
-  ['book_open.glb', 17.5, 2.0, 19.4, 0.45, 0.15, 0.35, 0],
-  ['display_stand_tiered_books.glb', 17.5, 2.0, 20.6, 0.45, 0.4, 0.4, 0],
+  // West bays (x=-17.5): CLOTHING store — folded clothes, t-shirts,
+  // scarves, blankets on the shelf tops.
+  ['clothes_folded_dark.glb', -17.5, 2.0, -20.6, 0.5, 0.25, 0.4, 0],
+  ['clothes_folded_dark_2.glb', -17.5, 2.0, -19.4, 0.5, 0.25, 0.4, 0],
+  ['shirt_denim_blue.glb', -17.5, 2.0, -10.6, 0.5, 0.3, 0.4, 0],
+  ['tshirt_black_2.glb', -17.5, 2.0, -9.4, 0.4, 0.45, 0.15, -Math.PI / 2],
+  ['tshirt_cream.glb', -17.5, 2.0, -0.6, 0.5, 0.4, 0.15, -Math.PI / 2],
+  ['clothes_folded_dark_3.glb', -17.5, 2.0, 0.6, 0.5, 0.25, 0.4, 0],
+  ['folded_black_clothes.glb', -17.5, 2.0, 9.4, 0.5, 0.25, 0.4, 0],
+  ['scarf_folded_darkred.glb', -17.5, 2.0, 10.6, 0.4, 0.2, 0.3, 0],
+  ['blanket_beige_folded.glb', -17.5, 2.0, 19.4, 0.5, 0.3, 0.4, 0],
+  ['blankets_folded_stack.glb', -17.5, 2.0, 20.6, 0.5, 0.35, 0.4, 0.3],
+  // East bays (x=17.5): TECH store — monitors, headphones, controllers,
+  // webcams, boxes on the shelf tops.
+  ['monitor_desktop_bluewave.glb', 17.5, 2.0, -20.6, 0.6, 0.45, 0.1, Math.PI / 2],
+  ['box_headphones.glb', 17.5, 2.0, -19.4, 0.35, 0.3, 0.3, 0],
+  ['controller_game_black.glb', 17.5, 2.0, -10.6, 0.35, 0.15, 0.3, 0],
+  ['controller_game_white.glb', 17.5, 2.0, -9.4, 0.35, 0.15, 0.3, 0],
+  ['headphones_black.glb', 17.5, 2.0, -0.6, 0.35, 0.3, 0.3, 0],
+  ['box_earbuds_white.glb', 17.5, 2.0, 0.6, 0.3, 0.25, 0.25, 0],
+  ['webcam_camera_on_stand_black.glb', 17.5, 2.0, 9.4, 0.35, 0.45, 0.3, 0],
+  ['webcam_camera_on_stand_black_2.glb', 17.5, 2.0, 10.6, 0.35, 0.45, 0.3, 0],
+  ['turntable_wood.glb', 17.5, 2.0, 19.4, 0.45, 0.3, 0.45, 0],
+  ['laptop_computer_open_purple_screen.glb', 17.5, 2.0, 20.6, 0.5, 0.35, 0.4, -Math.PI / 2],
 ];
 GROUND_SHELF_TOP.forEach((s) => shelfTop(...s));
 // Standing merchandise on the store floor in front of the shelves —
 // never within 2 m of a bomb spot, never blocking a bomb approach. The
-// west bay z=-10 (ground bomb at -16,-8) gets shelf-top items only; the
 // east bay z=10 (reindeer patrol) gets a display case beside the patrol,
-// not on it. Dressmaker torsos only — no full-body mannequins.
+// not on it. The full-body mannequins are wired in below, in the
+// clothing store and at the eye-catcher spots.
 const GROUND_FLOOR_ITEMS = [
   // file, x, z, tw, th, td, rotY, colliderR
+  // West (x=-16.2): CLOTHING store — all four dressmaker torsos live
+  // here now (they were split across both floors and both sides).
   ['mannequin_dressmaker.glb', -16.2, 0.8, 0.6, 1.5, 0.6, Math.PI / 2, 0.5],
-  ['giftbag_red_goldbow.glb', -16.2, 10, 0.4, 0.45, 0.3, 0, 0.4],
-  ['displaycase_glass_blackgold.glb', -16.2, 20, 0.7, 1.2, 0.5, Math.PI / 2, 0.5],
-  ['mannequin_dressmaker_2.glb', 16.2, -10, 0.6, 1.5, 0.6, -Math.PI / 2, 0.5],
+  ['mannequin_dressmaker_2.glb', -16.2, 10, 0.6, 1.5, 0.6, Math.PI / 2, 0.5],
+  ['mannequin_dressmaker_3.glb', -16.2, 20, 0.6, 1.5, 0.6, Math.PI / 2, 0.5],
+  ['mannequin_dressmaker_4.glb', -16.2, -10, 0.6, 1.5, 0.6, Math.PI / 2, 0.5],
+  // East (x=16.2): TECH store — TV, computer tower, display case, cabinet.
+  ['tv_landscape.glb', 16.2, -20, 1.2, 0.8, 0.3, -Math.PI / 2, 0.5],
+  ['black_computer_tower_speaker_purple_lights.glb', 16.2, 0, 0.5, 0.7, 0.5, -Math.PI / 2, 0.5],
   ['displaycase_glass_brown.glb', 16.2, 10, 0.7, 1.2, 0.5, -Math.PI / 2, 0.5],
   ['cabinet_display_black_tall.glb', 16.2, 20, 0.7, 1.8, 0.6, -Math.PI / 2, 0.5],
 ];
@@ -396,7 +411,7 @@ const UPPER_STORE_FIXTURES = [
   { file: 'shelf_wall_cubbies.glb', x: -17.5, z: 20, ry: Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
   { file: 'shelf_warehouse_3tier.glb', x: 17.5, z: -20, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
   { file: 'shelf_wall_cubbies.glb', x: 17.5, z: -10, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
-  { file: 'wine_rack_bottles.glb', x: 17.5, z: 0, ry: -Math.PI / 2, tw: 1.5, th: 1.8, td: 0.6 },
+  { file: 'shelf_warehouse_3tier.glb', x: 17.5, z: 0, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
   { file: 'shelf_warehouse_3tier.glb', x: 17.5, z: 10, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
   { file: 'shelf_wall_cubbies.glb', x: 17.5, z: 20, ry: -Math.PI / 2, tw: 2.5, th: 2.0, td: 0.8 },
 ];
@@ -406,31 +421,33 @@ UPPER_STORE_FIXTURES.forEach((f) => {
 });
 
 // ---- Store dressing (real mall props, upper floor) ----
-// Same pattern as the ground floor, shelf tops at y=6.5 (wine rack 6.3).
+// Same pattern as the ground floor, shelf tops at y=6.5.
 // Distinct models from the ground floor in the same bay — the same
 // object does not repeat on both floors of one bay.
 const UPPER_SHELF_TOP = [
-  // West bays (x=-17.5)
-  ['display_stand_tiered_books_2.glb', -17.5, 6.5, -20.6, 0.45, 0.4, 0.4, 0],
-  ['table_display_wood_books.glb', -17.5, 6.5, -19.4, 0.5, 0.3, 0.4, 0],
-  ['monitor_desktop_pinkwave.glb', -17.5, 6.5, -10.6, 0.6, 0.45, 0.1, Math.PI / 2],
-  ['box_earbuds_white.glb', -17.5, 6.5, -9.4, 0.3, 0.25, 0.25, 0],
-  ['clothes_folded_stack_dark.glb', -17.5, 6.5, -0.6, 0.5, 0.3, 0.4, 0],
-  ['scarf_folded_darkred.glb', -17.5, 6.5, 0.6, 0.4, 0.2, 0.3, 0],
-  ['giftbox_black_redbow.glb', -17.5, 6.5, 9.4, 0.4, 0.35, 0.4, 0],
-  ['giftbow_red_large_2.glb', -17.5, 6.5, 10.6, 0.45, 0.15, 0.45, 0],
-  ['vase_white_round.glb', -17.5, 6.5, 19.4, 0.3, 0.4, 0.3, 0],
-  ['poinsettia_goldvase.glb', -17.5, 6.5, 20.6, 0.35, 0.4, 0.35, 0],
-  // East bays (x=17.5)
-  ['headphones_black.glb', 17.5, 6.5, -20.6, 0.35, 0.3, 0.3, 0],
-  ['controller_game_black.glb', 17.5, 6.5, -19.4, 0.35, 0.15, 0.3, 0],
-  ['folded_black_clothes.glb', 17.5, 6.5, -10.6, 0.5, 0.25, 0.4, 0],
-  ['shirt_dress_blue_light_folded.glb', 17.5, 6.5, -9.4, 0.45, 0.2, 0.35, 0],
-  ['drink_milkshake_whipped.glb', 17.5, 6.3, -0.5, 0.18, 0.26, 0.18, 0],
-  ['drink_lemonade_yellow.glb', 17.5, 6.3, 0.5, 0.18, 0.26, 0.18, 0],
+  // West bays (x=-17.5): BOOK store — books, book stacks, tiered stands.
+  // (Book stacks repeat across bays — a book store has many identical stacks.)
+  ['display_stand_tiered_books.glb', -17.5, 6.5, -20.6, 0.45, 0.4, 0.4, 0],
+  ['display_stand_tiered_books_2.glb', -17.5, 6.5, -19.4, 0.45, 0.4, 0.4, 0],
+  ['book_open.glb', -17.5, 6.5, -10.6, 0.45, 0.15, 0.35, 0],
+  ['books_stack_color.glb', -17.5, 6.5, -9.4, 0.5, 0.35, 0.4, 0],
+  ['books_stack_tall.glb', -17.5, 6.5, -0.6, 0.5, 0.4, 0.4, 0],
+  ['books_stack_color.glb', -17.5, 6.5, 0.6, 0.5, 0.35, 0.4, 0],
+  ['table_display_wood_books.glb', -17.5, 6.5, 9.4, 0.5, 0.3, 0.4, 0],
+  ['books_stack_tall.glb', -17.5, 6.5, 10.6, 0.5, 0.4, 0.4, 0],
+  ['book_open.glb', -17.5, 6.5, 19.4, 0.45, 0.15, 0.35, 0],
+  ['books_stack_color.glb', -17.5, 6.5, 20.6, 0.5, 0.35, 0.4, 0],
+  // East bays (x=17.5): BOUTIQUE — jewelry trays/stands, necklace busts,
+  // gift boxes, handbags, vases.
+  ['black_jewelry_display_tray.glb', 17.5, 6.5, -20.6, 0.5, 0.15, 0.4, 0],
+  ['stand_jewelry_gold.glb', 17.5, 6.5, -19.4, 0.35, 0.45, 0.35, 0],
+  ['bust_necklace_black_white.glb', 17.5, 6.5, -10.6, 0.5, 0.5, 0.4, 0],
+  ['bust_necklace_black_red.glb', 17.5, 6.5, -9.4, 0.5, 0.5, 0.4, 0],
+  ['giftbox_beige_bow.glb', 17.5, 6.5, -0.6, 0.4, 0.35, 0.4, 0],
+  ['giftbox_black_redbow.glb', 17.5, 6.5, 0.6, 0.4, 0.35, 0.4, 0],
   ['handbag_beige.glb', 17.5, 6.5, 9.4, 0.4, 0.35, 0.25, 0],
   ['handbag_black_quilted.glb', 17.5, 6.5, 10.6, 0.4, 0.35, 0.25, 0],
-  ['bookshelf_wood_lit.glb', 17.5, 6.5, 19.4, 0.5, 0.4, 0.35, 0],
+  ['vase_white_round.glb', 17.5, 6.5, 19.4, 0.3, 0.4, 0.3, 0],
   ['vase_white_round_2.glb', 17.5, 6.5, 20.6, 0.3, 0.4, 0.3, 0],
 ];
 UPPER_SHELF_TOP.forEach((s) => shelfTop(...s));
@@ -439,16 +456,67 @@ UPPER_SHELF_TOP.forEach((s) => shelfTop(...s));
 // (upstairs bomb at 16,8) get shelf-top items only.
 const UPPER_FLOOR_ITEMS = [
   // file, x, z, tw, th, td, rotY, colliderR
-  ['mannequin_dressmaker_3.glb', -16.2, 0.8, 0.6, 1.5, 0.6, Math.PI / 2, 0.5],
-  ['black_gift_bag.glb', -16.2, 10, 0.4, 0.45, 0.3, 0, 0.4],
-  ['cube_display_black.glb', -16.2, 20, 0.7, 0.7, 0.7, Math.PI / 2, 0.5],
+  // West (x=-16.2): BOOK store — real bookshelves and book stacks on the
+  // floor. All clear of the upper west bomb at (-16,-8) (closest is 9 m).
+  ['bookshelf_corner_wood.glb', -16.2, 1, 1.0, 1.2, 0.4, Math.PI / 2, 0.5],
+  ['bookshelf_wood_arched.glb', -16.2, 5, 0.9, 1.6, 0.35, Math.PI / 2, 0.5],
+  ['bookshelf_wood_lit.glb', -16.2, 9, 0.9, 1.7, 0.4, Math.PI / 2, 0.5],
+  ['bookshelf_wood_arched_2.glb', -16.2, 13, 0.85, 1.6, 0.3, Math.PI / 2, 0.5],
+  ['books_stack_color.glb', -16.2, 17, 0.5, 0.5, 0.5, 0, 0.4],
+  ['books_stack_tall.glb', -16.2, 21, 0.5, 0.6, 0.5, 0, 0.4],
+  // East (x=16.2): BOUTIQUE — display counter, display case, gift box,
+  // round platform. All clear of the upper east bomb at (16,8)
+  // (closest is 4 m).
   ['counter_display_black_light.glb', 16.2, -20, 1.0, 1.1, 0.6, -Math.PI / 2, 0.5],
-  ['mannequin_dressmaker_4.glb', 16.2, -10, 0.6, 1.5, 0.6, -Math.PI / 2, 0.5],
+  ['displaycase_glass_blackgold.glb', 16.2, -10, 0.7, 1.2, 0.5, -Math.PI / 2, 0.5],
+  ['giftbox_gold_round.glb', 16.2, 12, 0.5, 0.5, 0.5, 0, 0.4],
   ['platform_display_round.glb', 16.2, 20, 0.9, 0.5, 0.9, -Math.PI / 2, 0.6],
 ];
 UPPER_FLOOR_ITEMS.forEach(([file, x, z, tw, th, td, ry, r]) => {
   loadProp('assets/props/mall/' + file, x, UPPER_Y + th / 2, z, tw, th, td, ry);
   colliders.push({ x, z, r, floor: 1 });
+});
+
+// ---- Display mannequins (Kyle, 2026-11-22: "use the mannequins,
+// that's part of the fun"). 13 verified person-reading mannequins —
+// the scan misnamed 4 of 15 files; the wrong ones are NOT used:
+// mannequin_female_white = black cushion/ottoman, mannequin_person_hatscarf
+// = grey metal pallet, dress_purple_ruffled_mannequin = dark counter,
+// suit_black_mannequin = cream t-shirt on a hanger. Two substitutes
+// found by direct render: dress_black_long_stand = person in a black
+// coat, red scarf, jeans and boots (the real "hat and scarf" person);
+// dress_black_long_stand_2 = black ruffled dress. All are PROPS, not
+// NPCs — never in the shoppers/terrorists arrays; shooting one is a
+// miss (nothing happens). They stand ~1.7 m tall, facing out into the
+// atrium, so a player glancing down the mall sees figures that could
+// be shoppers. The most person-like ones catch the eye at a glance:
+// the black-coat person at the south entrance, the dark-jacket person
+// by the UP escalator, a white female by the DOWN escalator landing,
+// and the red/black dress by the food court. The other nine stand in
+// the clothing store (ground west), spread through the bays. 2 m clear
+// of all bomb spots, escalator entries/exits, terrorist lanes, and
+// shopper huddles; no two copies of the same model side by side.
+// file, x, z, tw, th, td, rotY, floorY (0 or UPPER_Y), colliderR
+const MANNEQUINS = [
+  // Eye-catchers (atrium-facing, not in a store bay):
+  ['dress_black_long_stand.glb', -4, 24.5, 0.5, 1.7, 0.45, Math.PI, 0, 0.4],
+  ['mannequin_person_darkjacket.glb', 2, 6, 0.5, 1.7, 0.45, Math.PI, 0, 0.4],
+  ['mannequin_female_white_2.glb', 5.5, 15, 0.5, 1.7, 0.45, Math.PI, UPPER_Y, 0.4],
+  ['dress_redblack_mannequin.glb', 4, -19, 0.55, 1.7, 0.45, Math.PI, 0, 0.4],
+  // Clothing store, ground west (x=-16, facing out into the atrium):
+  ['dress_red_evening_mannequin.glb', -16, -22, 0.55, 1.7, 0.45, Math.PI / 2, 0, 0.4],
+  ['gown_blue_evening_mannequin.glb', -16, -18, 0.55, 1.7, 0.45, Math.PI / 2, 0, 0.4],
+  ['suit_black_mannequin_2.glb', -16, -13, 0.55, 1.7, 0.45, Math.PI / 2, 0, 0.4],
+  ['gown_green_mannequin.glb', -16, -2.5, 0.55, 1.7, 0.45, Math.PI / 2, 0, 0.4],
+  ['dress_purple_ruffled_mannequin_2.glb', -16, 2.5, 0.55, 1.7, 0.45, Math.PI / 2, 0, 0.4],
+  ['suit_gray_mannequin.glb', -16, 8, 0.55, 1.7, 0.45, Math.PI / 2, 0, 0.4],
+  ['blazer_navy_mannequin.glb', -16, 12, 0.55, 1.7, 0.45, Math.PI / 2, 0, 0.4],
+  ['mannequin_female_white_3.glb', -16, 18, 0.5, 1.7, 0.45, Math.PI / 2, 0, 0.4],
+  ['dress_black_long_stand_2.glb', -16, 22, 0.55, 1.7, 0.45, Math.PI / 2, 0, 0.4],
+];
+MANNEQUINS.forEach(([file, x, z, tw, th, td, ry, fy, r]) => {
+  loadProp('assets/props/mall/' + file, x, fy + th / 2, z, tw, th, td, ry);
+  colliders.push({ x, z, r, floor: fy ? 1 : 0 });
 });
 
 // ---- Escalators (UP at x=4, DOWN at x=8; ground z=4 -> upper z=12) ----
@@ -677,10 +745,20 @@ function modelBoneSet(model) {
   model.traverse((o) => { if (o.isBone) set.add(boneKey(o.name)); });
   return set;
 }
-// Shared walk/idle clips (Mixamo, metre-scale). Loaded once; every
-// character plays them through its own mixer.
+// Shared clips (Mixamo, metre-scale). Loaded once; every character
+// plays them through its own mixer. Besides idle/walk: the hostage
+// crouch/kneel clips (shoppers crouch in place, cowering) and the
+// terrorist aim/hold clips (guards aim, patrols walk weapon-up).
+// A clip that fails to load simply never appears in mxClips, and
+// playNpcClip falls back — nothing crashes.
 const mxClips = {};
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'],
+ ['crouch', 'Crouch_Idle.fbx'], ['crouchIdle2', 'Idle_Crouching.fbx'],
+ ['kneel', 'Pistol_Kneeling_Idle.fbx'], ['crouchF', 'Female_Crouch_Pose.fbx'],
+ ['crouchM', 'Male_Crouch_Pose.fbx'],
+ ['aimPistol', 'Aim Pistol.fbx'], ['aimGun', 'Aiming Gun.fbx'],
+ ['fireRifle', 'Firing_Rifle.fbx'], ['gunHold', 'Gunplay Stand Hold.fbx'],
+ ['pistolWalk', 'Pistol_Walk.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -706,21 +784,30 @@ function clipsFitModel(model) {
   return clip.tracks.some((t) => bones.has(boneKey(t.name)));
 }
 
-// ---- Player (Kyle_undercover, Mixamo) ----
+// ---- Player (Kyle_combat, Mixamo) ----
+// Combat model for this mission (Kyle, 2026-11-22): the mall is a
+// combat mission, so the player loads the combat version of Kyle.
+// Same 1.8 m fit, same spawn, same controls — only the model changes.
+// If it does not load, fall back to Kyle_undercover, then to a capsule.
 const player = new THREE.Group(); player.position.set(SPAWN.x, CHAR_LIFT, SPAWN.z); scene.add(player);
 let playerModel = null, mixer = null;
 const playerChar = { mixer: null, model: null, isTripo: false, _cur: null, _tripoClips: {} };
-fbxLoader.load('assets/characters/Kyle_undercover.fbx', (obj) => {
-  fitCharacter(obj, 1.8);
-  obj.rotation.y = Math.PI;
-  player.add(obj); playerModel = obj;
-  playerChar.model = obj;
-  playerChar.mixer = new THREE.AnimationMixer(obj); mixer = playerChar.mixer;
-}, undefined, () => {
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a2a }));
-  body.position.y = 1.0; player.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
-  head.position.y = 1.95; player.add(head); playerModel = body;
+function loadPlayerModel(file, onFail) {
+  fbxLoader.load(file, (obj) => {
+    fitCharacter(obj, 1.8);
+    obj.rotation.y = Math.PI;
+    player.add(obj); playerModel = obj;
+    playerChar.model = obj;
+    playerChar.mixer = new THREE.AnimationMixer(obj); mixer = playerChar.mixer;
+  }, undefined, onFail);
+}
+loadPlayerModel('assets/characters/Kyle_combat.fbx', () => {
+  loadPlayerModel('assets/characters/Kyle_undercover.fbx', () => {
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a2a }));
+    body.position.y = 1.0; player.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
+    head.position.y = 1.95; player.add(head); playerModel = body;
+  });
 });
 function playPlayerClip(key) {
   if (!playerChar.mixer) return;
@@ -738,31 +825,37 @@ function registerHitMeshes(npc, root) {
   root.traverse((o) => { if (o.isMesh) { o.userData.npc = npc; npcHitMeshes.push(o); } });
 }
 // Shoppers: all 7 real GLBs from the new models. Frightened shoppers —
-// they do NOT patrol like guards. Each huddles near a spot in the
-// atrium, shuffling slowly between two nearby points with long pauses
-// in between, mostly standing still. Shooting one fails the mission.
+// they do NOT patrol like guards. Each crouches or kneels in place in
+// a small huddle (2-3 per group), cowering, and never walks anywhere.
+// Shooting one fails the mission.
+// Hostage huddles: the shoppers crouch in place in small groups of
+// 2-3, not wandering the mall (see updatePatroller). The huddles keep
+// 2 m clear of the bombs and stay off the terrorist patrol lanes.
 const SHOPPER_ROSTER = [
-  { file: 'shopper1.glb', spot: [-6, 12] },
-  { file: 'shopper2.glb', spot: [5, 16] },
-  { file: 'shopper3.glb', spot: [-10, -6] },
-  { file: 'shopper4.glb', spot: [8, -12] },
-  { file: 'shopper5.glb', spot: [0, 22] },
-  { file: 'shopper6.glb', spot: [-12, 18] },
-  { file: 'shopper7.glb', spot: [10, -20] },
+  { file: 'shopper1.glb', spot: [-4, 12] },
+  { file: 'shopper2.glb', spot: [-3, 13.5] },
+  { file: 'shopper3.glb', spot: [-5, 13.5] },
+  { file: 'shopper4.glb', spot: [5, 16] },
+  { file: 'shopper5.glb', spot: [6.5, 17] },
+  { file: 'shopper6.glb', spot: [-10, -6] },
+  { file: 'shopper7.glb', spot: [8, -12] },
 ];
+// Hostage clip keys, one per shopper in rotation, so the huddles do
+// not all strike the same pose. Each is tried in order per shopper;
+// a clip that does not fit falls back to Crouch_Idle, then idle
+// (see playNpcClip).
+const HOSTAGE_CLIP_KEYS = ['crouch', 'crouchIdle2', 'kneel', 'crouchF', 'crouchM'];
 function makeShopper(spec, idx) {
   const outer = new THREE.Group();
   outer.position.set(spec.spot[0], CHAR_LIFT, spec.spot[1]);
   scene.add(outer);
   const inner = new THREE.Group(); outer.add(inner);
-  const off = (idx % 2 ? 1 : -1) * 1.5;
   const npc = {
     kind: 'shopper', file: spec.file, outer, inner,
     model: null, mixer: null, isTripo: true, _cur: null, _tripoClips: {},
-    speed: 0.35,
-    waypoints: [[spec.spot[0], spec.spot[1]], [spec.spot[0] + off, spec.spot[1] + (idx % 3 - 1)]],
-    pauses: [5 + Math.random() * 4, 5 + Math.random() * 4],
-    wpIdx: 1, wpDir: 1, pauseT: 3 + Math.random() * 5, stopped: false, fallT: 0, animOk: false,
+    hostageClip: HOSTAGE_CLIP_KEYS[idx % HOSTAGE_CLIP_KEYS.length],
+    speed: 0, waypoints: [[spec.spot[0], spec.spot[1]]], pauses: [0],
+    wpIdx: 0, wpDir: 1, pauseT: 0, stopped: false, fallT: 0, animOk: false,
   };
   gltfLoader.load('assets/characters/mall/' + spec.file, (gltf) => {
     const m = gltf.scene;
@@ -782,12 +875,20 @@ SHOPPER_ROSTER.forEach((spec, i) => makeShopper(spec, i));
 // stand guard near the bombs. They do not attack. Shooting one stops it
 // (same tip-over/sink/fade outcome as the Halloween shoot). The elf
 // guards the upstairs west-store bomb (upper floor).
+// Terrorists stand guard OVER or BESIDE a hostage group when not
+// patrolling: each roster's first waypoint is its guard spot (long
+// pause, aim/hold clip), the rest are its patrol. Santa and lights
+// guard the (-4,12) huddle, the elf guards the (-10,-6) hostage from
+// the balcony above, the reindeer guards the (5,16) huddle, and the
+// xmassweater guards the (8,-12) hostage. The xmassweater still
+// patrols the food-court lane; the lights patrols the west side at
+// x=-7 (moved off x=-5 so it does not walk through the huddle).
 const TERRORIST_ROSTER = [
-  { file: 'enemy-santa.fbx', speed: 1.4, waypoints: [[3, 3], [3, -3], [-3, -3], [-3, 3]], pauses: [1, 1, 1, 1] },
-  { file: 'enemy-elf.fbx', speed: 1.4, y: UPPER_Y, waypoints: [[-15, -6], [-15, -10]], pauses: [2, 2] },
-  { file: 'enemy-reindeer.fbx', speed: 1.4, waypoints: [[15, 6], [15, 10]], pauses: [2, 2] },
-  { file: 'enemy-xmassweater.fbx', speed: 1.5, waypoints: [[-8, -22], [8, -22]], pauses: [1, 1] },
-  { file: 'enemy-lights.fbx', speed: 1.5, waypoints: [[-5, 20], [-5, -20]], pauses: [0, 0] },
+  { file: 'enemy-santa.fbx', speed: 1.4, guardClip: 'aimPistol', waypoints: [[-4, 10], [3, -3], [-3, -3], [-3, 3]], pauses: [4, 1, 1, 1] },
+  { file: 'enemy-elf.fbx', speed: 1.4, y: UPPER_Y, guardClip: 'aimGun', waypoints: [[-10, -4], [-15, -6], [-15, -10]], pauses: [4, 2, 2] },
+  { file: 'enemy-reindeer.fbx', speed: 1.4, guardClip: 'gunHold', waypoints: [[4, 14], [15, 6], [15, 10]], pauses: [4, 2, 2] },
+  { file: 'enemy-xmassweater.fbx', speed: 1.5, guardClip: 'aimPistol', waypoints: [[6, -10], [-8, -22], [8, -22]], pauses: [4, 1, 1] },
+  { file: 'enemy-lights.fbx', speed: 1.5, guardClip: 'aimGun', waypoints: [[-2, 14], [-7, 20], [-7, -20]], pauses: [4, 0, 0] },
 ];
 function makeTerrorist(spec) {
   const start = spec.waypoints[0];
@@ -798,7 +899,7 @@ function makeTerrorist(spec) {
   const npc = {
     kind: 'terrorist', file: spec.file, outer, inner,
     model: null, mixer: null, isTripo: false, _cur: null, _tripoClips: {},
-    speed: spec.speed, waypoints: spec.waypoints, pauses: spec.pauses,
+    speed: spec.speed, guardClip: spec.guardClip, waypoints: spec.waypoints, pauses: spec.pauses,
     wpIdx: 1, wpDir: 1, pauseT: 0, stopped: false, fallT: 0, animOk: false,
   };
   fbxLoader.load('assets/characters/' + spec.file, (obj) => {
@@ -825,7 +926,7 @@ function faceToward(npc, dx, dz, dt) {
   while (d < -Math.PI) d += Math.PI * 2;
   npc.outer.rotation.y += d * Math.min(1, dt * 8);
 }
-function playNpcClip(npc, key) {
+function playNpcClip(npc, key, fallback) {
   if (!npc.mixer) return;
   // Lazy compatibility check: the shared clips load async, so a model
   // that loaded before them must not be permanently marked un-animatable.
@@ -834,15 +935,24 @@ function playNpcClip(npc, key) {
     if (!clipsFitModel(npc.model)) return;
     npc.animOk = true;
   }
-  playCharClip(npc, key);
+  // If the requested clip did not load, fall back (guarding terrorists
+  // to idle, patrolling terrorists to walk, shoppers to idle).
+  const k = mxClips[key] ? key : (fallback && mxClips[fallback] ? fallback : 'idle');
+  playCharClip(npc, k);
 }
-// Patrol / shuffle: ping-pong between waypoints, pausing at each.
-// Shoppers shuffle slowly with long pauses; terrorists patrol steadily.
+// Patrol: ping-pong between waypoints, pausing at each. Hostages do
+// not patrol at all — they crouch/kneel in place, cowering.
+// Terrorists guard (paused at a waypoint) with their weapon raised
+// (aim/hold clip) and patrol with their weapon up (Pistol_Walk).
 function updatePatroller(npc, dt) {
   if (npc.stopped) return;
+  if (npc.kind === 'shopper') {
+    playNpcClip(npc, npc.hostageClip || 'crouch', 'idle');
+    return;
+  }
   if (npc.pauseT > 0) {
     npc.pauseT -= dt;
-    playNpcClip(npc, 'idle');
+    playNpcClip(npc, npc.guardClip || 'aimPistol', 'idle');
     return;
   }
   const wp = npc.waypoints[npc.wpIdx];
@@ -853,14 +963,14 @@ function updatePatroller(npc, dt) {
     npc.wpIdx += npc.wpDir;
     if (npc.wpIdx >= npc.waypoints.length) { npc.wpIdx = npc.waypoints.length - 2; npc.wpDir = -1; }
     else if (npc.wpIdx < 0) { npc.wpIdx = 1; npc.wpDir = 1; }
-    playNpcClip(npc, 'idle');
+    playNpcClip(npc, npc.guardClip || 'aimPistol', 'idle');
     return;
   }
   const step = npc.speed * dt;
   npc.outer.position.x += dx / d * step;
   npc.outer.position.z += dz / d * step;
   faceToward(npc, dx, dz, dt);
-  playNpcClip(npc, 'walk');
+  playNpcClip(npc, 'pistolWalk', 'walk');
 }
 // A stopped terrorist tips over and fades out over ~1.6 s.
 function updateStopped(npc, dt) {
