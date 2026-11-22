@@ -1730,8 +1730,14 @@ function startReload() {
       }
       return;
     }
+    // Pistol / rifle reload was silent. Kyle's picks (2026-11-22):
+    // the mag swap plays at the start, the slide rack when the reload
+    // completes (~1.5 s). Token-guarded like the revolver clicks.
+    const tok = ++reloadToken;
     reloadUntil = performance.now() + 1500;
     playPlayerOneShot(weapon === 'rifle' ? 'reloadRifle' : 'reloadPistol');
+    playSfx(SFX_FILES.magSwap);
+    setTimeout(()=>{ if (tok === reloadToken && !gameOver && !won) playSfx(SFX_FILES.slideRack); }, 1500);
   }
 }
 // ---- Gun-battle + headshot slow motion ----
@@ -3065,25 +3071,35 @@ function noiseAlert(radius, isGun){
 // pitch (playbackRate 0.92–1.08) and a randomized peaking filter
 // (formant shift, 600–3000 Hz, ±6 dB) so no two shots sound identical.
 const SFX_FILES = {
-  pistol: 'assets/audio/pistol-gunshot.m4a',
   suppressedPistol: 'assets/audio/suppressed-pistol.m4a',
-  suppressedWalther: 'assets/audio/suppressedwalther.m4a',
   // Weapon sounds — Kyle's picks from the sound comparison
-  // (2026-11-22). Video extracts: Glock, Revolver, AKS74U, Shotgun.
-  // Real recordings: MP5K, RPG, suppressed pistol, bullet-load click,
-  // shotgun pump rack. Each trimmed to a tight shot (0.4–0.7 s) so it
-  // repeats cleanly at auto-fire rates. The MP5K is the first shot of
-  // the burst; the bullet-load is a single click cut from the full
-  // loading sequence. The suppressed pistol, bullet-load, and pump are
-  // real recordings replacing the earlier synthesised files.
+  // (2026-11-22, revised same day). Real recordings: Glock, Revolver,
+  // MP5K, Shotgun, Makarov, suppressed pistol, suppressed rifle, RPG,
+  // bullet-load click, shotgun pump rack. Video extracts: AKS74U,
+  // Walther, explosion. Procedural: slide rack, mag swap, C4 beep.
+  // Each gunshot is trimmed to a tight shot (0.35–0.7 s) so it repeats
+  // cleanly at auto-fire rates. The MP5K is the first shot of the burst;
+  // the bullet-load is a single click cut from the full loading sequence.
+  // The suppressed rifle (black-loadout MP5K/AKS74U only) is kept quiet
+  // (peak ~0.35) so it reads as suppressed; the slide rack, mag swap,
+  // and C4 beep are medium (peak ~0.5). The katana slash stays Kyle's
+  // own recordings (slash-hit / slash-miss) — no comparison pick.
+  // Kyle's original pistol-gunshot / suppressedwalther files are
+  // retired (still on disk) — Walther and Makarov have their own picks.
   glock: 'assets/audio/glock-shot.m4a',
   revolver: 'assets/audio/revolver-shot.m4a',
+  walther: 'assets/audio/walther-shot.m4a',
+  makarov: 'assets/audio/makarov-shot.m4a',
   mp5k: 'assets/audio/mp5k-burst.m4a',
   aks74u: 'assets/audio/aks74u-shot.m4a',
+  suppressedRifle: 'assets/audio/suppressed-rifle.m4a',
   shotgun: 'assets/audio/shotgun-blast.m4a',
   rpg: 'assets/audio/rpg-launch.m4a',
   bulletLoad: 'assets/audio/bullet-load.m4a',
   shotgunPump: 'assets/audio/shotgun-pump.m4a',
+  slideRack: 'assets/audio/slide-rack.m4a',
+  magSwap: 'assets/audio/mag-swap.m4a',
+  explosion: 'assets/audio/explosion.m4a',
   hit: ['assets/audio/gunshot-hit.m4a', 'assets/audio/gunshot-hit2.m4a'],
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
   slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
@@ -3158,17 +3174,20 @@ function playSfx(file){
 function pickSfx(arr){ return arr[(Math.random()*arr.length)|0]; }
 function playShotSound(){
   if (weapon === 'rifle'){
-    if (weaponVariant === 'AKS74U') playSfx(SFX_FILES.aks74u);
-    else if (weaponVariant === 'MP5K') playSfx(SFX_FILES.mp5k);
+    // Black loadout is the suppressed loadout: a black MP5K/AKS74U
+    // fires the quiet suppressed-rifle sound; the white loadout fires
+    // the loud pick (MP5K Real, AKS74U Video). Same split as the Glock.
+    if (weaponVariant === 'AKS74U') playSfx(playerLoadout === 'black' ? SFX_FILES.suppressedRifle : SFX_FILES.aks74u);
+    else if (weaponVariant === 'MP5K') playSfx(playerLoadout === 'black' ? SFX_FILES.suppressedRifle : SFX_FILES.mp5k);
     else if (weaponVariant === 'Shotgun') playSfx(SFX_FILES.shotgun);
     else if (weaponVariant === 'RPG7') playSfx(SFX_FILES.rpg);
     else playSfx(SFX_FILES.aks74u);
   } else {
-    if (weaponVariant === 'Walther') playSfx(SFX_FILES.suppressedWalther);
+    if (weaponVariant === 'Walther') playSfx(SFX_FILES.walther);
     else if (weaponVariant === 'Glock' && playerLoadout === 'black') playSfx(SFX_FILES.suppressedPistol);
     else if (weaponVariant === 'Glock') playSfx(SFX_FILES.glock);
     else if (weaponVariant === 'Revolver') playSfx(SFX_FILES.revolver);
-    else playSfx(SFX_FILES.pistol); // Makarov
+    else playSfx(SFX_FILES.makarov); // Makarov
   }
 }
 // ---------- Procedural ambient + footstep audio (Web Audio, no files) ----------
@@ -3355,6 +3374,7 @@ function tryShoot(){
       if (isHeadshot) headshotSlowT = (g.hp - w.dmg <= 0) ? HEADSHOT_HOLD : 0.4;
       g.hp -= w.dmg; g.meter = 100; g.state='ALERT'; g.lastKnown = player.position.clone();
       playSfx(pickSfx(SFX_FILES.hit));
+      if (weaponVariant === 'RPG7') playSfx(SFX_FILES.explosion); // RPG impact
       spawnBloodMist(hits[0].point.clone());
       spawnBloodSpatter(hits[0].point.clone());
       addDecal(new THREE.Vector3(g.group.position.x, 0.02, g.group.position.z), new THREE.Vector3(0, 1, 0), 'blood');
@@ -3380,6 +3400,7 @@ function tryShoot(){
         if (!(o && o.material === 'metal')) spawnParticles(sh.point, o && o.material === 'wood' ? 0x8a6a3a : 0x888888, 5, 1.5, 0.05, 0.5, 9.8);
       }
       endPoint = sh.point.clone();
+      if (weaponVariant === 'RPG7') playSfx(SFX_FILES.explosion); // RPG impact on a surface
     }
   }
   // Muzzle flash + tracer on EVERY shot — hit, wall, or clean miss
