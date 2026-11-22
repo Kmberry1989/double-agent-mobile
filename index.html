@@ -1690,7 +1690,17 @@ let modelYaw = yaw; // smoothed model yaw (animate lerps this toward camera yaw;
 let health = 100, detection = 0, intel = 0, gameOver = false, won = false;
 let weapon = 'pistol'; // pistol | rifle
 const weapons = { pistol:{mag:12, max:12, dmg:34, rate:0.28}, rifle:{mag:30, max:30, dmg:50, rate:0.11} };
-let ammoInMag = 12, lastShot = 0, reloadUntil = 0, currentAnim = 'idle';
+// Per-variant stats override the class table: the Revolver holds 6
+// (a cylinder IS the chamber — no +1) and hits harder but slower than
+// the semi-auto pistols; the Shotgun holds 5 shells and hits hardest
+// up close, its rate gated by the pump (PUMP_T below). Resolved at
+// call time, so weaponVariant may change underneath.
+function weaponStats(){
+  if (weaponVariant === 'Revolver') return { mag: 6, max: 6, dmg: 40, rate: 0.35 };
+  if (weaponVariant === 'Shotgun') return { mag: 5, max: 5, dmg: 70, rate: 0.11 };
+  return weapons[weapon];
+}
+let ammoInMag = 12, lastShot = 0, reloadUntil = 0, currentAnim = 'idle', pumpUntil = 0;
 // Reload: ammo requires reloading — when the mag runs dry the reload
 // starts on its own, and the player can also reload early. startReload
 // is the one place that begins a reload — KeyR, the RELOAD touch button,
@@ -1698,8 +1708,28 @@ let ammoInMag = 12, lastShot = 0, reloadUntil = 0, currentAnim = 'idle';
 // reload animation is the real Reloading_Rifle / Reloading_Walking clip
 // (one-shot, preloaded in CORE_PRELOAD); in crouch/crawl it falls back
 // to the standing reload (no crouch reload clip exists).
+// Revolver reload (2026-11-22, Kyle: six bullets, one per chamber, one
+// after another): six staggered clicks over ~2.7 s, not a magazine swap.
+// The ammo refills when reloadUntil passes (animate loop, as for every
+// weapon); the clicks are sound only, each guarded by a reload token so
+// switching weapons mid-reload silences the rest. Falls back to the
+// pistol reload clip — no revolver-specific clip exists.
+// Shotgun pump (2026-11-22, Kyle: pump after every shot): after a
+// shotgun shot the pump must finish (PUMP_T) before the next shot can
+// fire; the pump sound plays once per shot, right after the shot.
+const REV_BULLETS = 6, REV_CLICK_MS = 450, REV_RELOAD_MS = 2700, PUMP_T = 600;
+let reloadToken = 0;
 function startReload() {
   if (performance.now() > reloadUntil) {
+    if (weaponVariant === 'Revolver'){
+      const tok = ++reloadToken;
+      reloadUntil = performance.now() + REV_RELOAD_MS;
+      playPlayerOneShot('reloadPistol');
+      for (let i = 0; i < REV_BULLETS; i++){
+        setTimeout(()=>{ if (tok === reloadToken && !gameOver && !won && weaponVariant === 'Revolver') playSfx(SFX_FILES.bulletLoad); }, i * REV_CLICK_MS);
+      }
+      return;
+    }
     reloadUntil = performance.now() + 1500;
     playPlayerOneShot(weapon === 'rifle' ? 'reloadRifle' : 'reloadPistol');
   }
@@ -1827,12 +1857,14 @@ let playerLoadout = 'white'; // 'white' | 'black' — two distinct player sets
 // is a real visual + name change, not a new power level. RPG7 is a
 // rifle-class visual variant in this phase (no launcher / AoE behaviour).
 const WEAPON_CYCLE = [
-  { name: 'Glock', cls: 'pistol', len: 0.32 },
-  { name: 'Walther', cls: 'pistol', len: 0.32 },
-  { name: 'Makarov', cls: 'pistol', len: 0.32 },
-  { name: 'MP5K', cls: 'rifle', len: 0.60 },
-  { name: 'AKS74U', cls: 'rifle', len: 0.60 },
-  { name: 'RPG7', cls: 'rifle', len: 0.60 }
+  { name: 'Glock', cls: 'pistol', len: 0.32, mag: 12 },
+  { name: 'Walther', cls: 'pistol', len: 0.32, mag: 12 },
+  { name: 'Makarov', cls: 'pistol', len: 0.32, mag: 12 },
+  { name: 'Revolver', cls: 'pistol', len: 0.32, mag: 6 },
+  { name: 'MP5K', cls: 'rifle', len: 0.60, mag: 30 },
+  { name: 'AKS74U', cls: 'rifle', len: 0.60, mag: 30 },
+  { name: 'Shotgun', cls: 'rifle', len: 0.80, mag: 5 },
+  { name: 'RPG7', cls: 'rifle', len: 0.60, mag: 30 }
 ];
 // Guns that can take a suppressor. The RPG7 cannot — it never gets one.
 const SUPPRESSIBLE = new Set(['Glock', 'Walther', 'Makarov', 'MP5K', 'AKS74U']);
@@ -1841,7 +1873,7 @@ function weaponVariantInfo(){ return WEAPON_CYCLE.find(v=>v.name===weaponVariant
 function setWeaponVariant(name){
   const info = WEAPON_CYCLE.find(v=>v.name===name); if (!info) return;
   weaponVariant = info.name; weapon = info.cls;
-  ammoInMag = info.cls === 'pistol' ? Math.min(ammoInMag, 12) : 30;
+  ammoInMag = info.cls === 'pistol' ? Math.min(ammoInMag, info.mag) : info.mag;
   updateWeaponVisibility();
 }
 function cycleWeapon(){
@@ -1849,10 +1881,10 @@ function cycleWeapon(){
   setWeaponVariant(WEAPON_CYCLE[(i + 1) % WEAPON_CYCLE.length].name);
 }
 const PLAYER_LOADOUTS = {
-  white: { Glock: 'white_glock.glb', Walther: 'white_walther.glb', Makarov: 'white_makarov.glb', MP5K: 'white_mp5k.glb', AKS74U: 'white_aks74u.glb', RPG7: 'white_RPG7.glb' },
-  black: { Glock: 'black_glock_threaded.glb', Walther: 'black_walther.glb', Makarov: 'black_makarov.glb', MP5K: 'black_mp5k.glb', AKS74U: 'black_aks74u.glb', RPG7: 'black_rpg.glb' }
+  white: { Glock: 'white_glock.glb', Walther: 'white_walther.glb', Makarov: 'white_makarov.glb', Revolver: 'white_revolver.glb', MP5K: 'white_mp5k.glb', AKS74U: 'white_aks74u.glb', Shotgun: 'white_shotgun.glb', RPG7: 'white_RPG7.glb' },
+  black: { Glock: 'black_glock_threaded.glb', Walther: 'black_walther.glb', Makarov: 'black_makarov.glb', Revolver: 'black_revolver.glb', MP5K: 'black_mp5k.glb', AKS74U: 'black_aks74u.glb', Shotgun: 'black_shotgun.glb', RPG7: 'black_rpg.glb' }
 };
-const weaponPivots = { white: { Glock: null, Walther: null, Makarov: null, MP5K: null, AKS74U: null, RPG7: null }, black: { Glock: null, Walther: null, Makarov: null, MP5K: null, AKS74U: null, RPG7: null } };
+const weaponPivots = { white: { Glock: null, Walther: null, Makarov: null, Revolver: null, MP5K: null, AKS74U: null, Shotgun: null, RPG7: null }, black: { Glock: null, Walther: null, Makarov: null, Revolver: null, MP5K: null, AKS74U: null, Shotgun: null, RPG7: null } };
 // Suppressor + accessory groups (filled by loaders below; null until loaded).
 const suppressorGroups = { white: null, black: null };
 const accessoryGroups = { white: { glasses: null }, black: { glasses: null }, watch: null };
@@ -3034,6 +3066,11 @@ const SFX_FILES = {
   suppressedWalther: 'assets/audio/suppressedwalther.m4a',
   ak74: 'assets/audio/ak74.m4a',
   rifle: 'assets/audio/rifle-gunshots.m4a',
+  // Revolver reload (2026-11-22): one metallic click per chamber, six
+  // in a row. Shotgun pump (2026-11-22): two-part racking after every
+  // shot. Both synthesised (Python + ffmpeg), mono AAC like the rest.
+  bulletLoad: 'assets/audio/bullet-load.m4a',
+  shotgunPump: 'assets/audio/shotgun-pump.m4a',
   hit: ['assets/audio/gunshot-hit.m4a', 'assets/audio/gunshot-hit2.m4a'],
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
   slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
@@ -3245,7 +3282,8 @@ function tryShoot(){
   if (gameOver || won) return;
   if (takedownCine || chokeholdTakedown) return; // no shooting mid-takedown
   if (now<reloadUntil) return;
-  const w = weapons[weapon];
+  if (weaponVariant === 'Shotgun' && now < pumpUntil) return; // the pump must finish before the next shot
+  const w = weaponStats();
   if (now-lastShot < w.rate*1000) return;
   // Empty mag: reload starts automatically, no message, no key press.
   if (ammoInMag<=0){ startReload(); return; }
@@ -3272,6 +3310,7 @@ function tryShoot(){
   if (ammoInMag<=0) startReload(); // the last round fires, then the reload starts on its own
   ejectCasing();
   playShotSound();
+  if (weaponVariant === 'Shotgun'){ pumpUntil = now + PUMP_T; playSfx(SFX_FILES.shotgunPump); }
   playPlayerOneShot(weapon==='rifle' ? (crouching ? 'fireRifleCrouch' : 'fireRifle') : 'firePistol');
   // Hitscan: the shot resolves instantly, so the
   // tracer and the slow-mo carry the anticipation.
@@ -4028,14 +4067,14 @@ function animate(){
       if (stepAccum >= 1.1){ stepAccum -= 1.1; playFootstep(); }
     }
     stepPrevX = player.position.x; stepPrevZ = player.position.z;
-    if (now>reloadUntil && reloadUntil!==0){ ammoInMag=weapons[weapon].max; reloadUntil=0; }
+    if (now>reloadUntil && reloadUntil!==0){ ammoInMag=weaponStats().max; reloadUntil=0; }
     // Tactical top-off: when no enemy is aiming at the player (no guard
     // in ALERT, the state that shoots) and the mag is not completely
     // full, reload on its own to top it off. It never interrupts active
     // shooting — no shot in the last 2 s — and never fires while a
     // reload is already running. The empty-mag auto-reload in tryShoot
     // covers the dry case; this covers the half-full case when it is safe.
-    if (!gameOver && !won && now > reloadUntil && ammoInMag < weapons[weapon].max && now - lastShot > 2000) {
+    if (!gameOver && !won && now > reloadUntil && ammoInMag < weaponStats().max && now - lastShot > 2000) {
       const anyAiming = guards.some((g) => !g.dead && g.state === 'ALERT');
       if (!anyAiming) startReload();
     }
@@ -4182,7 +4221,7 @@ function animate(){
   const anyAlert = guards.some(g=>g.state==='ALERT');
   const _st=document.getElementById('stateText'); if(_st) _st.textContent = anyAlert?'ALERT':(detection>=30?'CAUTION':(detection>0?'SUSPICIOUS':'UNDETECTED'));
   const _wt=document.getElementById('weaponText'); if(_wt) _wt.textContent = weaponVariant + ' (' + weapon + ') · ' + playerLoadout + ' set';
-  const _at=document.getElementById('ammoText'); if(_at) _at.textContent = 'Ammo: '+ammoInMag+' / '+weapons[weapon].max + (now<reloadUntil?' (reloading)':'');
+  const _at=document.getElementById('ammoText'); if(_at) _at.textContent = 'Ammo: '+ammoInMag+' / '+weaponStats().max + (now<reloadUntil?' (reloading)':'');
   const _dispAnim = playerHeldPose || playerOneShotName || currentAnim;
   const _ant=document.getElementById('animText'); if(_ant) _ant.textContent = 'Anim: '+_dispAnim+' ('+(fbxPlaying ? 'Agent_Kyle.fbx, FBX' : 'procedural capsule')+') — FBX: '+(ANIM_MAP[_dispAnim]||ANIM_MAP[currentAnim]||'—');
   const _pt=document.getElementById('posText'); if(_pt) _pt.textContent = 'Intel: '+intel+'/3  •  X '+player.position.x.toFixed(0)+' Z '+player.position.z.toFixed(0);
