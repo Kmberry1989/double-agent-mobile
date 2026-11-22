@@ -120,15 +120,8 @@ function cyl(x, y, z, rTop, rBot, h, color, seg) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, seg || 24), new THREE.MeshStandardMaterial({ color }));
   m.position.set(x, y, z); scene.add(m); return m;
 }
-// Canvas texture helper (2026-11-17 theater visual pass): draws a
-// 2D canvas and returns it as a texture. Used for the painted stage
-// backdrop (dusk city skyline) and the framed playbills (decorative
-// border only — no show name exists in the file, so no words).
-function canvasTex(w, h, draw) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-}
+// canvasTex helper removed 2026-11-22: the backdrop and the playbills
+// (its only callers) are real generated images now, loaded with texLoader.
 const TEX = 'assets/textures/theater/';
 
 // ---- Theater environment ----
@@ -211,27 +204,16 @@ flatPlane(0, 10, 10, 28, 40, 0x2a3a3a, TEX + 'theater_ceiling_1024.webp', 6, 8, 
 // aisle lights. Procedural dressing — no real GLBs exist for these.
 // Playbills: gold-framed posters on the side walls near the entrance
 // (z=28), decorative border only — no show name exists in the file.
-const playbillTex = canvasTex(256, 384, (ctx, w, h) => {
-  ctx.fillStyle = '#f2e6c8'; ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 10; ctx.strokeRect(14, 14, w - 28, h - 28);
-  ctx.strokeStyle = '#8a6b3a'; ctx.lineWidth = 3; ctx.strokeRect(30, 30, w - 60, h - 60);
-  // Centre ornament: a gold diamond with rays, no words.
-  ctx.fillStyle = '#c9a227';
-  ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(Math.PI / 4); ctx.fillRect(-34, -34, 68, 68); ctx.restore();
-  ctx.fillStyle = '#f2e6c8';
-  ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate(Math.PI / 4); ctx.fillRect(-20, -20, 40, 40); ctx.restore();
-  ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 4;
-  for (let i = 0; i < 8; i++) {
-    const a = i * Math.PI / 4;
-    ctx.beginPath(); ctx.moveTo(w / 2 + Math.cos(a) * 52, h / 2 + Math.sin(a) * 52);
-    ctx.lineTo(w / 2 + Math.cos(a) * 72, h / 2 + Math.sin(a) * 72); ctx.stroke();
-  }
-  ctx.fillStyle = '#8a6b3a';
-  ctx.beginPath(); ctx.arc(w / 2, h / 2, 10, 0, Math.PI * 2); ctx.fill();
-});
+// Playbills: two real generated posters (no words) — replace the
+// canvas-painted border. Diamond medallion on the west wall, gold mask
+// on the east wall. Cropped to the poster's 0.62:0.92 aspect.
+const playbillTexW = texLoader.load(TEX + 'theater_playbill_diamond.webp');
+playbillTexW.colorSpace = THREE.SRGBColorSpace;
+const playbillTexE = texLoader.load(TEX + 'theater_playbill_mask.webp');
+playbillTexE.colorSpace = THREE.SRGBColorSpace;
 [-13.9, 13.9].forEach((x) => {
   const frame = box(x, 2.0, 28, 0.06, 1.05, 0.75, 0xc9a227);
-  const poster = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.92), new THREE.MeshBasicMaterial({ map: playbillTex }));
+  const poster = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.92), new THREE.MeshBasicMaterial({ map: x < 0 ? playbillTexW : playbillTexE }));
   poster.position.set(x + (x < 0 ? 0.04 : -0.04), 2.0, 28); poster.rotation.y = x < 0 ? Math.PI / 2 : -Math.PI / 2; scene.add(poster);
 });
 // Box-seat curtains: heavy red velvet panels framing the two balcony
@@ -581,47 +563,12 @@ function enemiesNearDrape(r) {
 // real GLBs exist for these. The backdrop hangs on the upstage wall
 // (z=-9.7, just in front of the back wall at -10); the set pieces sit
 // at the stage sides, clear of the centre fight area.
-// Painted backdrop: a dusk city skyline — indigo gradient sky, moon,
-// dark building silhouettes with a few lit windows, rooftop band.
-const backdropTex = canvasTex(1024, 288, (ctx, w, h) => {
-  // Dusk sky: deep violet at the top, magenta mid, warm orange at the
-  // horizon — a painted sunset, not a black void.
-  const sky = ctx.createLinearGradient(0, 0, 0, h);
-  sky.addColorStop(0, '#2a1a4a'); sky.addColorStop(0.45, '#6a3a5a'); sky.addColorStop(0.72, '#c96a3a'); sky.addColorStop(0.88, '#8a4a3a'); sky.addColorStop(1, '#3a1a2a');
-  ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
-  // Stars in the upper sky.
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
-  for (let i = 0; i < 60; i++) {
-    const sx = Math.random() * w, sy = Math.random() * h * 0.4;
-    ctx.fillRect(sx, sy, 2, 2);
-  }
-  // Moon: larger, with a stronger glow. Centred (w*0.5) so it shows
-  // through the gap in the upstage drape — at w*0.78 it sat behind the
-  // right drape panel and was invisible from the house.
-  ctx.fillStyle = '#f5e8c8'; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.18, 28, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = 'rgba(245,232,200,0.35)'; ctx.beginPath(); ctx.arc(w * 0.5, h * 0.18, 46, 0, Math.PI * 2); ctx.fill();
-  // Far skyline (lighter, hazier) then near skyline (darker).
-  ctx.fillStyle = '#3a3050';
-  [[0, 90, 70, 60], [80, 70, 60, 90], [170, 100, 80, 50], [280, 60, 55, 100], [360, 110, 90, 40], [470, 80, 60, 80], [560, 100, 70, 55], [660, 70, 60, 95], [750, 105, 85, 45], [860, 85, 65, 85], [950, 95, 74, 60]].forEach(([x, bw, bh, top]) => {
-    ctx.fillRect(x, h - top - bh, bw, bh + top);
-  });
-  ctx.fillStyle = '#1e1828';
-  [[20, 110, 60, 40], [130, 80, 90, 70], [230, 120, 70, 30], [370, 90, 100, 60], [480, 130, 80, 40], [630, 100, 110, 55], [750, 140, 90, 35], [900, 110, 80, 50]].forEach(([x, bw, bh, top]) => {
-    ctx.fillRect(x, h - top - bh, bw, bh + top);
-  });
-  // Lit windows in the near skyline — more of them, bigger, warmer.
-  ctx.fillStyle = '#ffdd88';
-  for (let i = 0; i < 80; i++) {
-    const wx = 20 + Math.random() * 980, wy = h - 60 - Math.random() * 110;
-    ctx.fillRect(wx, wy, 6, 8);
-  }
-  // Rooftop/hedge band along the bottom, with a few chimneys.
-  ctx.fillStyle = '#0e0a14'; ctx.fillRect(0, h - 28, w, 28);
-  ctx.fillStyle = '#0e0a14';
-  [[60, 18, 22], [300, 14, 26], [620, 16, 20], [880, 20, 24]].forEach(([x, cw, ch]) => {
-    ctx.fillRect(x, h - 28 - ch, cw, ch);
-  });
-});
+// Painted backdrop: a real generated image (dusk city skyline, 2026-11-22)
+// — replaces the canvas painting. Moon near the top-centre, lit windows,
+// same mood as the old painting, but a real image. Cropped to the plane's
+// 23:6.5 aspect so nothing distorts.
+const backdropTex = texLoader.load(TEX + 'theater_backdrop_dusk_skyline.webp');
+backdropTex.colorSpace = THREE.SRGBColorSpace;
 const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(23, 6.5), new THREE.MeshBasicMaterial({ map: backdropTex }));
 backdrop.position.set(0, STAGE_TOP + 3.25, -9.7); scene.add(backdrop);
 // Fake columns (fluted look via a plain shaft + gold capital/base) at
@@ -918,9 +865,12 @@ function playMxCharClipOnce(char, key) {
 // while she recovers). All Mixamo, metre-scale, stripRootTravel.
 // knockedOut = her fall; standingUp = her getting back up; beingCocky
 // = the enemies' taunt (a cocky lean-back gesture, 2.9 s, from Drive).
+// hitReact = the enemies' flinch when a slash connects (2026-11-22:
+// enemies now visibly react to every hit, not just the killing one).
 [['knockedOut', 'Knocked_Out.fbx'],
  ['standingUp', 'Standing_Up.fbx'],
- ['beingCocky', 'Being_Cocky.fbx']].forEach(([key, file]) => {
+ ['beingCocky', 'Being_Cocky.fbx'],
+ ['hitReact', 'Hit_Reaction.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -1186,6 +1136,7 @@ function makeEnemy(i) {
     x: ENEMY_SPAWNS[i][0], z: ENEMY_SPAWNS[i][1], y: -0.6,
     riseT: 0, fallT: 0, sway: Math.random() * 6.28,
     atkCd: 0, atkT: 0, hitDone: false, // enemy attack: cooldown, swing timer, hit landed
+    staggerT: 0, staggerFlash: 0, // hit stagger: freeze timer + white-flash timer (2026-11-22)
     is3D: !!slot.is3D, mesh: null, model: null, mixer: null, _cur: null, sword: null,
   };
   if (slot.is3D) {
@@ -1245,56 +1196,26 @@ function updateEnemyCount() {
   if (el) el.textContent = defeated + ' / 8';
 }
 // ---- Blood effects (katana cuts + enemy hits on Rochelle) ----
-// Two parts, both for the player and the enemies: a particle mist
-// (dark-red points that burst outward and fade) and, on top of it, a
-// small realistic blood-spatter sprite that stretches upward into the
-// air a little and then fades away. Three spatter variants, picked at
-// random each time so it does not feel manufactured.
-const bloodFx = []; // active mists + spatter sprites
-const BLOOD_SPATTER_TEX = [
-  'assets/textures/effects/blood_spatter.webp',
-  'assets/textures/effects/blood_spatter_2.webp',
-  'assets/textures/effects/blood_spatter_3.webp',
-];
-const bloodSpatterTex = []; // { tex, aspect } per variant
-BLOOD_SPATTER_TEX.forEach((url) => {
-  new THREE.TextureLoader().load(url, (t) => {
-    const img = t.image;
-    bloodSpatterTex.push({ tex: t, aspect: img ? img.width / img.height : 1 });
-  });
-});
-function pickBloodSpatter() {
-  if (!bloodSpatterTex.length) return null;
-  return bloodSpatterTex[Math.floor(Math.random() * bloodSpatterTex.length)];
-}
+// Particles ONLY (2026-11-22): the blood-spatter sprite/decal looked
+// cheesy, so it is gone — no spatter sprite, no decal plane, no
+// blood_spatter texture loaded. (The blood_spatter.webp files stay in
+// assets/textures/effects/ unreferenced.) The burst is a richer,
+// longer particle mist: ~48 dark-red points, wider spread, ~0.8 s.
+const bloodFx = []; // active mists
 function spawnBlood(x, y, z) {
-  // Particle mist: ~24 dark-red points bursting outward and up.
-  const n = 24, pos = new Float32Array(n * 3), vel = [];
+  // Particle mist: ~48 dark-red points bursting outward and up.
+  const n = 48, pos = new Float32Array(n * 3), vel = [];
   for (let i = 0; i < n; i++) {
     pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
-    const a = Math.random() * Math.PI * 2, sp = 0.6 + Math.random() * 1.6;
-    vel.push(new THREE.Vector3(Math.cos(a) * sp, 0.5 + Math.random() * 1.8, Math.sin(a) * sp));
+    const a = Math.random() * Math.PI * 2, sp = 0.8 + Math.random() * 2.4;
+    vel.push(new THREE.Vector3(Math.cos(a) * sp, 0.8 + Math.random() * 2.6, Math.sin(a) * sp));
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const m = new THREE.PointsMaterial({ color: 0x8a0f0f, size: 0.14, transparent: true, opacity: 0.95, depthWrite: false });
+  const m = new THREE.PointsMaterial({ color: 0xb01010, size: 0.18, transparent: true, opacity: 0.95, depthWrite: false });
   const pts = new THREE.Points(g, m);
   scene.add(pts);
-  bloodFx.push({ kind: 'mist', obj: pts, vel, t: 0, dur: 0.5 });
-  // Spatter sprite: a realistic splash (random variant) that stretches
-  // upward a little and then fades away.
-  const pick = pickBloodSpatter();
-  if (pick) {
-    const sm = new THREE.SpriteMaterial({ map: pick.tex, transparent: true, opacity: 0.95, depthWrite: false });
-    const spr = new THREE.Sprite(sm);
-    spr.position.set(x, y, z);
-    // Preserve the variant's aspect ratio (variant 2/3 are landscape).
-    const a = pick.aspect || 1;
-    spr.scale.set(0.5 * a, 0.5, 1);
-    spr.userData.baseW = 0.5 * a; spr.userData.baseH = 0.5;
-    scene.add(spr);
-    bloodFx.push({ kind: 'spatter', obj: spr, t: 0, dur: 0.6 });
-  }
+  bloodFx.push({ kind: 'mist', obj: pts, vel, t: 0, dur: 0.8 });
 }
 function updateBloodFx(dt) {
   for (let i = bloodFx.length - 1; i >= 0; i--) {
@@ -1318,19 +1239,17 @@ function updateBloodFx(dt) {
       }
       pos.needsUpdate = true;
       fx.obj.material.opacity = 0.95 * (1 - k);
-    } else {
-      // Spatter: stretches upward into the air a little, then fades.
-      const stretch = 1 + Math.min(k / 0.4, 1) * 0.7;
-      const bw = fx.obj.userData.baseW || 0.5, bh = fx.obj.userData.baseH || 0.5;
-      fx.obj.scale.set(bw * (1 + k * 0.4), bh * stretch, 1);
-      fx.obj.material.opacity = 0.95 * (1 - Math.max(0, (k - 0.35) / 0.65));
     }
   }
 }
 function defeatEnemy(enemy, silent) {
   if (!enemy || enemy.state === 'falling' || enemy.state === 'gone') return;
-  // Blood where the katana cut: mist + spatter at the enemy's chest.
+  // Blood where the katana cut: particle mist at the enemy's chest.
   spawnBlood(enemy.x, (enemy.y || 0) + 1.3, enemy.z);
+  // A staggered enemy that is killed mid-flinch must not keep its lean
+  // or its flash into the fall — the fall tips it forward from upright.
+  enemy.staggerT = 0; restoreEnemyFlash(enemy);
+  if (enemy.is3D && enemy.model) enemy.model.rotation.x = 0;
   enemy.state = 'falling'; enemy.fallT = 0;
   defeated++; updateEnemyCount();
   // Cinematic moment ONLY on the final (8th) kill: a 0.8 s slow-mo +
@@ -1472,7 +1391,24 @@ function updateOneEnemy(e, dt, t) {
     // walking / chasing / menacing / attacking / taunting.
     const dx = player.position.x - e.x, dz = player.position.z - e.z;
     const d = Math.hypot(dx, dz);
-    if (knockedDown && (e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting')) {
+    // Hit stagger: while staggered the enemy is frozen — it does not
+    // advance its state machine. The push-back already moved e.x/e.z in
+    // staggerEnemy; the lean-back tilt is applied at the bottom of this
+    // function, after the position sync.
+    if (e.staggerT > 0) {
+      e.staggerT -= dt;
+      if (e.staggerFlash > 0) {
+        e.staggerFlash -= dt;
+        if (e.staggerFlash <= 0) restoreEnemyFlash(e);
+      }
+      if (e.staggerT <= 0) {
+        if (e.is3D && e.model) e.model.rotation.x = 0;
+        restoreEnemyFlash(e);
+      }
+    }
+    if (e.staggerT > 0) {
+      // Staggered: frozen in place, no state advance, no attack.
+    } else if (knockedDown && (e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting')) {
       // She is down: stop fighting and taunt her (the cocky lean-back
       // gesture) instead. This is what gives her time to get back up —
       // they mock her instead of finishing her. When she gets up they
@@ -1557,6 +1493,13 @@ function updateOneEnemy(e, dt, t) {
       e.mesh.rotation.y = Math.atan2(camera.position.x - e.x, camera.position.z - e.z);
       e.mesh.rotation.x = 0;
       e.mesh.position.set(e.x, e.y + 0.9, e.z);
+    }
+    // Stagger lean-back: applied after the position sync, which resets
+    // a billboard's rotation.x to 0 every frame. Decays with staggerT.
+    if (e.staggerT > 0) {
+      const k = Math.max(0, e.staggerT / 0.3);
+      if (e.is3D && e.model) e.model.rotation.x = -0.28 * k;
+      else if (!e.is3D) e.mesh.rotation.x = -0.12 * k;
     }
   }
 
@@ -1807,6 +1750,46 @@ function updateMeter() {
   const fill = document.getElementById('meterFill');
   if (fill) fill.style.width = (meter / METER_HITS * 100) + '%';
 }
+// ---- Hit stagger (2026-11-22) ----
+// A connecting slash now visibly staggers the enemy: it is pushed back
+// ~0.3 m away from Rochelle, frozen for ~0.3 s (its state machine does
+// not advance), leans back, flashes white, and plays the Hit_Reaction
+// clip if it loaded. This is an addition on every hit, not a replacement
+// for the 3-hits knockdown — the knockdown, taunt, meter, special and
+// slow-mo are all untouched.
+function flashEnemy(e) {
+  if (!e.is3D || !e.model) {
+    // Billboard: no emissive on MeshBasicMaterial — tint the map red.
+    if (e.mesh && e.mesh.material) { e.mesh.material.color.setHex(0xff8888); e._flashBillboard = true; }
+    return;
+  }
+  e._flashMats = [];
+  e.model.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    mats.forEach((m) => {
+      if (!m.emissive) return;
+      if (e._flashMats.some((f) => f.m === m)) return;
+      e._flashMats.push({ m, e: m.emissive.getHex(), i: m.emissiveIntensity });
+      m.emissive.setHex(0xffffff); m.emissiveIntensity = 0.9;
+    });
+  });
+}
+function restoreEnemyFlash(e) {
+  if (e._flashBillboard && e.mesh && e.mesh.material) { e.mesh.material.color.setHex(0xffffff); e._flashBillboard = false; }
+  if (e._flashMats) { e._flashMats.forEach((f) => { f.m.emissive.setHex(f.e); f.m.emissiveIntensity = f.i; }); e._flashMats = null; }
+}
+function staggerEnemy(e) {
+  const dx = e.x - player.position.x, dz = e.z - player.position.z;
+  const d = Math.hypot(dx, dz) || 1;
+  // Push back ~0.3 m away from the player, clamped to the player bounds.
+  e.x = Math.max(-13.5, Math.min(13.5, e.x + dx / d * 0.3));
+  e.z = Math.max(-9.5, Math.min(29.5, e.z + dz / d * 0.3));
+  e.staggerT = 0.3; e.staggerFlash = 0.15;
+  e.atkT = 0; e.hitDone = false;
+  flashEnemy(e);
+  if (e.is3D) playEnemyAnim(e, 'hitReact');
+}
 function hitCheck(range, dot) {
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   const inFront = (x, z) => {
@@ -1825,7 +1808,7 @@ function hitCheck(range, dot) {
       hits++;
       e.hp = (e.hp === undefined ? ENEMY_HITS_TO_KILL : e.hp) - 1;
       if (e.hp <= 0) defeatEnemy(e);
-      else { spawnBlood(e.x, (e.y || 0) + 1.3, e.z); e.atkT = 0; e.hitDone = false; }
+      else { spawnBlood(e.x, (e.y || 0) + 1.3, e.z); staggerEnemy(e); }
     }
   }
   for (const sb of sandbags) if (!sb.used && inFront(sb.x, sb.z)) triggerSandbag(sb);
@@ -2357,10 +2340,11 @@ updateEnemyCount();
 if (new URLSearchParams(location.search).has('test')) {
   window.__theater = {
     player, enemies, sandbags, chandelier, setFlats, drapeState, crates,
-    footlightsState, spotL, spotR,
+    footlightsState, spotL, spotR, bloodFx,
     get defeated() { return defeated; }, get won() { return won; },
     get cine() { return cine; }, get bowPhase() { return bowPhase; },
     startCinematic, doChainAttack, defeatEnemy, spawnNextEnemy, startBow, groundHeight,
+    spawnBlood, hitCheck, staggerEnemy,
   };
 }
 animate();
