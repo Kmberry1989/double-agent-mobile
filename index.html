@@ -1731,13 +1731,14 @@ function startReload() {
       return;
     }
     // Pistol / rifle reload was silent. Kyle's picks (2026-11-22):
-    // the mag swap plays at the start, the slide rack when the reload
-    // completes (~1.5 s). Token-guarded like the revolver clicks.
+    // a mechanical click at the start and another at completion
+    // (~1.5 s) — his own recordings, random pool. Token-guarded like
+    // the revolver clicks.
     const tok = ++reloadToken;
     reloadUntil = performance.now() + 1500;
     playPlayerOneShot(weapon === 'rifle' ? 'reloadRifle' : 'reloadPistol');
-    playSfx(SFX_FILES.magSwap);
-    setTimeout(()=>{ if (tok === reloadToken && !gameOver && !won) playSfx(SFX_FILES.slideRack); }, 1500);
+    playSfx(pickSfx(SFX_FILES.mechClick)); // reload start
+    setTimeout(()=>{ if (tok === reloadToken && !gameOver && !won) playSfx(pickSfx(SFX_FILES.mechClick)); }, 1500); // reload complete
   }
 }
 // ---- Gun-battle + headshot slow motion ----
@@ -3098,8 +3099,13 @@ const SFX_FILES = {
   rpg: 'assets/audio/rpg-launch.m4a',
   bulletLoad: 'assets/audio/bullet-load.m4a',
   shotgunPump: 'assets/audio/shotgun-pump.m4a',
-  slideRack: 'assets/audio/slide-rack.m4a',
-  magSwap: 'assets/audio/mag-swap.m4a',
+  // Mechanical clicks (Kyle, 2026-11-22): his own recordings from file 3
+  // (the 5 sounds he ID'd as Click/mechanical in the artifact). A random
+  // pool for the reload — a click at reload start (was the procedural
+  // mag swap) and a click at completion (was the procedural slide rack).
+  // The procedural slide-rack.m4a / mag-swap.m4a are retired (files
+  // stay on disk). He likes variants, so each reload picks randomly.
+  mechClick: ['assets/audio/mech-click-1.m4a', 'assets/audio/mech-click-2.m4a', 'assets/audio/mech-click-3.m4a', 'assets/audio/mech-click-4.m4a', 'assets/audio/mech-click-5.m4a'],
   explosion: 'assets/audio/explosion.m4a',
   hit: ['assets/audio/gunshot-hit.m4a', 'assets/audio/gunshot-hit2.m4a'],
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
