@@ -1599,6 +1599,9 @@ function updateDestructibles(dt) {
 const SFX_FILES = {
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
   slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
+  // Katana draw (Kyle, 2026-11-22): his own recording. Plays once,
+  // before the first slash of the fight — the draw before the first slash.
+  katanaUnsheath: 'assets/audio/katana-unsheath.m4a',
 };
 let audioCtx = null, sfxBufs = {}, sfxMaster = null, sfxReverb = null;
 // Echoing reverb for the slash SFX: a ConvolverNode fed by a
@@ -1725,6 +1728,7 @@ function startSlowMo(dur, scale) {
   slowMo = { t: 0, dur, scale, cam };
 }
 let combo = 0, meter = 0, specialQueued = false;
+let katanaDrawn = false; // the unsheath plays once, before the first slash
 let dash = null;
 const CLOSE_CYCLE = ['atkQuick', 'atkQuickL', 'atkRise', 'atkRiseL', 'atkChop', 'atkChopL', 'atkComboL'];
 const DASH_CYCLE = ['atkLunge', 'atkLungeL'];
@@ -1841,6 +1845,8 @@ function doChainAttack() {
   noteActivity(); // an attack ends any idle orbit
   if (!started || won || knockedDown || cine || bowPhase) return;
   if (slashCooldown > 0 || dash) return;
+  // Katana draw: the unsheath plays once, before the first slash.
+  if (!katanaDrawn) { katanaDrawn = true; playSfx(SFX_FILES.katanaUnsheath); }
   const target = nearestLockTarget();
   if (!target) {
     // Whiff: a slash at nothing. Combo breaks, miss sound.

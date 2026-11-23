@@ -2914,6 +2914,7 @@ function meleeHit(dmg, range){
   const chest = best.group.position.clone(); chest.y += 1.3;
   spawnBloodMist(chest); spawnBloodSpatter(chest);
   playSfx(pickSfx(SFX_FILES.hit));
+  playSfx(pickSfx(SFX_FILES.enemyHitVocal)); // the guard grunts when hit
   if (best.hp <= 0){
     best.dead = true; if (best.cone) best.cone.visible = false;
     if (playGuardDeath(best, pickRandomDeath()) === false) tipGuardOver(best);
@@ -3103,6 +3104,20 @@ const SFX_FILES = {
   hit: ['assets/audio/gunshot-hit.m4a', 'assets/audio/gunshot-hit2.m4a'],
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
   slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
+  // New sounds (Kyle, 2026-11-22) — his own recordings, wired where
+  // they fit. The 12 hit vocals are a random pool (he likes variants):
+  // a guard grunts when hit, alongside the flesh-hit sound. The guard's
+  // gun firing is the strayshot; a distant guard shot also whizzes in.
+  // Body drag plays on pickup, body drop on drop. Banked in
+  // assets/audio/ but NOT wired (no home yet): stab x7 (no knife
+  // weapon), typing (no typing interaction), door-open-electric
+  // (no door mechanic). The enemy-hit-vocal-00 file he sent was empty
+  // (298 bytes, no audio) — it needs a re-send if he wants it.
+  enemyHitVocal: ['assets/audio/enemy-hit-vocal-01.m4a', 'assets/audio/enemy-hit-vocal-02.m4a', 'assets/audio/enemy-hit-vocal-03.m4a', 'assets/audio/enemy-hit-vocal-04.m4a', 'assets/audio/enemy-hit-vocal-05.m4a', 'assets/audio/enemy-hit-vocal-06.m4a', 'assets/audio/enemy-hit-vocal-07.m4a', 'assets/audio/enemy-hit-vocal-08.m4a', 'assets/audio/enemy-hit-vocal-09.m4a', 'assets/audio/enemy-hit-vocal-10.m4a', 'assets/audio/enemy-hit-vocal-11.m4a', 'assets/audio/enemy-hit-vocal-12.m4a'],
+  strayshot: 'assets/audio/strayshot.m4a',
+  bulletWhizz: 'assets/audio/bullet-whizz.m4a',
+  bodyDragging: 'assets/audio/body-dragging.m4a',
+  bodyDrop: 'assets/audio/body-drop.m4a',
 };
 // Footstep recordings (Kyle, 2026-11-14): real steps per surface.
 // Water step (Kyle's pick, 2026-11-15): the water footstep plays on
@@ -3374,6 +3389,7 @@ function tryShoot(){
       if (isHeadshot) headshotSlowT = (g.hp - w.dmg <= 0) ? HEADSHOT_HOLD : 0.4;
       g.hp -= w.dmg; g.meter = 100; g.state='ALERT'; g.lastKnown = player.position.clone();
       playSfx(pickSfx(SFX_FILES.hit));
+      playSfx(pickSfx(SFX_FILES.enemyHitVocal)); // the guard grunts when hit
       if (weaponVariant === 'RPG7') playSfx(SFX_FILES.explosion); // RPG impact
       spawnBloodMist(hits[0].point.clone());
       spawnBloodSpatter(hits[0].point.clone());
@@ -3581,6 +3597,7 @@ function toggleCarryDrop(){
   const g = nearestDeadGuard(2.0);
   if (!g) return;
   carriedBody = g; g.carried = true;
+  playSfx(SFX_FILES.bodyDragging); // lifting + dragging the body into the carry
   // Stop the death clip (if any) so the model returns to its bind pose,
   // then lay the rigid body flat: it is held in front of the player.
   // updateCarriedBody re-asserts this every frame, so a death clip that
@@ -3594,6 +3611,7 @@ function toggleCarryDrop(){
 function dropCarriedBody(){
   const g = carriedBody; if (!g) return;
   carriedBody = null; g.carried = false;
+  playSfx(SFX_FILES.bodyDrop); // the body thuds down
   // Place the body flat on the ground 1 m in front of the player (or at
   // the player's feet if that spot is inside a wall/crate).
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
@@ -3845,6 +3863,8 @@ function updateGuard(g, dt, now){
         spawnMuzzleSmoke(gMuzzle, gDir);
         spawnTracer(gMuzzle, kChest);
         ejectCasingAt(gp, new THREE.Vector3(Math.sin(g.yaw), 0, Math.cos(g.yaw)), gp.y + 1.3);
+        playSfx(SFX_FILES.strayshot); // the guard's gun firing
+        if (dist > 10) playSfx(SFX_FILES.bulletWhizz); // distant shot — the bullet whizzes in
         spawnBloodMist(kChest.clone());
         spawnBloodSpatter(kChest.clone());
         health-=6; playPlayerOneShot('hitReaction'); showMsg('Taking fire!',800); if (health<=0){ health=0; playPlayerOneShot(pickRandomDeath(), {hold:true}); endScreen('MISSION FAILED — you were taken down.'); } }
