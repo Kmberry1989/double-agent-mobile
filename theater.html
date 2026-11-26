@@ -895,9 +895,11 @@ function moveClipKey(fx, fz, ml) {
 // The katana's geometry sits +0.744 m in mesh-local X from the node origin,
 // so the pivot is placed so the handle centre lands on the palm; the hands
 // are mirrors, so the left hand needs its own entry (X flips sign).
+// Offsets tuned by Kyle in the viewer (2026-11-26): right sword low with
+// the blade yawed 86 deg, left rolled further (rx -11, ry 76, rz 30).
 const KATANA_OFFSETS = {
-  'katana': { x: 0.414, y: 0.060, z: -0.003, rx: 0, ry: 0, rz: 0, s: 1 },
-  'katana|L': { x: -0.412, y: 0.061, z: -0.031, rx: 0, ry: 0, rz: 0, s: 1 },
+  'katana': { x: 0.060, y: -0.366, z: 0.016, rx: 0, ry: 86, rz: 0, s: 1 },
+  'katana|L': { x: -0.110, y: -0.325, z: -0.147, rx: -11, ry: 76, rz: 30, s: 1 },
 };
 const FINGER_DIR = new THREE.Vector3(-0.012, 1.000, 0.027).normalize();
 const DORSAL_DIR = new THREE.Vector3(0.569, 0.029, -0.822).normalize();

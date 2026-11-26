@@ -74,6 +74,7 @@
     <span id="gzRead">model: —</span>
     <button id="gzCopy" type="button">Copy</button>
     <button id="gzReset" type="button">Reset</button>
+    <button id="gzHide" type="button">Hide gizmo</button>
   </div>
   <div id="wOff" hidden>
     <span class="wOffTitle">Weapon offset</span>
@@ -720,77 +721,43 @@ function classDefault(name) {
   if (n.includes('glock') || n.includes('makarov') || n.includes('walther') || n.includes('revolver')) return PISTOL_OFFSET;
   return DEFAULT_OFFSET;
 }
-// Katana handle centre in mesh-local coordinates (measured 2026-11-07).
-// The file's geometry is offset +0.744 m in mesh-local X from the node
-// origin, so the node origin is NOT the grip — the real handle is here.
-// The per-character offset (seedKatanaOffset, below) is measured from
-// this point, so each character's hand axes produce their own numbers.
-const KATANA_HANDLE = new THREE.Vector3(0.744, 0.018, 0.109);
 // Per-character katana position offsets, measured at load time (see
-// seedKatanaOffset). Keyed by weapon name + side ('katana', 'katana|L').
-// These override the global BAKED_OFFSETS katana entries, which are kept
-// only as a fallback if the measurement fails (no mesh node / no hand).
-// Cleared when the model changes, so each character gets a fresh
-// measurement. Rotation/scale still come from the baked entry (0/0/0/1).
+// seedKatanaOffset). DISABLED 2026-11-26 — seedKatanaOffset is a no-op
+// now, so this map stays empty and the baked katana entries are used for
+// every character (matching the theater, which never measured per
+// character). Kept so the getOffset lookup below still works unchanged.
 const computedKatanaOffsets = new Map();
-// Measure the katana's per-character position offset: after the grip
-// logic puts the node origin on the hand, the real handle sits off the
-// palm by an amount that depends on the character's hand axes (each
-// character's hand sits at a different angle, so one global offset
-// cannot fit them all — Rochelle's +0.414/-0.412 pushed the sword
-// sideways on everyone else). Measure where the handle actually is in
-// hand-local space and offset by the negative of that, so the handle
-// lands on the palm for THIS character. Call after the pivot is
-// attached and positioned at basePos, before applyWeaponOffset.
+// Per-character katana measurement — DISABLED 2026-11-26 (see below).
+// It used to measure each character's handle position at load time and
+// override the baked position, because one global offset could not fit
+// every hand (Rochelle's +0.414/-0.412 pushed the sword sideways on
+// everyone else). Kyle has now tuned the katana offsets in the viewer
+// and they are the baked entries; the measurement would override the
+// tuned POSITION and only the rotation would stick, so the tuned pose
+// would not reproduce. The baked values are used for every character,
+// matching the theater, which never measured per character. Kept as a
+// no-op so the loadWeapon / loadWeaponL call sites stay untouched.
 function seedKatanaOffset(name, forLeft, meshNode, hand) {
-  if (name !== 'katana' || !meshNode || !hand) return;
-  try {
-    model.updateMatrixWorld(true);
-    const handleWorld = meshNode.localToWorld(KATANA_HANDLE.clone());
-    const handleHand = hand.worldToLocal(handleWorld.clone());
-    const key = forLeft ? name + '|L' : name;
-    // Rotation/scale come from the baked entry (0/0/0/1 for the katana)
-    // — the measurement only corrects the POSITION. Without these, the
-    // missing rx/ry/rz/s fall through to the rifle class default
-    // (-12/2/61/1.32), which rotates the blade 61 deg off the hand and
-    // scales it 1.32x. (That is what broke the first version of this
-    // fix: the position measured correctly — Rochelle's reproduced the
-    // baked +0.414/-0.412 exactly — but the 61-deg rotation swung both
-    // swords out of her palms.)
-    const baked = (forLeft ? BAKED_OFFSETS[name + '|L'] : null) || BAKED_OFFSETS[name] || {};
-    computedKatanaOffsets.set(key, {
-      x: -handleHand.x, y: -handleHand.y, z: -handleHand.z,
-      rx: baked.rx ?? 0, ry: baked.ry ?? 0, rz: baked.rz ?? 0, s: baked.s ?? 1,
-    });
-    // Drop the cached offset so the next getOffset re-seeds from the
-    // measured value (a stale entry would be the old character's
-    // numbers, or the global baked entry).
-    weaponOffsets.delete(key);
-  } catch (e) { /* measurement failed — fall back to the baked entry */ }
+  return;
 }
 // Baked weapon offsets, approved by Kyle in the viewer (hand-local metres /
 // degrees, optional scale factor). A weapon loads at its baked placement;
 // Reset returns to that baked placement (or the default), and reloading
-// re-seeds it. The katana entries below are FALLBACKS only — the katana's
-// position offset is measured per character at load time
-// (seedKatanaOffset), since one global value cannot fit every hand.
+// re-seeds it. The katana entries are the tuned values (Kyle, 2026-11-26),
+// used directly for every character.
 const BAKED_OFFSETS = {
   'white aks74u': { x: -0.021, y: 0.014, z: 0.055, rx: -12, ry: 2, rz: 61, s: 1.32 },
   // Katana (Rochelle's dual-wield): the file's geometry is offset +0.744 m
   // in mesh-local X from the node origin (the "re-origin" baked the node
   // translation into the vertices instead of centring the grip on the
-  // origin), so the grip logic — which reads the node origin as the grip —
-  // puts the pivot on the hand while the real handle floats 0.753 m behind
-  // her back. These entries compensate: they move the pivot so the handle
-  // centre (mesh-local (0.744, 0.018, 0.109)) lands on the palm, verified
-  // in the Standing_Idle pose (handle-to-hand 0.000 m both hands, blade
-  // still along the fingers, dot 1.000). The left hand needs its OWN entry
-  // ('katana|L'): the hands are mirrors, so the X correction flips sign
-  // (+0.414 right, -0.412 left) — a single shared offset cannot fix both
-  // (baking the right value on both leaves the left handle 1.49 m off).
-  // The blade runs along local -Z; no rotation or scale is applied.
-  'katana': { x: 0.414, y: 0.060, z: -0.003, rx: 0, ry: 0, rz: 0, s: 1 },
-  'katana|L': { x: -0.412, y: 0.061, z: -0.031, rx: 0, ry: 0, rz: 0, s: 1 },
+  // origin). Kyle tuned these offsets in the viewer (2026-11-26) — the
+  // right sword sits low with the blade yawed 86 deg, the left is rolled
+  // further (rx -11, ry 76, rz 30). These are the baked values now; the
+  // per-character measurement (seedKatanaOffset) is disabled, because it
+  // would override the tuned position and only the rotation would stick.
+  // The left hand needs its OWN entry ('katana|L'): the hands are mirrors.
+  'katana': { x: 0.060, y: -0.366, z: 0.016, rx: 0, ry: 86, rz: 0, s: 1 },
+  'katana|L': { x: -0.110, y: -0.325, z: -0.147, rx: -11, ry: 76, rz: 30, s: 1 },
 };
 let curWeaponName = '';
 // Which hand the offset panel edits ('R' or 'L'). Dual wielding needs
@@ -844,10 +811,11 @@ const fmt3 = v => (v === 0 ? 0 : v).toFixed(3);
 function getOffset(name, forLeft) {
   const key = forLeft ? name + '|L' : name;
   if (!weaponOffsets.has(key)) {
-    // Priority: per-character measured katana offset first (when one was
-    // measured for this character), then the per-weapon baked entry
-    // (side-specific, then shared), then the weapon's class default
-    // (pistol/rifle), then the universal default (the rifle numbers).
+    // Priority: the per-weapon baked entry (side-specific, then shared),
+    // then the weapon's class default (pistol/rifle), then the universal
+    // default (the rifle numbers). (The per-character measured katana
+    // offset used to come first, but seedKatanaOffset is disabled now —
+    // Kyle's tuned katana entries are the baked values.)
     const measured = (name === 'katana') ? computedKatanaOffsets.get(key) : null;
     const b = measured || (forLeft ? BAKED_OFFSETS[name + '|L'] : null) || BAKED_OFFSETS[name] || {};
     const c = classDefault(name);
@@ -913,9 +881,10 @@ function applyWeaponScale(pivot, name) {
 function setOffsetAxis(a, v) {
   const t = offTarget(); if (!t.name) return;
   const o = getOffset(t.name, t.forLeft);
-  // Range widened ±0.2 -> ±0.5 m: the katana's tuned X (+0.414) sits outside
-  // the old range, and the old clamp would have snapped it to 0.2 the moment
-  // the slider was touched, destroying the grip.
+  // Range widened ±0.2 -> ±0.5 m: the katana's tuned Y (-0.366 right,
+  // -0.325 left) sits outside the old range, and the old clamp would
+  // have snapped it to 0.2 the moment the slider was touched, destroying
+  // the grip.
   o[a] = Math.max(-0.5, Math.min(0.5, v));
   offSliders[a].value = o[a];
   offNums[a].value = fmt3(o[a]);
@@ -1201,6 +1170,17 @@ gizmo.setSpace('world');
 scene.add(gizmo);
 let gizmoTarget = 'model'; // 'model' | 'weaponR' | 'weaponL'
 let gizmoMode = 'translate'; // 'translate' | 'rotate' | 'scale'
+let gizmoVisible = true; // Hide gizmo (Kyle, 2026-11-26): hides the handles
+// and disables them, so the model/weapons can be viewed clean or adjusted
+// by sliders only. G toggles it (works in orbit and free camera).
+function setGizmoVisible(v) {
+  gizmoVisible = v;
+  gizmo.visible = v;
+  gizmo.enabled = v;
+  const b = document.getElementById('gzHide');
+  if (b) { b.textContent = v ? 'Hide gizmo' : 'Show gizmo'; b.classList.toggle('on', !v); }
+}
+document.getElementById('gzHide').addEventListener('click', () => setGizmoVisible(!gizmoVisible));
 let modelFitH = 1.8; // target height fitModel used for the current model
 function gizmoObject() {
   if (gizmoTarget === 'weaponR') return weaponPivot;
@@ -1337,8 +1317,9 @@ document.getElementById('gzReset').addEventListener('click', () => {
 });
 window.addEventListener('keydown', (e) => {
   if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
-  if (camMode !== 'orbit') return; // W/A/S/D drive the free camera there
   const k = e.key.toLowerCase();
+  if (k === 'g') { setGizmoVisible(!gizmoVisible); return; }
+  if (camMode !== 'orbit') return; // W/A/S/D drive the free camera there
   if (k === 'w') setGizmoMode('translate');
   else if (k === 'e') setGizmoMode('rotate');
   else if (k === 'r') setGizmoMode('scale');
