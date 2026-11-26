@@ -805,7 +805,7 @@ function playMxCharClipOnce(char, key) {
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); char._cur = act;
 }
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['strafeLeft', 'Strafe_Left.fbx'], ['strafeRight', 'Strafe_Right.fbx'], ['turnLeft', 'Turn Left.fbx'], ['turnRight', 'Turn Right.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['strafeLeft', 'Strafe_Left.fbx'], ['strafeRight', 'Strafe_Right.fbx'], ['turnLeft', 'Turn_Left.fbx'], ['turnRight', 'Turn_Right.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -816,18 +816,18 @@ function playMxCharClipOnce(char, key) {
 // by 180 would collapse the Hips to ~7 mm. The old Drive clips
 // (sword_attack, sword_regular_combo) are retired from the theater; the
 // formal bow clip stays a Drive clip (fixDriveClip).
-[['bow', 'bow_1046932.fbx']].forEach(([key, file]) => {
+[['bow', 'Bow_1046932.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = fixDriveClip(raw);
   }, undefined, () => {});
 });
-[['atkQuick', 'Sword And Shield Slash Quick.fbx'],
- ['atkQuickL', 'Sword And Shield Slash Quick Left Hand.fbx'],
- ['atkLunge', 'Sword And Sword Attack.fbx'],
- ['atkRise', 'Sword And Shield Slash.fbx'],
- ['atkChop', 'Sword And Shield Slash Advancing.fbx'],
- ['atkCombo', 'Sword And Shield Slash Advancing Combo.fbx']].forEach(([key, file]) => {
+[['atkQuick', 'Sword_And_Shield_Slash_Quick.fbx'],
+ ['atkQuickL', 'Sword_And_Shield_Slash_Quick_Left_Hand.fbx'],
+ ['atkLunge', 'Sword_And_Sword_Attack.fbx'],
+ ['atkRise', 'Sword_And_Shield_Slash.fbx'],
+ ['atkChop', 'Sword_And_Shield_Slash_Advancing.fbx'],
+ ['atkCombo', 'Sword_And_Shield_Slash_Advancing_Combo.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (!raw) return;

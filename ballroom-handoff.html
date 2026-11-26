@@ -1257,7 +1257,7 @@ function stripRootTravel(clip) {
   });
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
-[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx'], ['openDoor', 'Opening_Door_Inwards.fbx'], ['idleLook', 'Looking_Around.fbx'], ['idleShrug', 'Shrugging.fbx'], ['idleNod', 'Head_Nod_Yes.fbx'], ['idleShake', 'Shaking_Head_No.fbx'], ['strafeLeft', 'Strafe_Left.fbx'], ['strafeRight', 'Strafe_Right.fbx'], ['turnLeft', 'Turn Left.fbx'], ['turnRight', 'Turn Right.fbx']].forEach(([key, file]) => {
+[['idle', 'Standing_Idle.fbx'], ['walk', 'Walking.fbx'], ['talk', 'Talking.fbx'], ['wave', 'Waving.fbx'], ['drunkIdle', 'Drunk_Idle.fbx'], ['drunkWalk', 'Drunk_Walk.fbx'], ['drunkStumble', 'Drunk_Stumbling_Walking.fbx'], ['falling', 'Falling_Down.fbx'], ['openDoor', 'Opening_Door_Inwards.fbx'], ['idleLook', 'Looking_Around.fbx'], ['idleShrug', 'Shrugging.fbx'], ['idleNod', 'Head_Nod_Yes.fbx'], ['idleShake', 'Shaking_Head_No.fbx'], ['strafeLeft', 'Strafe_Left.fbx'], ['strafeRight', 'Strafe_Right.fbx'], ['turnLeft', 'Turn_Left.fbx'], ['turnRight', 'Turn_Right.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -1272,7 +1272,7 @@ function stripRootTravel(clip) {
 // snippets (__2, __3, __8, __9) and the 21.6 s base file are not wired.
 // Root XZ travel is stripped, same as walk, so the dance stays in place.
 const SALSA_KEYS = ['salsa1', 'salsa4', 'salsa5', 'salsa6', 'salsa7'];
-[['salsa1', 'Salsa_Dancing__1.fbx'], ['salsa4', 'Salsa_Dancing__4.fbx'], ['salsa5', 'Salsa_Dancing__5.fbx'], ['salsa6', 'Salsa_Dancing__6.fbx'], ['salsa7', 'Salsa_Dancing__7.fbx']].forEach(([key, file]) => {
+[['salsa1', 'Salsa_Dancing_1.fbx'], ['salsa4', 'Salsa_Dancing_4.fbx'], ['salsa5', 'Salsa_Dancing_5.fbx'], ['salsa6', 'Salsa_Dancing_6.fbx'], ['salsa7', 'Salsa_Dancing_7.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);

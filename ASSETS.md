@@ -288,11 +288,11 @@ Generated from `assets/` in Kmberry1989/double-agent-mobile. 269 files, 207.8 MB
 | File | Size | Note |
 | --- | --- | --- |
 | `animations/Rumba_Dancing.fbx` | 331.0 KB |  |
-| `animations/Salsa_Dancing__1.fbx` | 386.7 KB |  |
-| `animations/Salsa_Dancing__4.fbx` | 1.6 MB |  |
-| `animations/Salsa_Dancing__5.fbx` | 1.1 MB |  |
-| `animations/Salsa_Dancing__6.fbx` | 704.9 KB |  |
-| `animations/Salsa_Dancing__7.fbx` | 1.1 MB |  |
+| `animations/Salsa_Dancing_1.fbx` | 386.7 KB |  |
+| `animations/Salsa_Dancing_4.fbx` | 1.6 MB |  |
+| `animations/Salsa_Dancing_5.fbx` | 1.1 MB |  |
+| `animations/Salsa_Dancing_6.fbx` | 704.9 KB |  |
+| `animations/Salsa_Dancing_7.fbx` | 1.1 MB |  |
 
 ## Animations — drunk (4 files, 1.6 MB)
 
