@@ -165,7 +165,7 @@ const MODELS = [
     ['Halloween ghost', 'assets/theater/enemies/halloween_ghost.glb', 'glb', ''],
     ['Halloween pumpkin', 'assets/theater/enemies/halloween_pumpkin.glb', 'glb', ''],
     ['Halloween skeleton', 'assets/theater/enemies/halloween_skeleton.glb', 'glb', ''],
-    ['Halloween terror 5', 'assets/theater/enemies/halloween_terror5.glb', 'glb', ''],
+    ['Enemy terror 5', 'assets/theater/enemies/halloween_terror5.glb', 'glb', ''],
     ['Halloween witch', 'assets/theater/enemies/halloween_witch.glb', 'glb', ''],
     ['Mall Christmas sweater', 'assets/theater/enemies/mall_xmassweater.glb', 'glb', ''],
     ['Mall elf', 'assets/theater/enemies/mall_elf.glb', 'glb', ''],
@@ -788,7 +788,20 @@ function seedKatanaOffset(name, forLeft, meshNode, hand) {
 // re-seeds it. The katana entries are the tuned values (Kyle, 2026-11-26),
 // used directly for every character.
 const BAKED_OFFSETS = {
-  'white aks74u': { x: -0.021, y: 0.014, z: 0.055, rx: -12, ry: 2, rz: 61, s: 1.32 },
+  // AK (all variants — Kyle, 2026-11-26): the same tuned offset for every
+  // AK: aks74u, aks74u suppressed, black aks74u, black aks74u suppressed,
+  // white aks74u, white aks74u suppressed. x -0.027, y 0.014, z 0.055,
+  // rot -17/5/61, scale 1.32.
+  'aks74u': { x: -0.027, y: 0.014, z: 0.055, rx: -17, ry: 5, rz: 61, s: 1.32 },
+  'aks74u suppressed': { x: -0.027, y: 0.014, z: 0.055, rx: -17, ry: 5, rz: 61, s: 1.32 },
+  'black aks74u': { x: -0.027, y: 0.014, z: 0.055, rx: -17, ry: 5, rz: 61, s: 1.32 },
+  'black aks74u suppressed': { x: -0.027, y: 0.014, z: 0.055, rx: -17, ry: 5, rz: 61, s: 1.32 },
+  'white aks74u': { x: -0.027, y: 0.014, z: 0.055, rx: -17, ry: 5, rz: 61, s: 1.32 },
+  'white aks74u suppressed': { x: -0.027, y: 0.014, z: 0.055, rx: -17, ry: 5, rz: 61, s: 1.32 },
+  // Shotgun (all — Kyle, 2026-11-26): same tuned offset for black shotgun
+  // and white shotgun. x -0.007, y -0.016, z -0.092, rot -10/13/61, scale 1.32.
+  'black shotgun': { x: -0.007, y: -0.016, z: -0.092, rx: -10, ry: 13, rz: 61, s: 1.32 },
+  'white shotgun': { x: -0.007, y: -0.016, z: -0.092, rx: -10, ry: 13, rz: 61, s: 1.32 },
   // Katana (Rochelle's dual-wield): the file's geometry is offset +0.744 m
   // in mesh-local X from the node origin (the "re-origin" baked the node
   // translation into the vertices instead of centring the grip on the

@@ -159,12 +159,12 @@ const ANIM_MAP = {
   // transferred onto Agent_Kyle's armature. Static two-handed front hold;
   // it stays up while a body is carried and releases on drop.
   carryHold:'Carrying.fbx',
-  // Chokehold takedown (2026-11-14, from Kyle's takedown-chokehold.blend):
-  // 5 s / 120 frames @ 24 fps, attacker + victim in sync. Registered only;
-  // not yet triggered — the takedown wiring (which clip the F takedown
-  // plays) is still Kyle's call.
-  takedownChokeholdAttacker:'Takedown_Chokehold_Attacker.fbx',
-  takedownChokeholdVictim:'Takedown_Chokehold_Victim.fbx',
+  // Chokehold takedown (Kyle's pick 2026-11-26): the Mixamo strangle
+  // pair, attacker + victim in sync (10.9 s each). Replaces the .blend
+  // clips (Takedown_Chokehold_Attacker/Victim, 3.0 s) — those files stay
+  // on disk and in the viewer list.
+  takedownChokeholdAttacker:'Strangling_Choke.fbx',
+  takedownChokeholdVictim:'Being_Strangled_Choked.fbx',
   // Yawn + shoulder-throw pair (2026-11-14, Kyle's uploads, Mixamo):
   // registered only, not yet triggered.
   yawn:'Yawn.fbx',
@@ -3568,12 +3568,12 @@ function tryRoll(){
 }
 // ---------- Stealth: takedown affordance, carry/drop, hiding bodies ----------
 // Takedowns (Kyle's picks): behind an unaware guard, both silent, no
-// alarm. MELEE (F key / MELEE button) = rear chokehold (3 s sleeper, v2
-// clip 2026-11-17). FIRE at an unaware guard's back up close = bullet-
+// alarm. MELEE (F key / MELEE button) = rear chokehold (3 s sleeper;
+// strangle pair, Kyle's pick 2026-11-26). FIRE at an unaware guard's back up close = bullet-
 // time pistol killshot (the cinematic plays instead of a loud shot).
 // No aim-without-firing needed on touch — the button you press picks
-// the takedown. The chokehold clips (Takedown_Chokehold_Attacker/Victim)
-// are the takedown, not the hook — melee_hook is the melee combo
+// the takedown. The chokehold clips (Strangling_Choke /
+// Being_Strangled_Choked) are the takedown, not the hook — melee_hook is the melee combo
 // finisher only. The takedown prompt is the TAKE DOWN button's state
 // only (highlighted when a takedown is available) — no text anywhere.
 function isBehindGuard(g){
