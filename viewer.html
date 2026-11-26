@@ -397,23 +397,27 @@ const modelSel = document.getElementById('modelSel');
 const animSel = document.getElementById('animSel');
 const statusEl = document.getElementById('status');
 const scrub = document.getElementById('scrub');
+// Dropdowns list alphabetically (Kyle, 2026-11-26): sort at population
+// time (case-insensitive) so every menu reads A–Z no matter what order
+// the source arrays are in — new items sort themselves in.
+const alphaBy = (a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' });
 MODELS.forEach(g => {
   const og = document.createElement('optgroup'); og.label = g.group;
-  g.items.forEach(([name]) => { const o = document.createElement('option'); o.value = name; o.textContent = name; og.appendChild(o); });
+  [...g.items].sort((a, b) => alphaBy(a[0], b[0])).forEach(([name]) => { const o = document.createElement('option'); o.value = name; o.textContent = name; og.appendChild(o); });
   modelSel.appendChild(og);
 });
 function setAnimOptions(names) {
   animSel.innerHTML = '';
   if (!names.length) { const o = document.createElement('option'); o.value = ''; o.textContent = '— no animations —'; animSel.appendChild(o); return; }
-  names.forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; animSel.appendChild(o); });
+  [...names].sort(alphaBy).forEach(n => { const o = document.createElement('option'); o.value = n; o.textContent = n; animSel.appendChild(o); });
 }
 setAnimOptions(ANIMS);
 const weaponSel = document.getElementById('weaponSel');
 { const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'No weapon'; weaponSel.appendChild(o0);
-  WEAPONS.forEach(w => { const o = document.createElement('option'); o.value = w.name; o.textContent = w.name; weaponSel.appendChild(o); }); }
+  [...WEAPONS].sort((a, b) => alphaBy(a.name, b.name)).forEach(w => { const o = document.createElement('option'); o.value = w.name; o.textContent = w.name; weaponSel.appendChild(o); }); }
 const weaponSelL = document.getElementById('weaponSelL');
 { const o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'No weapon'; weaponSelL.appendChild(o0);
-  WEAPONS.forEach(w => { const o = document.createElement('option'); o.value = w.name; o.textContent = w.name; weaponSelL.appendChild(o); }); }
+  [...WEAPONS].sort((a, b) => alphaBy(a.name, b.name)).forEach(w => { const o = document.createElement('option'); o.value = w.name; o.textContent = w.name; weaponSelL.appendChild(o); }); }
 
 let model = null, mixer = null, action = null, clip = null, embeddedAnims = [];
 let curIsGLB = false; // true when the current model was loaded as a GLB
