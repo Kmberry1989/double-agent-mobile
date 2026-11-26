@@ -102,7 +102,6 @@
   <button id="backBtn" type="button">Back</button>
   <button id="topBtn" type="button">Top</button>
   <button id="resetBtn" type="button">Reset view</button>
-  <button id="shootBtn" type="button">Kyle shoot test</button>
   <button id="levelsBtn" type="button">Levels</button>
   <nav id="levelsPanel" class="levels" hidden><a href="menu.html">Main Menu</a><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html" class="cur" aria-current="page">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html">Halloween</a><a href="mall.html">Mall</a></nav>
 </div>
@@ -444,7 +443,6 @@ let playing = true, loop = true, stripRoot = true, showTarget = false;
 let camMode = 'orbit', yaw = 0, pitch = -0.1, freePos = new THREE.Vector3(2.5, 1.8, 4);
 let fitDist = 4, fitCenter = new THREE.Vector3(0, 0.9, 0);
 let scrubbing = false, bones = {};
-let pendingAnim = null;
 const target = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 8, 32), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
 target.position.set(0, 1.4, 5); target.visible = false; scene.add(target);
 
@@ -1424,8 +1422,7 @@ function afterModel(obj, info) {
   if (mixamo) names = names.concat(ANIMS.filter(n => names.indexOf(n) < 0));
   if (!hasBones && !names.length) setAnimOptions([]);
   else setAnimOptions(names);
-  if (pendingAnim) { const pa = pendingAnim; pendingAnim = null; animSel.value = pa; playAnim(pa); setView('side'); }
-  else if (mixamo && hasBones) { animSel.value = 'Standing_Idle'; playAnim('Standing_Idle'); }
+  if (mixamo && hasBones) { animSel.value = 'Standing_Idle'; playAnim('Standing_Idle'); }
   else if (embeddedAnims.length) { animSel.value = embeddedAnims[0].name; playAnim(embeddedAnims[0].name); }
   resetView();
   if (weaponSel.value) loadWeapon(weaponSel.value);
@@ -1521,11 +1518,6 @@ document.getElementById('sideBtn').addEventListener('click', () => setView('side
 document.getElementById('backBtn').addEventListener('click', () => setView('back'));
 document.getElementById('topBtn').addEventListener('click', () => setView('top'));
 document.getElementById('resetBtn').addEventListener('click', resetView);
-document.getElementById('shootBtn').addEventListener('click', () => {
-  pendingAnim = 'Pistol_Fire_Recoil'; modelSel.value = 'Kyle'; weaponSel.value = 'white glock';
-  weaponSelL.value = '';
-  loadModel('Kyle'); // weapon option values come from filenames, lowercase
-});
 document.getElementById('levelsBtn').addEventListener('click', () => { const p = document.getElementById('levelsPanel'); p.hidden = !p.hidden; });
 // Hide/show the whole overlay (top bar + bottom timeline) so the 3D view
 // is unobstructed. The toggle button lives outside #bar/#timeline, so it
