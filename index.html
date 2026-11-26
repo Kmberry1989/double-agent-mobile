@@ -1766,7 +1766,7 @@ const BATTLE_RANGE = 25, BATTLE_MIN_GUARDS = 2, BATTLE_SHOT_WINDOW = 3000, HEADS
 let takedownSlowT = 0, takedownCine = null;
 const TAKEDOWN_SLOWMO = 0.25, TAKEDOWN_CINE_T = 2.2, TAKEDOWN_SHOT_T = 0.5;
 // Rear chokehold takedown (Kyle's pick 2026-11-17, alongside the bullet-
-// time killshot): F / MELEE behind an unaware guard plays the 3 s sleeper
+// time killshot): F / MELEE behind an unaware guard plays the 10.9 s sleeper
 // chokehold — Kyle locks the choke, the guard struggles then goes limp,
 // and drops silent. The bullet-time pistol killshot is the FIRE execution
 // instead: shoot an unaware guard from behind at close range and the
@@ -1777,7 +1777,9 @@ const TAKEDOWN_SLOWMO = 0.25, TAKEDOWN_CINE_T = 2.2, TAKEDOWN_SHOT_T = 0.5;
 // frozen (AI off, victim clip playing) until the clip ends, then dies
 // and tips over.
 let chokeholdTakedown = null;
-const CHOKEHOLD_T = 3.0;
+// The strangle pair is 10.9 s (Kyle's pick 2026-11-26) — the timer matches
+// the clip length, so the guard dies as the choke ends.
+const CHOKEHOLD_T = 10.9;
 
 // ---------- Real player models (with capsule / box-gun fallbacks) ----------
 // WEAPON SPLIT (user-corrected, standing): unprefixed GLBs are ENEMY
@@ -3450,7 +3452,7 @@ function tryTakedown(){
     // Behind check: guard forward vs direction from guard to player.
     const behind = isBehindGuard(g);
     if (behind && g.state!=='ALERT' && g.meter<80){
-      // MELEE takedown = rear chokehold (silent sleeper, 3 s). The
+      // MELEE takedown = rear chokehold (silent sleeper, 10.9 s). The
       // bullet-time pistol killshot is the FIRE execution instead: shoot
       // an unaware guard from behind at close range and it plays the
       // cinematic killshot rather than a loud shot (see tryShoot).
@@ -3501,7 +3503,7 @@ function playGuardChokeholdVictim(g){
   // Play the victim half of the chokehold on the guard (struggle, then
   // limp). Same bone gate + one-shot pattern as playGuardDeath, but the
   // guard is NOT marked dead yet — the chokehold timer kills him when
-  // the 3 s clip ends. Returns true / 'pending' / false like playGuardDeath.
+  // the 10.9 s clip ends. Returns true / 'pending' / false like playGuardDeath.
   if (!g.mixer || !g.guardAnimOk || !g.realModel) return false;
   const run = ()=>{
     const clip = fbxClips.takedownChokeholdVictim; if (!clip) return false;
@@ -3526,7 +3528,7 @@ function playGuardChokeholdVictim(g){
   return 'pending';
 }
 function startChokeholdTakedown(g){
-  // Rear chokehold takedown (v2 clip, 3 s): step Kyle in tight behind
+  // Rear chokehold takedown (strangle pair, 10.9 s): step Kyle in tight behind
   // the guard — chest to back, ~0.30 m, facing the same way (at the
   // guard's back) — then play the attacker clip on Kyle and the victim
   // clip on the guard. The guard's AI is frozen for the chokehold
@@ -3568,7 +3570,7 @@ function tryRoll(){
 }
 // ---------- Stealth: takedown affordance, carry/drop, hiding bodies ----------
 // Takedowns (Kyle's picks): behind an unaware guard, both silent, no
-// alarm. MELEE (F key / MELEE button) = rear chokehold (3 s sleeper;
+// alarm. MELEE (F key / MELEE button) = rear chokehold (10.9 s sleeper;
 // strangle pair, Kyle's pick 2026-11-26). FIRE at an unaware guard's back up close = bullet-
 // time pistol killshot (the cinematic plays instead of a loud shot).
 // No aim-without-firing needed on touch — the button you press picks
@@ -3807,7 +3809,7 @@ function playerStealthFactor(){
 function updateGuard(g, dt, now){
   if (g.dead){ if (g.deathPlaying && g.mixer){ try { g.mixer.update(dt); } catch (e) {} return; } if (g.mixer && !g.mixerStopped){ try { g.mixer.stopAllAction(); } catch (e) {} g.mixerStopped = true; } return; }
   // Chokehold takedown: the guard is frozen (AI off, victim clip playing)
-  // for the 3 s chokehold — no patrol, no detection, no movement. The
+  // for the 10.9 s chokehold — no patrol, no detection, no movement. The
   // victim clip's own mixer update runs in updateGuardAnimation's
   // chokehold branch; here we only stop the AI from moving/seeing him.
   if (g.inChokehold) return;
@@ -4030,7 +4032,7 @@ function animate(){
     if (takedownCine.t >= TAKEDOWN_CINE_T) takedownCine = null;
   }
   // Rear chokehold takedown: the timer runs on real time. At the end of
-  // the 3 s clip the guard is out — mark him dead (cone already hidden),
+  // the 10.9 s clip the guard is out — mark him dead (cone already hidden),
   // tip him over (the victim clip ends slumped, not flat), and clear the
   // freeze flag so the body can be carried / discovered normally.
   if (chokeholdTakedown){
@@ -4068,7 +4070,7 @@ function animate(){
     if (touchMode && (touchFx !== 0 || touchFz !== 0)){ fx = touchFx; fz = touchFz; }
     // Gamepad left stick adds to keys / touch (analog vector).
     if (gp.connected) { fx += gp.lx; fz += -gp.ly; }
-    // Chokehold takedown: Kyle is planted for the 3 s choke — no walking
+    // Chokehold takedown: Kyle is planted for the 10.9 s choke — no walking
     // away mid-choke (the clip is positional; moving would break the hold).
     if (chokeholdTakedown){ fx = 0; fz = 0; }
     const moving = fx!==0 || fz!==0;
