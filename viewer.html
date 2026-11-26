@@ -23,6 +23,10 @@
   #wOff { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; padding-top: 2px; }
   #wOff[hidden] { display: none; }
   #wOff .wOffTitle { font-size: 12px; color: #bbb; }
+  #gizmoBar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; padding-top: 2px; }
+  #gizmoBar .gizmoTitle { font-size: 12px; color: #bbb; }
+  #gzRead { font-size: 12px; color: #ccc; }
+  #gzSpace { font-size: 12px; color: #888; }
   #wOff label { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #bbb; }
   #wOff input[type=range] { width: 110px; height: 28px; }
   #wOff input[type=number] { width: 72px; font-size: 13px; padding: 6px 4px; background: #222; color: #eee; border: 1px solid #444; border-radius: 6px; }
@@ -58,6 +62,19 @@
   <select id="animSel" aria-label="Animation"></select>
   <select id="weaponSel" aria-label="Weapon in right hand"></select>
   <select id="weaponSelL" aria-label="Weapon in left hand"></select>
+  <div id="gizmoBar">
+    <span class="gizmoTitle">Gizmo</span>
+    <button id="gzTargetModel" type="button" class="on">Model</button>
+    <button id="gzTargetR" type="button">Weapon R</button>
+    <button id="gzTargetL" type="button">Weapon L</button>
+    <button id="gzMove" type="button" class="on">Move</button>
+    <button id="gzRotate" type="button">Rotate</button>
+    <button id="gzScale" type="button">Scale</button>
+    <span id="gzSpace">world</span>
+    <span id="gzRead">model: —</span>
+    <button id="gzCopy" type="button">Copy</button>
+    <button id="gzReset" type="button">Reset</button>
+  </div>
   <div id="wOff" hidden>
     <span class="wOffTitle">Weapon offset</span>
     <button id="offHandR" type="button" class="on">Right hand</button>
@@ -100,6 +117,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
@@ -1087,6 +1105,7 @@ function loadWeapon(name) {
       applyWeaponRotation();
       applyWeaponScale();
     } catch (e) { pivot.removeFromParent(); }
+    refreshGizmoTarget();
   }, undefined, () => { statusEl.textContent += ' / weapon failed to load: ' + w.file; });
 }
 weaponSel.addEventListener('change', () => loadWeapon(weaponSel.value));
@@ -1158,9 +1177,198 @@ function loadWeaponL(name) {
       applyWeaponRotation(pivot, name);
       applyWeaponScale(pivot, name);
     } catch (e) { pivot.removeFromParent(); }
+    refreshGizmoTarget();
   }, undefined, () => { statusEl.textContent += ' / left weapon failed to load: ' + w.file; });
 }
 weaponSelL.addEventListener('change', () => loadWeaponL(weaponSelL.value));
+// ---- Transform gizmo (Kyle, 2026-11-26) ----
+// Move / Rotate / Scale handles on the model and on each hand's weapon,
+// so objects can be nudged in 3D instead of only by sliders. The gizmo
+// writes back into the same coordinates the Copy buttons paste:
+//  - a weapon gizmo edits that weapon's hand-local offset (position,
+//    rotation, scale) — the offset panel sliders, readout and its Copy
+//    all follow the gizmo's move;
+//  - the model gizmo edits the model's world transform, shown in the
+//    gizmo readout with its own Copy.
+// Space follows the target: the model moves in world space, a weapon in
+// the hand's local space (the offset frame), so the numbers stay the
+// hand-relative ones the game pastes. Click an object in the 3D view to
+// select it, or use the target buttons. W / E / R switch Move / Rotate /
+// Scale (orbit camera only — in free-look they drive the camera).
+const gizmo = new TransformControls(camera, renderer.domElement);
+gizmo.setMode('translate');
+gizmo.setSpace('world');
+scene.add(gizmo);
+let gizmoTarget = 'model'; // 'model' | 'weaponR' | 'weaponL'
+let gizmoMode = 'translate'; // 'translate' | 'rotate' | 'scale'
+let modelFitH = 1.8; // target height fitModel used for the current model
+function gizmoObject() {
+  if (gizmoTarget === 'weaponR') return weaponPivot;
+  if (gizmoTarget === 'weaponL') return weaponPivotL;
+  return model;
+}
+function syncGizmoButtons() {
+  const set = (id, on) => { const b = document.getElementById(id); if (b) b.classList.toggle('on', on); };
+  set('gzTargetModel', gizmoTarget === 'model');
+  set('gzTargetR', gizmoTarget === 'weaponR');
+  set('gzTargetL', gizmoTarget === 'weaponL');
+  set('gzMove', gizmoMode === 'translate');
+  set('gzRotate', gizmoMode === 'rotate');
+  set('gzScale', gizmoMode === 'scale');
+  const sp = document.getElementById('gzSpace');
+  if (sp) sp.textContent = gizmoTarget === 'model' ? 'world' : 'local';
+  const r = document.getElementById('gzTargetR');
+  const l = document.getElementById('gzTargetL');
+  if (r) r.disabled = !weaponPivot;
+  if (l) l.disabled = !weaponPivotL;
+}
+function refreshGizmoTarget() {
+  const obj = gizmoObject();
+  if (obj) {
+    gizmo.attach(obj);
+    gizmo.setSpace(gizmoTarget === 'model' ? 'world' : 'local');
+  } else {
+    gizmo.detach();
+  }
+  syncGizmoButtons();
+  updateGizmoReadout();
+}
+function setGizmoTarget(t) {
+  gizmoTarget = t;
+  if (t === 'weaponR') offHand = 'R';
+  if (t === 'weaponL') offHand = 'L';
+  syncHandToggle();
+  refreshGizmoTarget();
+}
+function setGizmoMode(m) {
+  gizmoMode = m;
+  gizmo.setMode(m);
+  syncGizmoButtons();
+}
+// Read a weapon pivot back into its offset entry, so the offset sliders,
+// readout and Copy all show the gizmo's move. Position is the pivot's
+// local position minus its base (grip) position; rotation is the offset
+// quaternion (baseQuat^-1 * pivot.quaternion) as XYZ Euler degrees — the
+// same order applyWeaponRotation uses, so the round-trip is exact; scale
+// is the uniform factor on top of the base fit scale.
+function syncWeaponOffsetFromPivot(pivot) {
+  if (!pivot || !pivot.userData.basePos || !pivot.userData.baseQuat || !pivot.userData.baseScale) return;
+  const forLeft = pivot === weaponPivotL;
+  const name = forLeft ? curWeaponNameL : curWeaponName;
+  if (!name) return;
+  const o = getOffset(name, forLeft);
+  const b = pivot.userData.basePos;
+  o.x = pivot.position.x - b.x;
+  o.y = pivot.position.y - b.y;
+  o.z = pivot.position.z - b.z;
+  const q = pivot.userData.baseQuat.clone().invert().multiply(pivot.quaternion);
+  const e = new THREE.Euler().setFromQuaternion(q, 'XYZ');
+  o.rx = Math.round(THREE.MathUtils.radToDeg(e.x));
+  o.ry = Math.round(THREE.MathUtils.radToDeg(e.y));
+  o.rz = Math.round(THREE.MathUtils.radToDeg(e.z));
+  const bs = pivot.userData.baseScale;
+  o.s = bs.x ? pivot.scale.x / bs.x : 1;
+  offHand = forLeft ? 'L' : 'R';
+  syncHandToggle();
+  syncOffsetUI();
+}
+function updateGizmoReadout() {
+  const el = document.getElementById('gzRead');
+  if (!el) return;
+  const obj = gizmoObject();
+  if (!obj) { el.textContent = 'gizmo: no object in this slot'; return; }
+  if (gizmoTarget === 'model' && model) {
+    const p = model.position, r = model.rotation, s = model.scale;
+    const deg = v => Math.round(THREE.MathUtils.radToDeg(v));
+    el.textContent = `model: pos x=${fmt3(p.x)}, y=${fmt3(p.y)}, z=${fmt3(p.z)} m | rot x=${deg(r.x)}, y=${deg(r.y)}, z=${deg(r.z)} deg | scale x=${s.x.toFixed(2)}, y=${s.y.toFixed(2)}, z=${s.z.toFixed(2)}`;
+  } else {
+    // Weapon: the same offset text the weapon Copy button pastes.
+    updateOffsetReadout();
+    el.textContent = offReadEl.textContent;
+  }
+}
+async function copyTextToClipboard(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) {}
+    ta.remove();
+    return ok;
+  }
+}
+gizmo.addEventListener('dragging-changed', (e) => {
+  // While a gizmo handle is dragged, the orbit camera must not move.
+  controls.enabled = !e.value && camMode === 'orbit';
+});
+gizmo.addEventListener('objectChange', () => {
+  const obj = gizmoObject();
+  if (!obj) return;
+  if (gizmoTarget === 'model') updateGizmoReadout();
+  else { syncWeaponOffsetFromPivot(obj); updateGizmoReadout(); }
+});
+document.getElementById('gzTargetModel').addEventListener('click', () => setGizmoTarget('model'));
+document.getElementById('gzTargetR').addEventListener('click', () => setGizmoTarget('weaponR'));
+document.getElementById('gzTargetL').addEventListener('click', () => setGizmoTarget('weaponL'));
+document.getElementById('gzMove').addEventListener('click', () => setGizmoMode('translate'));
+document.getElementById('gzRotate').addEventListener('click', () => setGizmoMode('rotate'));
+document.getElementById('gzScale').addEventListener('click', () => setGizmoMode('scale'));
+document.getElementById('gzCopy').addEventListener('click', async (e) => {
+  updateGizmoReadout();
+  const text = document.getElementById('gzRead').textContent;
+  const ok = await copyTextToClipboard(text);
+  const btn = e.target;
+  btn.textContent = ok ? 'Copied' : 'Copy failed';
+  setTimeout(() => { btn.textContent = 'Copy'; }, 3000);
+});
+document.getElementById('gzReset').addEventListener('click', () => {
+  const obj = gizmoObject();
+  if (!obj) return;
+  if (gizmoTarget === 'model') {
+    if (model) { fitModel(model, modelFitH); resetView(); updateGizmoReadout(); }
+  } else {
+    // Weapon: reuse the offset panel's Reset (it re-seeds from the baked /
+    // default offset and keeps a dual-wielded twin in step). offHand is
+    // already the gizmo target's hand (setGizmoTarget / sync above).
+    document.getElementById('offReset').click();
+    updateGizmoReadout();
+  }
+});
+window.addEventListener('keydown', (e) => {
+  if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  if (camMode !== 'orbit') return; // W/A/S/D drive the free camera there
+  const k = e.key.toLowerCase();
+  if (k === 'w') setGizmoMode('translate');
+  else if (k === 'e') setGizmoMode('rotate');
+  else if (k === 'r') setGizmoMode('scale');
+});
+// Click an object in the 3D view to select it for the gizmo (weapons
+// first — they are small and sit in front of the body). A real click is a
+// pointerup with almost no movement; an orbit drag does not select. A
+// pointerdown on a gizmo handle (gizmo.axis set) never selects either.
+const gizmoRay = new THREE.Raycaster();
+const gizmoPointer = new THREE.Vector2();
+let gzDownPos = null, gzDownOnGizmo = false;
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  gzDownPos = { x: e.clientX, y: e.clientY };
+  gzDownOnGizmo = gizmo.axis != null;
+});
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (!gzDownPos) return;
+  const dx = e.clientX - gzDownPos.x, dy = e.clientY - gzDownPos.y;
+  gzDownPos = null;
+  if (gzDownOnGizmo) return;
+  if (dx * dx + dy * dy > 25) return;
+  if (gizmo.dragging) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  gizmoPointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+  gizmoRay.setFromCamera(gizmoPointer, camera);
+  const pick = (obj) => obj ? gizmoRay.intersectObject(obj, true).length > 0 : false;
+  if (pick(weaponPivot)) setGizmoTarget('weaponR');
+  else if (pick(weaponPivotL)) setGizmoTarget('weaponL');
+  else if (pick(model)) setGizmoTarget('model');
+});
 function applyBasecolor(obj, texPath) {
   if (!texPath) return;
   const tex = texLoader.load(texPath + '?v=' + ASSET_V); tex.colorSpace = THREE.SRGBColorSpace;
@@ -1194,6 +1402,7 @@ function afterModel(obj, info) {
   curIsGLB = (info[2] === 'glb');
   const isCat = info[0] === 'Mabel' || info[0] === 'Margo' || info[0] === 'Moxie';
   const fit = fitModel(obj, isCat ? 0.35 : 1.8);
+  modelFitH = isCat ? 0.35 : 1.8; // gizmo Reset re-fits to this height
   collectBones(obj);
   // Capture the bind-pose Hips local Y now (before any animation plays)
   // — stripRootTravel re-bases each clip's Hips Y to this, so a
@@ -1241,6 +1450,7 @@ function afterModel(obj, info) {
   if (weaponSel.value) loadWeapon(weaponSel.value);
   if (weaponSelL.value) loadWeaponL(weaponSelL.value);
   setStatus(`${info[0]} — ${info[1]}\nsize ${(fit.size.x).toFixed(2)} x ${(fit.size.y).toFixed(2)} x ${(fit.size.z).toFixed(2)} m, ${boneCount} bones${hasBones ? '' : '\nSTATIC MODEL — no skeleton, so no animation can play on it'}${bones.hips ? '' : '\n(no Hips bone found)'}`);
+  refreshGizmoTarget(); // attach the gizmo to the fresh model / weapons
 }
 function loadModel(name) {
   const info = findModel(name); if (!info) return;
