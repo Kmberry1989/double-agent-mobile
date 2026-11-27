@@ -812,11 +812,13 @@ function playMxCharClipOnce(char, key) {
     if (raw) mxClips[key] = stripRootTravel(raw);
   }, undefined, () => {});
 });
-// Sword attacks — five new metre-scale clips (2026-11-11 intake), loaded
-// with stripRootTravel, NOT fixDriveClip: they are metres, and dividing
-// by 180 would collapse the Hips to ~7 mm. The old Drive clips
-// (sword_attack, sword_regular_combo) are retired from the theater; the
-// formal bow clip stays a Drive clip (fixDriveClip).
+// Sword attacks — metre-scale clips, loaded with stripRootTravel, NOT
+// fixDriveClip: they are metres, and dividing by 180 would collapse the
+// Hips to ~7 mm. The old Drive clips (sword_attack, sword_regular_combo)
+// are retired from the theater; the formal bow clip stays a Drive clip
+// (fixDriveClip). Thrust_Slash + Sword_And_Shield_Slash_Left_Hand are the
+// two unwired sword attacks from the 2026-11-26 unused-animation look —
+// both UnitScaleFactor 100 (metre-scale), same series as the others.
 [['bow', 'Bow_1046932.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
@@ -828,14 +830,19 @@ function playMxCharClipOnce(char, key) {
  ['atkLunge', 'Sword_And_Sword_Attack.fbx'],
  ['atkRise', 'Sword_And_Shield_Slash.fbx'],
  ['atkChop', 'Sword_And_Shield_Slash_Advancing.fbx'],
- ['atkCombo', 'Sword_And_Shield_Slash_Advancing_Combo.fbx']].forEach(([key, file]) => {
+ ['atkCombo', 'Sword_And_Shield_Slash_Advancing_Combo.fbx'],
+ ['atkThrust', 'Thrust_Slash.fbx'],
+ ['atkSlashL', 'Sword_And_Shield_Slash_Left_Hand.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (!raw) return;
     const base = stripRootTravel(raw);
     mxClips[key] = base;
     // Mirrored twin for variety (atkQuick already has its left-hand twin,
-    // atkQuickL — mirroring it would just duplicate that pair).
+    // atkQuickL — mirroring it would just duplicate that pair; atkSlashL
+    // is itself the real left-hand clip, so its mirror is the right-hand
+    // atkSlashR, not atkSlashLL).
+    if (key === 'atkSlashL') { mxClips['atkSlashR'] = mirrorClip(base); return; }
     if (key !== 'atkQuick' && key !== 'atkQuickL') mxClips[key + 'L'] = mirrorClip(base);
   }, undefined, () => {});
 });
@@ -1733,8 +1740,14 @@ function startSlowMo(dur, scale) {
 let combo = 0, meter = 0, specialQueued = false;
 let katanaDrawn = false; // the unsheath plays once, before the first slash
 let dash = null;
-const CLOSE_CYCLE = ['atkQuick', 'atkQuickL', 'atkRise', 'atkRiseL', 'atkChop', 'atkChopL', 'atkComboL'];
-const DASH_CYCLE = ['atkLunge', 'atkLungeL'];
+// Close chain, cycled by combo count: quick slashes, then the rising
+// slash, the new left/right shield slashes, the advancing chop, the
+// thrust, and the advancing combo as the chain finisher. A slash that
+// hits nothing breaks the combo back to atkQuick.
+const CLOSE_CYCLE = ['atkQuick', 'atkQuickL', 'atkRise', 'atkRiseL', 'atkSlashL', 'atkSlashR', 'atkChop', 'atkChopL', 'atkThrust', 'atkThrustL', 'atkComboL'];
+// Dash finishers: after dashing in, the lunge or the thrust lands —
+// both are forward-driving attacks, so either reads as the dash's end.
+const DASH_CYCLE = ['atkLunge', 'atkLungeL', 'atkThrust', 'atkThrustL'];
 let slashCooldown = 0, slashTimer = 0;
 function nearestLockTarget() {
   let best = null, bestD = LOCK_RANGE;
