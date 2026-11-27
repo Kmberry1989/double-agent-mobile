@@ -54,6 +54,12 @@
 <option value="shopper6.fbx">Hostage 6</option>
 <option value="shopper7.fbx">Hostage 7</option>
 </optgroup>
+<optgroup label="Masquerade">
+<option value="masquerade_man_black.glb">Masquerade Man Black</option>
+<option value="masquerade_woman_blue.glb">Masquerade Woman Blue</option>
+<option value="masquerade_red_black.glb">Masquerade Red Black</option>
+<option value="masquerade_man_navy.glb">Masquerade Man Navy</option>
+</optgroup>
 </select>
 <div id="preview"><canvas id="previewCanvas"></canvas><div id="previewStatus" class="hidden"></div></div>
 <fieldset class="maps" id="loadoutBox"><legend>Loadout</legend><label><input type="radio" name="loadout" value="black" checked> Black</label><label><input type="radio" name="loadout" value="white"> White</label></fieldset>
@@ -396,6 +402,9 @@ function previewAttachWeapons() {
   if (previewIsDuel()) { previewAttachKatana('R'); previewAttachKatana('L'); }
   else previewAttachGun();
 }
+// The masquerade enemies live in assets/theater/enemies/, not
+// assets/characters/ — resolve the path by filename prefix.
+function previewCharPath(file) { return file.indexOf('masquerade_') === 0 ? 'assets/theater/enemies/' + file : 'assets/characters/' + file; }
 function previewShowCharacter(file) {
   if (!previewOK) return;
   const seq = ++previewLoadSeq;
@@ -416,8 +425,8 @@ function previewShowCharacter(file) {
   const onError = () => {
     if (seq === previewLoadSeq) { previewStatus.textContent = 'Model could not load'; previewStatus.hidden = false; }
   };
-  if (file.toLowerCase().endsWith('.glb')) previewGltf.load('assets/characters/' + file, (g) => onLoad(g.scene), undefined, onError);
-  else previewFbx.load('assets/characters/' + file, onLoad, undefined, onError);
+  if (file.toLowerCase().endsWith('.glb')) previewGltf.load(previewCharPath(file), (g) => onLoad(g.scene), undefined, onError);
+  else previewFbx.load(previewCharPath(file), onLoad, undefined, onError);
 }
 function previewOnCharLoaded(obj, file, seq) {
   if (seq !== previewLoadSeq) return;

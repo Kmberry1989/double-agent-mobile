@@ -161,7 +161,13 @@ let dmClient = null, dmSlot = -1, dmPlayers = [null,null], dmLastSent = 0, dmSta
 // assets/characters/. The lobby passes ?character=<file>; only a file on
 // this list is loaded (anything else falls back to Agent_Kyle.fbx, so a
 // tampered URL cannot pull an arbitrary file).
-const DM_CHARACTER_ROSTER = new Set(['Kyle_tux.glb','Kyle_combat.fbx','Rochelle_undercover.fbx','Rochelle_combat.fbx','Donald.fbx','Eric.fbx','Kristen.fbx','Vickie.fbx','trickortreat-frankenstein.fbx','trickortreater-ghost.fbx','trickortreater-hero.fbx','trickortreater-mummy.fbx','trickortreater-pirate.fbx','trickortreater-pumpkin.fbx','trickortreater-vampire.fbx','trickortreater-werewolf.fbx','trickortreater-witch.fbx','trickortreater_princess.fbx','trickortreaterskeleton.fbx','enemy-terror1.fbx','enemy-terror2.fbx','enemy-terror3.fbx','enemy-terror4.fbx','enemy-terror5.fbx','shopper1.fbx','shopper2.fbx','shopper3.fbx','shopper4.fbx','shopper5.fbx','shopper6.fbx','shopper7.fbx']);
+const DM_CHARACTER_ROSTER = new Set(['Kyle_tux.glb','Kyle_combat.fbx','Rochelle_undercover.fbx','Rochelle_combat.fbx','Donald.fbx','Eric.fbx','Kristen.fbx','Vickie.fbx','trickortreat-frankenstein.fbx','trickortreater-ghost.fbx','trickortreater-hero.fbx','trickortreater-mummy.fbx','trickortreater-pirate.fbx','trickortreater-pumpkin.fbx','trickortreater-vampire.fbx','trickortreater-werewolf.fbx','trickortreater-witch.fbx','trickortreater_princess.fbx','trickortreaterskeleton.fbx','enemy-terror1.fbx','enemy-terror2.fbx','enemy-terror3.fbx','enemy-terror4.fbx','enemy-terror5.fbx','shopper1.fbx','shopper2.fbx','shopper3.fbx','shopper4.fbx','shopper5.fbx','shopper6.fbx','shopper7.fbx','masquerade_man_black.glb','masquerade_woman_blue.glb','masquerade_red_black.glb','masquerade_man_navy.glb']);
+// The masquerade enemies live in assets/theater/enemies/, not
+// assets/characters/ — resolve the path by filename prefix. Tripo
+// (shopper / masquerade) skeletons are Z-up and need their clips
+// converted (convertClipForTripo); every other character is Y-up Mixamo.
+function dmCharPath(file){ return file.indexOf('masquerade_') === 0 ? 'assets/theater/enemies/' + file : 'assets/characters/' + file; }
+function dmIsTripoFile(file){ return file.indexOf('shopper') === 0 || file.indexOf('masquerade_') === 0; }
 function dmCharacter(){ return dmAnyMode && DM_CHARACTER_ROSTER.has(dmParams.get('character')||'') ? dmParams.get('character') : 'Kyle_combat.fbx'; }
 // Deathmatch spawns per map (mirror the relay's MAPS in workers/deathmatch).
 // The welcome handler places the player here; the relay's state broadcast
@@ -328,6 +334,16 @@ const CORE_PRELOAD = ['idle','walk','run','sprint','crouchIdle','crouchWalk','sn
 let playerMixer = null, playerActions = {}, playerCurrentLoop = null, playerOneShot = null, playerOneShotName = null,
     playerOneShotHold = false, playerHeldPose = null, playerDesiredLoop = 'idle',
     playerRigOk = false, playerRigChecked = false, fbxPlaying = false;
+// Tripo player (shopper / masquerade pick): the shared Mixamo clips are
+// converted per action into the skeleton's frame and cached here, the
+// same pattern as the theater's playerClip. Mixamo players use the
+// shared fbxClips untouched.
+let playerIsTripo = false;
+const playerTripoClips = {};
+function playerClip(action) {
+  if (!playerIsTripo || !riggedModel || !fbxClips[action]) return fbxClips[action];
+  return playerTripoClips[action] || (playerTripoClips[action] = convertClipForTripo(fbxClips[action], riggedModel));
+}
 function boneKey(name){
   if (!name) return '';
   let base = name.split('.')[0].split('|')[0];
@@ -386,6 +402,52 @@ function processClip(clip, model){
   });
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
+// Tripo (shopper / masquerade) skeletons are Z-up: their Armature is
+// rotated +90° about X, so the Hips bone's local frame has Z as the
+// vertical — and man_navy's bones are centimetres (Armature scale 0.01).
+// The shared Mixamo clips are Y-up metres, so played raw on a Tripo
+// skeleton the Hips position (0, ~0.54, 0) maps to world +Z instead of
+// +Y and the whole body lies flat. Convert the Hips track into the
+// skeleton's frame: rotate the Hips position by the inverse of the
+// rotation from the model root to the Hips parent and divide by the
+// parent-chain scale (man_navy needs x100), and premultiply the Hips
+// quaternion by the same inverse rotation. Only the Hips needs it — it
+// is the only bone with a position track, and every bone below it hangs
+// off the Hips. Returns a NEW clip; the shared one is untouched.
+// (Ported from theater.html, which handles the same Tripo rigs.)
+function convertClipForTripo(clip, model) {
+  let hips = null;
+  model.traverse((o) => { if (!hips && o.isBone && o.name.toLowerCase().indexOf('hips') >= 0) hips = o; });
+  if (!hips || !hips.parent) return clip;
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3(1, 1, 1);
+  let node = hips.parent;
+  const chain = [];
+  while (node && node !== model) { chain.unshift(node); node = node.parent; }
+  for (const n of chain) { q.multiply(n.quaternion); s.multiply(n.scale); }
+  const qInv = q.clone().invert();
+  const tracks = clip.tracks.map((t) => {
+    const nt = t.clone();
+    const bone = t.name.split('.')[0].toLowerCase();
+    if (bone.indexOf('hips') < 0) return nt;
+    if (t.name.endsWith('.position')) {
+      const v = new THREE.Vector3();
+      for (let i = 0; i + 2 < nt.values.length; i += 3) {
+        v.set(nt.values[i], nt.values[i + 1], nt.values[i + 2]).applyQuaternion(qInv);
+        nt.values[i] = v.x / s.x; nt.values[i + 1] = v.y / s.y; nt.values[i + 2] = v.z / s.z;
+      }
+    } else if (t.name.endsWith('.quaternion')) {
+      const qq = new THREE.Quaternion();
+      for (let i = 0; i + 3 < nt.values.length; i += 4) {
+        qq.set(nt.values[i], nt.values[i + 1], nt.values[i + 2], nt.values[i + 3]);
+        qq.premultiply(qInv);
+        nt.values[i] = qq.x; nt.values[i + 1] = qq.y; nt.values[i + 2] = qq.z; nt.values[i + 3] = qq.w;
+      }
+    }
+    return nt;
+  });
+  return new THREE.AnimationClip(clip.name + '_tripo', clip.duration, tracks);
+}
 function loadClipFile(action, model){
   if (fbxClips[action]) return Promise.resolve(fbxClips[action]);
   if (fbxClipLoading[action]) return fbxClipLoading[action];
@@ -404,7 +466,7 @@ function loadClipFile(action, model){
 function getPlayerAction(action){
   if (!playerMixer) return null;
   if (!playerActions[action]){
-    const clip = fbxClips[action]; if (!clip) return null;
+    const clip = playerClip(action); if (!clip) return null;
     const a = playerMixer.clipAction(clip);
     if (ANIM_LOOPS.has(action)) a.setLoop(THREE.LoopRepeat, Infinity);
     else { a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; }
@@ -572,6 +634,11 @@ gltfLoader.load = function(path, onLoad, onProgress, onError){
 function normalizeCharacter(obj, targetHeight, yawOffset){
   obj.traverse((o)=>{ if (o.isMesh) o.castShadow = true; });
   obj.rotation.y = yawOffset || 0;
+  // Three 0.160 measures a SkinnedMesh's bounding box from the skinned
+  // vertex positions, which need the bones' world matrices — a freshly
+  // loaded GLB has not had updateMatrixWorld run yet, so the box can
+  // collapse on a Tripo rig. Force the matrices up to date first.
+  obj.updateMatrixWorld(true);
   let box = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); box.getSize(size);
   if (!size.y || size.y <= 0) return false;
   obj.scale.setScalar(targetHeight / size.y);
@@ -1756,12 +1823,12 @@ function loadDmRemoteCharacter(file){
     dmRemoteModel = obj; dmRemote.add(obj);
     dmRemoteBody.visible = false; dmRemoteHead.visible = false;
     dmRemoteMixer = new THREE.AnimationMixer(obj);
-    loadClipFile('idle', obj).then((clip)=>{ if (clip) { dmRemoteClips.idle = clip; dmRemotePlay('idle'); } });
-    loadClipFile('walk', obj).then((clip)=>{ if (clip) dmRemoteClips.walk = clip; });
+    loadClipFile('idle', obj).then((clip)=>{ if (clip) { dmRemoteClips.idle = dmIsTripoFile(f) ? convertClipForTripo(clip, obj) : clip; dmRemotePlay('idle'); } });
+    loadClipFile('walk', obj).then((clip)=>{ if (clip) dmRemoteClips.walk = dmIsTripoFile(f) ? convertClipForTripo(clip, obj) : clip; });
   };
   const onError = ()=>{ dmRemoteBody.visible = true; dmRemoteHead.visible = true; };
-  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf)=>onLoad(gltf.scene), undefined, onError);
-  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+  if (isGlb) gltfLoader.load(dmCharPath(f), (gltf)=>onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load(dmCharPath(f), onLoad, undefined, onError);
 }
 function updateDmRemoteAnim(dt){
   if (!dmRemoteMixer) return;
@@ -1813,12 +1880,12 @@ function loadDmBotCharacter(ent, file){
     ent.model = obj; ent.group.add(obj);
     ent.body.visible = false; ent.head.visible = false;
     ent.mixer = new THREE.AnimationMixer(obj);
-    loadClipFile('idle', obj).then((clip)=>{ if (clip) { ent.clips.idle = clip; dmBotPlay(ent, 'idle'); } });
-    loadClipFile('walk', obj).then((clip)=>{ if (clip) ent.clips.walk = clip; });
+    loadClipFile('idle', obj).then((clip)=>{ if (clip) { ent.clips.idle = dmIsTripoFile(f) ? convertClipForTripo(clip, obj) : clip; dmBotPlay(ent, 'idle'); } });
+    loadClipFile('walk', obj).then((clip)=>{ if (clip) ent.clips.walk = dmIsTripoFile(f) ? convertClipForTripo(clip, obj) : clip; });
   };
   const onError = ()=>{ ent.body.visible = true; ent.head.visible = true; };
-  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf)=>onLoad(gltf.scene), undefined, onError);
-  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+  if (isGlb) gltfLoader.load(dmCharPath(f), (gltf)=>onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load(dmCharPath(f), onLoad, undefined, onError);
 }
 function makeDmBotEnt(bot){
   const group = new THREE.Group();
@@ -2212,6 +2279,10 @@ function loadPlayerModel(file){
   const isGlb = file.toLowerCase().endsWith('.glb');
   const onLoad = (obj)=>{
     if (!normalizeCharacter(obj, 2.2, Math.PI)) return;
+    // A Tripo pick (shopper / masquerade) plays its clips converted
+    // (playerClip); the converted cache is per-model, so it resets here.
+    playerIsTripo = dmIsTripoFile(file);
+    for (const k in playerTripoClips) delete playerTripoClips[k];
     // Capsule stays visible until the idle clip is ready (initPlayerAnimation
     // hides it then), so there is no T-pose flash while clips preload.
     agentModel = obj; player.add(obj);
@@ -2227,8 +2298,8 @@ function loadPlayerModel(file){
     else if (file !== 'Agent.fbx') loadPlayerModel('Agent_Kyle.fbx');
     else console.info('[double-agent] No player model found (Agent_Kyle.fbx / Agent.fbx) — using procedural capsule for the player.');
   };
-  if (isGlb) gltfLoader.load('assets/characters/' + file, (gltf)=>onLoad(gltf.scene), undefined, onError);
-  else fbxLoader.load('assets/characters/' + file, onLoad, undefined, onError);
+  if (isGlb) gltfLoader.load(dmCharPath(file), (gltf)=>onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load(dmCharPath(file), onLoad, undefined, onError);
 }
 loadPlayerModel(dmCharacter());
 let playerLoadout = 'black'; // 'white' | 'black' — two distinct player sets.

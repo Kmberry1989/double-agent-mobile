@@ -75,7 +75,13 @@ const dmAnyMode = deathmatchMode || soloAiMode;
 const dmBotCount = (soloAiMode || coopMode) ? cleanBotCount(dmParams.get('bots')) : 0;
 const dmBotDifficulty = cleanDifficulty(dmParams.get('difficulty'));
 let dmClient = null, dmSlot = -1, dmPlayers = [null,null], dmLastSent = 0, dmStarted = false, dmPaused = false, dmFinished = false, dmAmmo = 12, dmLastShot = 0;
-const DM_CHARACTER_ROSTER = new Set(['Kyle_tux.glb','Kyle_combat.fbx','Rochelle_undercover.fbx','Rochelle_combat.fbx','Donald.fbx','Eric.fbx','Kristen.fbx','Vickie.fbx','trickortreat-frankenstein.fbx','trickortreater-ghost.fbx','trickortreater-hero.fbx','trickortreater-mummy.fbx','trickortreater-pirate.fbx','trickortreater-pumpkin.fbx','trickortreater-vampire.fbx','trickortreater-werewolf.fbx','trickortreater-witch.fbx','trickortreater_princess.fbx','trickortreaterskeleton.fbx','enemy-terror1.fbx','enemy-terror2.fbx','enemy-terror3.fbx','enemy-terror4.fbx','enemy-terror5.fbx','shopper1.fbx','shopper2.fbx','shopper3.fbx','shopper4.fbx','shopper5.fbx','shopper6.fbx','shopper7.fbx']);
+const DM_CHARACTER_ROSTER = new Set(['Kyle_tux.glb','Kyle_combat.fbx','Rochelle_undercover.fbx','Rochelle_combat.fbx','Donald.fbx','Eric.fbx','Kristen.fbx','Vickie.fbx','trickortreat-frankenstein.fbx','trickortreater-ghost.fbx','trickortreater-hero.fbx','trickortreater-mummy.fbx','trickortreater-pirate.fbx','trickortreater-pumpkin.fbx','trickortreater-vampire.fbx','trickortreater-werewolf.fbx','trickortreater-witch.fbx','trickortreater_princess.fbx','trickortreaterskeleton.fbx','enemy-terror1.fbx','enemy-terror2.fbx','enemy-terror3.fbx','enemy-terror4.fbx','enemy-terror5.fbx','shopper1.fbx','shopper2.fbx','shopper3.fbx','shopper4.fbx','shopper5.fbx','shopper6.fbx','shopper7.fbx','masquerade_man_black.glb','masquerade_woman_blue.glb','masquerade_red_black.glb','masquerade_man_navy.glb']);
+// The masquerade enemies live in assets/theater/enemies/, not
+// assets/characters/ — resolve the path by filename prefix. Tripo
+// (shopper / masquerade) skeletons are Z-up and need their clips
+// converted (convertClipForTripo, via char.isTripo).
+function dmCharPath(file){ return file.indexOf('masquerade_') === 0 ? 'assets/theater/enemies/' + file : 'assets/characters/' + file; }
+function dmIsTripoFile(file){ return file.indexOf('shopper') === 0 || file.indexOf('masquerade_') === 0; }
 function dmCharacter(){ return dmAnyMode && DM_CHARACTER_ROSTER.has(dmParams.get('character')||'') ? dmParams.get('character') : 'Kyle_combat.fbx'; }
 const DM_MAP_SPAWNS = { courtyard: [{x:-14,z:20,yaw:-0.61},{x:14,z:-20,yaw:2.53}], ballroom: [{x:-14,z:9,yaw:-0.61},{x:14,z:-9,yaw:2.53}], theater: [{x:-10,z:16,yaw:-0.61},{x:10,z:-16,yaw:2.53}], mall: [{x:-14,z:24,yaw:-0.61},{x:14,z:-24,yaw:2.53}] };
 function dmSpawn(){ const m = DM_MAP_SPAWNS[dmParams.get('map')] || DM_MAP_SPAWNS.mall; return m[dmSlot] || m[0]; }
@@ -958,10 +964,12 @@ function loadPlayerModel(file, onFail) {
     obj.rotation.y = Math.PI;
     player.add(obj); playerModel = obj;
     playerChar.model = obj;
+    playerChar.isTripo = dmIsTripoFile(file);
+    playerChar._tripoClips = {};
     playerChar.mixer = new THREE.AnimationMixer(obj); mixer = playerChar.mixer;
   };
-  if (isGlb) gltfLoader.load('assets/characters/' + file, (gltf)=>onLoad(gltf.scene), undefined, onFail);
-  else fbxLoader.load('assets/characters/' + file, onLoad, undefined, onFail);
+  if (isGlb) gltfLoader.load(dmCharPath(file), (gltf)=>onLoad(gltf.scene), undefined, onFail);
+  else fbxLoader.load(dmCharPath(file), onLoad, undefined, onFail);
 }
 function loadPlayerCapsule() {
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a2a }));
@@ -1495,13 +1503,13 @@ function loadDmRemoteCharacter(file) {
     obj.rotation.y = Math.PI;
     dmRemoteModel = obj; dmRemote.add(obj);
     dmRemoteBody.visible = false; dmRemoteHead.visible = false;
-    dmRemoteChar.model = obj; dmRemoteChar.isTripo = f.indexOf('shopper') === 0;
+    dmRemoteChar.model = obj; dmRemoteChar.isTripo = dmIsTripoFile(f);
     dmRemoteChar.mixer = new THREE.AnimationMixer(obj); dmRemoteMixer = dmRemoteChar.mixer;
     playCharClip(dmRemoteChar, 'idle');
   };
   const onError = () => { dmRemoteBody.visible = true; dmRemoteHead.visible = true; };
-  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf) => onLoad(gltf.scene), undefined, onError);
-  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+  if (isGlb) gltfLoader.load(dmCharPath(f), (gltf) => onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load(dmCharPath(f), onLoad, undefined, onError);
 }
 function updateDmRemoteAnim(dt) {
   if (!dmRemoteMixer) return;
@@ -1555,13 +1563,13 @@ function loadDmBotCharacter(ent, file){
     obj.rotation.y = Math.PI;
     ent.model = obj; ent.group.add(obj);
     ent.body.visible = false; ent.head.visible = false;
-    ent.char.model = obj; ent.char.isTripo = f.indexOf('shopper') === 0;
+    ent.char.model = obj; ent.char.isTripo = dmIsTripoFile(f);
     ent.char.mixer = new THREE.AnimationMixer(obj);
     playCharClip(ent.char, 'idle');
   };
   const onError = () => { ent.body.visible = true; ent.head.visible = true; };
-  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf) => onLoad(gltf.scene), undefined, onError);
-  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+  if (isGlb) gltfLoader.load(dmCharPath(f), (gltf) => onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load(dmCharPath(f), onLoad, undefined, onError);
 }
 function makeDmBotEnt(bot){
   const group = new THREE.Group();
