@@ -2056,9 +2056,9 @@ function weaponStats(){
   // (mag 0 — it never runs out); the consumables carry their count;
   // the sniper reaches 80 m, past the old 60 m ray.
   if (weaponVariant === 'Knife') return { mag: 0, max: 0, dmg: 50, rate: 0.5, range: 2.2 };
-  if (weaponVariant === 'ThrowingKnife') return { mag: 6, max: 6, dmg: 40, rate: 0.7, range: 30 };
-  if (weaponVariant === 'Grenade') return { mag: 3, max: 3, dmg: 90, rate: 1.0, range: 25 };
-  if (weaponVariant === 'Claymore') return { mag: 2, max: 2, dmg: 100, rate: 1.0, range: 6 };
+  if (weaponVariant === 'ThrowingKnife') return { mag: 2, max: 2, dmg: 40, rate: 0.7, range: 30 };
+  if (weaponVariant === 'Grenade') return { mag: 1, max: 1, dmg: 90, rate: 1.0, range: 25 };
+  if (weaponVariant === 'Claymore') return { mag: 1, max: 1, dmg: 100, rate: 1.0, range: 6 };
   if (weaponVariant === 'SniperRifle') return { mag: 5, max: 5, dmg: 100, rate: 1.2, range: 80 };
   const base = weapons[weapon];
   return { mag: base.mag, max: base.max, dmg: base.dmg, rate: base.rate, range: 60 };
@@ -2257,9 +2257,9 @@ const WEAPON_CYCLE = [
   // grenade and the claymore are consumables (spent for the life, no
   // reload); the sniper rifle is a slow one-shot long gun.
   { name: 'Knife', cls: 'melee', len: 0.35, mag: 0 },
-  { name: 'ThrowingKnife', cls: 'thrown', len: 0.25, mag: 6 },
-  { name: 'Grenade', cls: 'thrown', len: 0.12, mag: 3 },
-  { name: 'Claymore', cls: 'mine', len: 0.25, mag: 2 },
+  { name: 'ThrowingKnife', cls: 'thrown', len: 0.25, mag: 2 },
+  { name: 'Grenade', cls: 'thrown', len: 0.12, mag: 1 },
+  { name: 'Claymore', cls: 'mine', len: 0.25, mag: 1 },
   { name: 'SniperRifle', cls: 'rifle', len: 1.10, mag: 5 }
 ];
 // Guns that can take a suppressor. The RPG7 cannot — it never gets one.

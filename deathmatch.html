@@ -9,7 +9,7 @@
 </style>
 </head>
 <body><main class="card"><a href="menu.html">← Main menu</a><h1>Deathmatch</h1><p>Private 1v1, solo vs AI, or co-op vs bots — first to 10 takedowns. Pick your character, loadout, and arena — any of the 8 weapons, in black or white — and the game’s desktop, controller, or touch controls.</p>
-<fieldset class="maps"><legend>Mode</legend><label><input type="radio" name="mode" value="1v1" checked> 1v1 Private match</label><label><input type="radio" name="mode" value="solo"> Solo vs AI</label><label><input type="radio" name="mode" value="coop"> Co-op vs Bots</label></fieldset>
+<fieldset class="maps"><legend>Mode</legend><label><input type="radio" name="mode" value="1v1" checked> 1v1 Private match</label><label><input type="radio" name="mode" value="solo"> Solo vs AI</label><label><input type="radio" name="mode" value="coop"> Co-op vs Bots</label><label><input type="radio" name="mode" value="duel"> Katana Duel (1v1)</label><label><input type="radio" name="mode" value="solo-duel"> Katana Duel (Solo vs AI)</label></fieldset>
 <label for="name">Agent name</label><input id="name" maxlength="18" autocomplete="nickname" value="Agent">
 <label for="character">Character</label><select id="character">
 <optgroup label="Agents">
@@ -72,8 +72,8 @@
 <option value="shopper7.fbx">Shopper 7</option>
 </optgroup>
 </select>
-<fieldset class="maps"><legend>Loadout</legend><label><input type="radio" name="loadout" value="black" checked> Black</label><label><input type="radio" name="loadout" value="white"> White</label></fieldset>
-<label for="weapon">Starting weapon</label><select id="weapon">
+<fieldset class="maps" id="loadoutBox"><legend>Loadout</legend><label><input type="radio" name="loadout" value="black" checked> Black</label><label><input type="radio" name="loadout" value="white"> White</label></fieldset>
+<label for="weapon" id="weaponLabel">Starting weapon</label><select id="weapon">
 <option value="Glock" selected>Glock · pistol · 12</option>
 <option value="Walther">Walther · pistol · 12</option>
 <option value="Makarov">Makarov · pistol · 12</option>
@@ -83,12 +83,12 @@
 <option value="Shotgun">Shotgun · 5 shells</option>
 <option value="RPG7">RPG7 · rifle · 30</option>
 <option value="Knife">Knife · melee · ∞</option>
-<option value="ThrowingKnife">Throwing knife · thrown · 6</option>
-<option value="Grenade">Grenade · thrown · 3</option>
-<option value="Claymore">Claymore · mine · 2</option>
+<option value="ThrowingKnife">Pen · thrown · 2</option>
+<option value="Grenade">Grenade · thrown · 1</option>
+<option value="Claymore">Claymore · mine · 1</option>
 <option value="SniperRifle">Sniper rifle · rifle · 5</option>
 </select>
-<fieldset class="maps"><legend>Arena</legend><label><input type="radio" name="map" value="courtyard" checked> Courtyard</label><label><input type="radio" name="map" value="mall"> Mall</label></fieldset>
+<fieldset class="maps" id="arenaBox"><legend>Arena</legend><label><input type="radio" name="map" value="courtyard" checked> Courtyard</label><label><input type="radio" name="map" value="mall"> Mall</label></fieldset>
 <section id="botOptions" class="hidden">
 <label for="botCount">Bots</label><select id="botCount"></select>
 <label for="difficulty">Difficulty</label><select id="difficulty">
@@ -100,39 +100,59 @@
 </section>
 <div class="choices"><button id="create">Create private room</button><button id="showJoin" class="secondary">Join with code</button><button id="startSolo" class="hidden">Start solo match</button></div>
 <section id="joinPanel" class="hidden"><label for="code">Room code</label><div class="row"><input id="code" maxlength="6" autocomplete="off" placeholder="6-character code"><button id="join">Join</button></div></section>
-<div id="status" role="status" aria-live="polite"></div><p class="rules">Modes: 1v1 Private match — first to 10 takedowns against one other player, via a room code. Solo vs AI — you vs 1–4 bots, first to 10 takedowns (your takedowns vs the bots’ takedowns); needs no relay and no code, and works even before the relay is configured. Co-op vs Bots — you and a friend as a team vs the bots, first team to 10; create a room and share the code, the room plays on the creator’s arena, and the joiner’s arena pick is ignored. Bots are computer opponents, always labeled BOT — never real people. The relay pauses the match during a disconnect and allows 30 seconds to reconnect. Leaving longer forfeits the match. Loadout: pick a black or white finish and a starting weapon above — 13 weapons now: the 8 guns plus Knife (melee, silent, never runs out), Throwing knife (6, sticks where it lands), Grenade (3, 2-second fuse, blast hurts anyone close — including you), Claymore (2, place it and it fires when an enemy crosses its front arc), and Sniper rifle (5, one-shot, scope on aim). In the match, Tab cycles weapons and 1–9, 0 select one directly (9 Knife, 0 Sniper rifle; throwing knife, grenade and claymore are Tab-only) on the courtyard. Ballroom and Theater need a gun system before they can host a deathmatch. Deathmatch multiplayer needs the project’s Cloudflare Worker deployed and its URL set in <code>assets/js/deathmatch-config.js</code> — solo vs AI does not.</p></main>
+<div id="status" role="status" aria-live="polite"></div><p class="rules">Modes: 1v1 Private match — first to 10 takedowns against one other player, via a room code. Solo vs AI — you vs 1–4 bots, first to 10 takedowns (your takedowns vs the bots’ takedowns); needs no relay and no code, and works even before the relay is configured. Co-op vs Bots — you and a friend as a team vs the bots, first team to 10; create a room and share the code, the room plays on the creator’s arena, and the joiner’s arena pick is ignored. Katana Duel — a melee duel with Rochelle’s dual katanas on the Theater stage, first to 3 hits; 1v1 is a private room over the relay, Solo is you vs one BOT. No loadout, no starting weapon, no arena pick — katanas only, Theater only. Bots are computer opponents, always labeled BOT — never real people. The relay pauses the match during a disconnect and allows 30 seconds to reconnect. Leaving longer forfeits the match. Loadout: pick a black or white finish and a starting weapon above — 13 weapons now: the 8 guns plus Knife (melee, silent, never runs out), Pen (2, thrown, sticks where it lands), Grenade (1, 2-second fuse, blast hurts anyone close — including you), Claymore (1, place it and it fires when an enemy crosses its front arc), and Sniper rifle (5, one-shot, scope on aim). In the match, Tab cycles weapons and 1–9, 0 select one directly (9 Knife, 0 Sniper rifle; throwing knife, grenade and claymore are Tab-only) on the courtyard. Ballroom needs a gun system before it can host a deathmatch. Deathmatch multiplayer needs the project’s Cloudflare Worker deployed and its URL set in <code>assets/js/deathmatch-config.js</code> — solo vs AI does not.</p></main>
 <script type="module">
 import { DEATHMATCH_RELAY_URL } from './assets/js/deathmatch-config.js';
 import { BOT_MIN_COUNT, BOT_MAX_COUNT, BOT_DEFAULT_COUNT } from './assets/js/dm-bot-brain.js';
 const $ = id => document.getElementById(id), status = $('status');
 function setupNeeded(){status.innerHTML='Multiplayer relay is not configured yet. Deploy <code>workers/deathmatch</code>, then set its URL in <code>assets/js/deathmatch-config.js</code>.';}
-const MAP_PAGES={courtyard:'index.html',mall:'mall.html'};
+const MAP_PAGES={courtyard:'index.html',mall:'mall.html',theater:'theater.html'};
 function currentMode(){return document.querySelector('input[name="mode"]:checked')?.value||'1v1';}
 function botCount(){const n=parseInt($('botCount').value,10);return Number.isFinite(n)?Math.max(BOT_MIN_COUNT,Math.min(BOT_MAX_COUNT,n)):BOT_DEFAULT_COUNT;}
 function botDifficulty(){return $('difficulty').value||'normal';}
 function playerFields(){return {name:$('name').value.trim().slice(0,18)||'Agent',character:$('character').value,loadout:document.querySelector('input[name="loadout"]:checked')?.value||'black',weapon:$('weapon').value||'Glock',map:document.querySelector('input[name="map"]:checked')?.value||'courtyard'};}
 function updateModeUI(){
   const mode=currentMode();
-  $('botOptions').classList.toggle('hidden',mode==='1v1');
-  $('startSolo').classList.toggle('hidden',mode!=='solo');
-  $('create').classList.toggle('hidden',mode==='solo');
-  $('showJoin').classList.toggle('hidden',mode==='solo');
-  if(mode==='solo') $('joinPanel').classList.add('hidden');
+  const isDuel=mode==='duel'||mode==='solo-duel';
+  // A katana duel needs no loadout, no starting weapon and no arena
+  // pick — katanas only, Theater only. The duel defaults to
+  // Rochelle_combat when the character is still the lobby default.
+  $('loadoutBox').classList.toggle('hidden',isDuel);
+  $('weaponLabel').classList.toggle('hidden',isDuel);
+  $('weapon').classList.toggle('hidden',isDuel);
+  $('arenaBox').classList.toggle('hidden',isDuel);
+  if(isDuel&&$('character').value==='Agent_Kyle.fbx') $('character').value='Rochelle_combat.fbx';
+  $('botOptions').classList.toggle('hidden',mode==='1v1'||mode==='duel');
+  // A solo duel is 1v1 vs one BOT — the bot count is always 1, so only
+  // the difficulty shows.
+  $('botCount').closest('label').classList.toggle('hidden',mode==='solo-duel');
+  $('startSolo').classList.toggle('hidden',mode!=='solo'&&mode!=='solo-duel');
+  $('create').classList.toggle('hidden',mode==='solo'||mode==='solo-duel');
+  $('showJoin').classList.toggle('hidden',mode==='solo'||mode==='solo-duel');
+  if(mode==='solo'||mode==='solo-duel') $('joinPanel').classList.add('hidden');
 }
 function startSolo(){
   const f=playerFields();
-  const url=new URL(MAP_PAGES[f.map]||'index.html',location.href);
-  url.searchParams.set('mode','solo-ai');url.searchParams.set('bots',String(botCount()));url.searchParams.set('difficulty',botDifficulty());url.searchParams.set('name',f.name);url.searchParams.set('character',f.character);url.searchParams.set('loadout',f.loadout);url.searchParams.set('weapon',f.weapon);url.searchParams.set('map',f.map);location.href=url;
+  const isDuel=currentMode()==='solo-duel';
+  const map=isDuel?'theater':f.map;
+  const url=new URL(MAP_PAGES[map]||'index.html',location.href);
+  url.searchParams.set('mode',isDuel?'solo-duel':'solo-ai');
+  url.searchParams.set('bots',String(isDuel?1:botCount()));
+  url.searchParams.set('difficulty',botDifficulty());
+  url.searchParams.set('name',f.name);url.searchParams.set('character',f.character);url.searchParams.set('loadout',f.loadout);
+  url.searchParams.set('weapon',isDuel?'Katana':f.weapon);url.searchParams.set('map',map);location.href=url;
 }
 async function enter(action){
   if(!DEATHMATCH_RELAY_URL){setupNeeded();return;}
   status.textContent='Creating secure room…';
   const character=$('character').value;
   const loadout=document.querySelector('input[name="loadout"]:checked')?.value||'black';
-  const weapon=$('weapon').value||'Glock';
+  const isDuel=currentMode()==='duel';
+  const weapon=isDuel?'Katana':($('weapon').value||'Glock');
   const body={name:$('name').value.trim().slice(0,18)||'Agent',character,loadout,weapon};
-  if(action==='create') body.map=document.querySelector('input[name="map"]:checked')?.value||'courtyard';
+  if(action==='create') body.map=isDuel?'theater':(document.querySelector('input[name="map"]:checked')?.value||'courtyard');
   if(action==='create'&&currentMode()==='coop'){body.mode='coop';body.botCount=botCount();body.difficulty=botDifficulty();}
+  if(action==='create'&&isDuel) body.mode='duel';
   if(action==='join') body.code=$('code').value.trim().toUpperCase();
   try{
     const response=await fetch(new URL(`/api/rooms/${action}`,DEATHMATCH_RELAY_URL),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
@@ -140,7 +160,8 @@ async function enter(action){
     if(!response.ok) throw new Error(result.error||'Could not enter that room.');
     const map=result.map||body.map||'courtyard';
     const url=new URL(MAP_PAGES[map]||'index.html',location.href);
-    url.searchParams.set('mode','deathmatch');
+    const isDuelRoom=result.mode==='duel'||isDuel;
+    url.searchParams.set('mode',isDuelRoom?'katana-duel':'deathmatch');
     const coop=result.mode==='coop'||currentMode()==='coop';
     if(coop){url.searchParams.set('coop','1');url.searchParams.set('bots',String(result.botCount||botCount()));url.searchParams.set('difficulty',result.difficulty||botDifficulty());}
     url.searchParams.set('code',result.code);url.searchParams.set('token',result.token);url.searchParams.set('name',body.name);url.searchParams.set('character',character);url.searchParams.set('loadout',loadout);url.searchParams.set('weapon',weapon);url.searchParams.set('map',map);location.href=url;

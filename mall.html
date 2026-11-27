@@ -91,7 +91,7 @@ function dmSpawn(){ const m = DM_MAP_SPAWNS[dmParams.get('map')] || DM_MAP_SPAWN
 // reaches 80 m. The mall renders no weapon model, no scope and no
 // placed-mine mesh for them — the relay / local resolution carries the
 // hit, the tracer (or the explosion sound) carries the feedback.
-const DM_WEAPON_STATS = { Glock:{rate:280,cap:12,range:60}, Walther:{rate:280,cap:12,range:60}, Makarov:{rate:280,cap:12,range:60}, Revolver:{rate:350,cap:6,range:60}, MP5K:{rate:110,cap:30,range:60}, AKS74U:{rate:110,cap:30,range:60}, Shotgun:{rate:600,cap:5,range:60}, RPG7:{rate:110,cap:30,range:60}, Knife:{rate:500,cap:0,range:2.2}, ThrowingKnife:{rate:700,cap:6,range:30}, Grenade:{rate:1000,cap:3,range:25}, Claymore:{rate:1000,cap:2,range:6}, SniperRifle:{rate:1200,cap:5,range:80} };
+const DM_WEAPON_STATS = { Glock:{rate:280,cap:12,range:60}, Walther:{rate:280,cap:12,range:60}, Makarov:{rate:280,cap:12,range:60}, Revolver:{rate:350,cap:6,range:60}, MP5K:{rate:110,cap:30,range:60}, AKS74U:{rate:110,cap:30,range:60}, Shotgun:{rate:600,cap:5,range:60}, RPG7:{rate:110,cap:30,range:60}, Knife:{rate:500,cap:0,range:2.2}, ThrowingKnife:{rate:700,cap:2,range:30}, Grenade:{rate:1000,cap:1,range:25}, Claymore:{rate:1000,cap:1,range:6}, SniperRifle:{rate:1200,cap:5,range:80} };
 const DM_CONSUMABLES = new Set(['ThrowingKnife', 'Grenade', 'Claymore']);
 function dmAmmoText(){
   const st = DM_WEAPON_STATS[dmWeapon()];

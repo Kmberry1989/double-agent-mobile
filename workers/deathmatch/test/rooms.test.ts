@@ -116,7 +116,7 @@ describe('new weapons', () => {
     expect(hit.fired).toBe(true);
     expect(hit.hit).toBe(true);
     expect(bot.health).toBe(100 - 40);
-    expect(human.ammo).toBe(5); // one of six thrown
+    expect(human.ammo).toBe(1); // one of two thrown
     bot.x = 0; bot.z = -40; bot.health = 100; human.lastShot = 0;
     const far = resolveHumanShot(state, 0, packet, 6000);
     expect(far.fired).toBe(true);
@@ -134,7 +134,7 @@ describe('new weapons', () => {
     expect(thrown.fired).toBe(true);
     expect(state.grenades.length).toBe(1);
     expect(state.grenades[0].detonateAt).toBe(5000 + GRENADE_FUSE_MS);
-    expect(human.ammo).toBe(2); // one of three thrown
+    expect(human.ammo).toBe(0); // the one grenade thrown
     // Before the fuse, nothing has happened.
     expect(applyGrenadeBlasts(state, 6000)).toBe(false);
     expect(bot.health).toBe(100);
@@ -161,7 +161,7 @@ describe('new weapons', () => {
     // Human at (0,0) facing +z; the mine goes 1 m ahead, facing +z.
     expect(placeMine(state, 0, { type: 'place', weapon: 'Claymore', x: 0, z: 1, yaw: 0 }, 5000)).toBe(true);
     expect(state.mines.length).toBe(1);
-    expect(human.ammo).toBe(1); // one of two placed
+    expect(human.ammo).toBe(0); // the one claymore placed
     // Before it arms, a bot in the arc does not trip it.
     bot.x = 0; bot.z = 5;
     expect(checkMines(state, 5500)).toBe(false);
@@ -202,16 +202,16 @@ describe('new weapons', () => {
     const state = coopState();
     const human = state.players[0]!;
     const packet = { type: 'shoot', weapon: 'Grenade', point: { x: 0, z: -5 } };
-    // Throw all three.
-    for (let i = 0; i < 3; i++) { human.lastShot = 0; resolveHumanShot(state, 0, packet, 5000 + i * 2000); }
+    // Throw the one.
+    human.lastShot = 0; resolveHumanShot(state, 0, packet, 5000);
     expect(human.ammo).toBe(0);
     expect(human.counts.Grenade).toBe(0);
-    // A fourth throw is refused, and no reload starts.
+    // A second throw is refused, and no reload starts.
     human.lastShot = 0;
     const spent = resolveHumanShot(state, 0, packet, 12000);
     expect(spent.fired).toBe(false);
     expect(human.reloadAt).toBe(0);
-    expect(state.grenades.length).toBe(3);
+    expect(state.grenades.length).toBe(1);
   });
 
   it('bot weapons: a grenade bot is rejected, a sniper bot hits for 100', () => {
@@ -376,5 +376,106 @@ describe('shot events', () => {
     expect(thrown.fired).toBe(true);
     expect(state.grenades.length).toBe(1);
     expect(state.events.length).toBe(0);
+  });
+});
+
+// A fabricated katana-duel room for the pure-helper tests: two duelists
+// on the theater stage, 3 hits each, no bots.
+function duelState(overrides: Partial<RoomState> = {}): RoomState {
+  const state: RoomState = {
+    map: 'theater',
+    players: [
+      { token: 'duelist-0', name: 'Rochelle', character: 'Rochelle_combat.fbx', loadout: 'black', slot: 0, x: -6, z: 2, yaw: -1.25, health: 3, score: 0, ammo: 0, weapon: 'Katana', lastMove: 0, lastShot: 0, reloadAt: 0, disconnectedAt: null, respawnAt: 0, counts: {} },
+      { token: 'duelist-1', name: 'Kyle', character: 'Kyle_combat.fbx', loadout: 'black', slot: 1, x: 6, z: -2, yaw: 1.89, health: 3, score: 0, ammo: 0, weapon: 'Katana', lastMove: 0, lastShot: 0, reloadAt: 0, disconnectedAt: null, respawnAt: 0, counts: {} },
+    ],
+    startedAt: 1000,
+    createdAt: 0,
+    finished: false,
+    winner: null,
+    finishReason: null,
+    mode: 'duel',
+    bots: [],
+    difficulty: 'normal',
+    teamScore: { humans: 0, bots: 0 },
+    winnerTeam: null,
+    lastBotTick: 1000,
+    grenades: [],
+    mines: [],
+    events: [],
+  };
+  return { ...state, ...overrides };
+}
+
+describe('katana duel', () => {
+  it('creates a katana duel room on the theater, and rejects an unknown duel weapon or mode', async () => {
+    const created = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Rochelle',mode:'duel',map:'theater',weapon:'Katana',character:'Rochelle_combat.fbx'}) }),env);
+    const room = await created.json() as {code:string;token:string;map:string;mode:string};
+    expect(created.status).toBe(200);
+    expect(room.mode).toBe('duel');
+    expect(room.map).toBe('theater');
+    const joined = await exports.default.fetch(new Request('https://relay/api/rooms/join', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Kyle',code:room.code,character:'Kyle_combat.fbx'}) }),env);
+    const joinedRoom = await joined.json() as {mode:string;map:string};
+    expect(joined.status).toBe(200);
+    expect(joinedRoom.mode).toBe('duel');
+    expect(joinedRoom.map).toBe('theater');
+    const badWeapon = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Rochelle',mode:'duel',weapon:'Blaster'}) }),env);
+    expect(badWeapon.status).toBe(400);
+    const badMode = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Rochelle',mode:'swordfight'}) }),env);
+    expect(badMode.status).toBe(400);
+  });
+
+  it('katana: hits inside 2.5 m in front for 1 damage, three hits end the duel with no respawn', () => {
+    const state = duelState();
+    const shooter = state.players[0]!;
+    const other = state.players[1]!;
+    // Face each other: shooter at (0,0) facing +z, opponent 2 m ahead.
+    shooter.x = 0; shooter.z = 0; shooter.yaw = 0;
+    other.x = 0; other.z = 2;
+    const first = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Katana' }, 5000);
+    expect(first.fired).toBe(true);
+    expect(first.hit).toBe(true);
+    expect(other.health).toBe(2); // 3 - 1
+    expect(state.events.length).toBe(1);
+    expect(state.events[0].weapon).toBe('Katana');
+    expect(state.events[0].hit).toBe(true);
+    expect(state.events[0].point).toEqual({ x: 0, y: 1.4, z: 2 });
+    expect(state.finished).toBe(false);
+    // Second hit (rate gate is 490 ms — 600 ms later is fine).
+    const second = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Katana' }, 5600);
+    expect(second.hit).toBe(true);
+    expect(other.health).toBe(1);
+    // A swing inside the 490 ms rate gate is refused.
+    const gated = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Katana' }, 5800);
+    expect(gated.fired).toBe(false);
+    expect(other.health).toBe(1);
+    // Third hit ends the duel: winner, no respawn.
+    const third = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Katana' }, 6200);
+    expect(third.hit).toBe(true);
+    expect(other.health).toBe(0);
+    expect(other.respawnAt).toBe(0); // no respawn in a duel
+    expect(state.finished).toBe(true);
+    expect(state.winner).toBe(0);
+    expect(state.finishReason).toBe('score');
+    expect(shooter.score).toBe(1);
+  });
+
+  it('katana: a swing beyond 2.5 m or behind the shooter whiffs', () => {
+    const state = duelState();
+    const shooter = state.players[0]!;
+    const other = state.players[1]!;
+    shooter.x = 0; shooter.z = 0; shooter.yaw = 0;
+    other.x = 0; other.z = 3; // beyond 2.5 m
+    const far = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Katana' }, 5000);
+    expect(far.fired).toBe(true);
+    expect(far.hit).toBe(false);
+    expect(other.health).toBe(3);
+    expect(state.events.length).toBe(1);
+    expect(state.events[0].hit).toBe(false);
+    expect(state.events[0].point).toBeUndefined();
+    // Behind the shooter: also a whiff.
+    other.x = 0; other.z = -2; shooter.lastShot = 0;
+    const behind = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Katana' }, 6000);
+    expect(behind.hit).toBe(false);
+    expect(other.health).toBe(3);
   });
 });

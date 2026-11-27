@@ -14,7 +14,11 @@ export type Mine = { owner: number; x: number; z: number; yaw: number; armedAt: 
 // plus lastShotAt, the ms timestamp of its last shot, so clients can
 // draw the bot's tracer. The brain keeps lastShot (cadence) separately.
 export type Bot = { id: string; name: string; character: string; weapon: string; loadout: 'white'|'black'; difficulty: string; x: number; z: number; yaw: number; health: number; score: number; ammo: number; dead: boolean; respawnAt: number; lastShot: number; lastShotAt: number; reloadUntil: number; [key: string]: any };
-export type RoomMode = 'pvp'|'coop';
+export type RoomMode = 'pvp'|'coop'|'duel';
+// A katana duel is a single fight to 3 hits (not first-to-10): each
+// duelist has DUEL_HITS health and the katana deals 1 per hit. The
+// first kill ends the match — no respawn, no score target.
+export const DUEL_HITS = 3;
 export type Difficulty = 'easy'|'normal'|'hard';
 // A shot event: the relay's hit resolution, broadcast so every client
 // can render the same effects (blood + a bullet hole on the victim's
@@ -39,7 +43,11 @@ export type RoomState = { map: MapId; players: (Player|null)[]; startedAt: numbe
 const MAPS = {
   courtyard: { bounds: { x: 39, z: 39 }, spawns: [{ x: -14, z: 20, yaw: -0.61 }, { x: 14, z: -20, yaw: 2.53 }] },
   ballroom: { bounds: { x: 19, z: 13 }, spawns: [{ x: -14, z: 9, yaw: -0.61 }, { x: 14, z: -9, yaw: 2.53 }] },
-  theater: { bounds: { x: 14, z: 20 }, spawns: [{ x: -10, z: 16, yaw: -0.61 }, { x: 10, z: -16, yaw: 2.53 }] },
+  // The theater is the katana-duel arena: the fight is on the stage
+  // (x -12..12, z -6..6), so the spawns face each other across it and
+  // the bounds cover the stage + house (z to 29.5) while the client
+  // clamps the player to the theater's own walls.
+  theater: { bounds: { x: 13, z: 29 }, spawns: [{ x: -6, z: 2, yaw: -1.25 }, { x: 6, z: -2, yaw: 1.89 }] },
   mall: { bounds: { x: 19, z: 29 }, spawns: [{ x: -14, z: 24, yaw: -0.61 }, { x: 14, z: -24, yaw: 2.53 }] },
 } as const;
 type MapId = keyof typeof MAPS;
@@ -61,6 +69,9 @@ const cleanCharacter = (v: unknown): string => (typeof v === 'string' && /^[A-Za
 // throw packet carries the landing point, the blast is applied on the
 // fuse by the alarm, damage falling off to 20 at the 5 m edge);
 // 'mine' is the claymore (placed by a 'place' packet, never shot).
+// 'melee' is the knife (no ammo, cap 0 — it never reloads, and its hit is a
+// distance + front-arc check, not a ray) and the katana (same melee
+// resolution, 2.5 m reach, 1 damage — the duel's 3-hit fight).
 // A weapon reloads only when it is a hitscan gun — consumables
 // (throwing knife, grenade, claymore) are spent for the life, and the
 // per-weapon counts on the Player track them across switches.
@@ -74,10 +85,11 @@ const WEAPONS = {
   Shotgun: { dmg: 70, rate: 600, cap: 5, kind: 'hitscan', range: 60 },
   RPG7: { dmg: 50, rate: 105, cap: 30, kind: 'hitscan', range: 60 },
   Knife: { dmg: 50, rate: 490, cap: 0, kind: 'melee', range: 2.2 },
-  ThrowingKnife: { dmg: 40, rate: 690, cap: 6, kind: 'thrown', range: 30 },
-  Grenade: { dmg: 90, rate: 990, cap: 3, kind: 'blast', range: 25, blast: 5 },
-  Claymore: { dmg: 100, rate: 990, cap: 2, kind: 'mine', range: 6, blast: 6 },
+  ThrowingKnife: { dmg: 40, rate: 690, cap: 2, kind: 'thrown', range: 30 },
+  Grenade: { dmg: 90, rate: 990, cap: 1, kind: 'blast', range: 25, blast: 5 },
+  Claymore: { dmg: 100, rate: 990, cap: 1, kind: 'mine', range: 6, blast: 6 },
   SniperRifle: { dmg: 100, rate: 1190, cap: 5, kind: 'hitscan', range: 80 },
+  Katana: { dmg: 1, rate: 490, cap: 0, kind: 'melee', range: 2.5 },
 } as const;
 type WeaponId = keyof typeof WEAPONS;
 // A weapon reloads only when it is a hitscan gun (the 8 + the sniper).
@@ -227,6 +239,13 @@ export function resolveHumanShot(state: RoomState, shooterSlot: number, packet: 
   };
   const killOpponent = () => {
     if (!other) return;
+    // A katana duel ends on the first kill (3 hits, no respawn, no
+    // score target) — the winner is the duelist who landed the third hit.
+    if (state.mode === 'duel') {
+      shooter.score++;
+      state.finished = true; state.winner = shooterSlot; state.finishReason = 'score';
+      return;
+    }
     other.respawnAt = now + 2500; shooter.score++;
     if (shooter.score >= 10) { state.finished = true; state.winner = shooterSlot; if (state.mode === 'coop') state.winnerTeam = 'humans'; state.finishReason = 'score'; }
   };
@@ -453,11 +472,11 @@ export default {
       if (body.character !== undefined && cleanCharacter(body.character) !== body.character) return json({error:'Unknown character.'},400);
       if (body.weapon !== undefined && !(typeof body.weapon === 'string' && body.weapon in WEAPONS)) return json({error:'Unknown weapon.'},400);
       if (body.loadout !== undefined && body.loadout !== 'white' && body.loadout !== 'black') return json({error:'Unknown loadout.'},400);
-      if (body.mode !== undefined && body.mode !== 'pvp' && body.mode !== 'coop') return json({error:'Unknown mode.'},400);
+      if (body.mode !== undefined && body.mode !== 'pvp' && body.mode !== 'coop' && body.mode !== 'duel') return json({error:'Unknown mode.'},400);
       if (body.botCount !== undefined && !isValidBotCount(body.botCount)) return json({error:'Bot count must be an integer from 1 to 4.'},400);
       if (body.difficulty !== undefined && !(typeof body.difficulty === 'string' && (BOT_DIFFICULTIES as readonly string[]).includes(body.difficulty))) return json({error:'Unknown difficulty.'},400);
       if (body.botWeapon !== undefined && !isBotWeapon(body.botWeapon)) return json({error:'Unknown bot weapon.'},400);
-      const mode: RoomMode = body.mode === 'coop' ? 'coop' : 'pvp';
+      const mode: RoomMode = body.mode === 'coop' ? 'coop' : body.mode === 'duel' ? 'duel' : 'pvp';
       const botCount = mode === 'coop' ? cleanBotCount(body.botCount) : 0;
       const difficulty = cleanDifficulty(body.difficulty) as Difficulty;
       const room = env.ROOMS.get(env.ROOMS.idFromName(code));
@@ -482,7 +501,7 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 function cleanName(value:unknown){return String(value||'Agent').replace(/[<>\u0000-\u001f]/g,'').trim().slice(0,18)||'Agent';}
-function blankPlayer(token:string,name:string,slot:number,map:MapId,character:string,weapon:WeaponId,loadout:'white'|'black'):Player{const spawn=MAPS[map].spawns[slot];return {token,name,character,loadout,slot,x:spawn.x,z:spawn.z,yaw:spawn.yaw,health:100,score:0,ammo:WEAPONS[weapon].cap,weapon,lastMove:0,lastShot:0,reloadAt:0,disconnectedAt:null,respawnAt:0,counts:{}};}
+function blankPlayer(token:string,name:string,slot:number,map:MapId,character:string,weapon:WeaponId,loadout:'white'|'black',health=100):Player{const spawn=MAPS[map].spawns[slot];return {token,name,character,loadout,slot,x:spawn.x,z:spawn.z,yaw:spawn.yaw,health,score:0,ammo:WEAPONS[weapon].cap,weapon,lastMove:0,lastShot:0,reloadAt:0,disconnectedAt:null,respawnAt:0,counts:{}};}
 function blankState():RoomState{return {map:'courtyard',players:[null,null],startedAt:null,createdAt:Date.now(),finished:false,winner:null,finishReason:null,mode:'pvp',bots:[],difficulty:'normal',teamScore:{humans:0,bots:0},winnerTeam:null,lastBotTick:0,grenades:[],mines:[],events:[]};}
 
 export class DeathmatchRoom extends DurableObject<Env> {
@@ -503,8 +522,8 @@ export class DeathmatchRoom extends DurableObject<Env> {
       if(existing)return json({slot:existing.slot,map:state.map});
       if(input.slot===1&&state.players[0]===null)return json({error:'Room code was not found.'},404);
       if(state.players[input.slot])return json({error:'Room already has two agents.'},409);
-      if(input.slot===0){state.map=cleanMap(input.map);state.mode=input.mode==='coop'?'coop':'pvp';state.difficulty=cleanDifficulty(input.difficulty) as Difficulty;state.bots=state.mode==='coop'?createBotsForRoom(state.map,cleanBotCount(input.botCount),state.difficulty,cleanBotWeapon(input.botWeapon)):[];state.teamScore={humans:0,bots:0};state.winnerTeam=null;state.lastBotTick=0;}
-      state.players[input.slot]=blankPlayer(input.token,cleanName(input.name),input.slot,state.map,cleanCharacter(input.character),cleanWeapon(input.weapon),cleanLoadout(input.loadout));await this.save(state);await this.scheduleAlarm(state);return json({slot:input.slot,map:state.map,mode:state.mode,botCount:state.bots.length,difficulty:state.difficulty});
+      if(input.slot===0){state.map=cleanMap(input.map);state.mode=input.mode==='coop'?'coop':input.mode==='duel'?'duel':'pvp';state.difficulty=cleanDifficulty(input.difficulty) as Difficulty;state.bots=state.mode==='coop'?createBotsForRoom(state.map,cleanBotCount(input.botCount),state.difficulty,cleanBotWeapon(input.botWeapon)):[];state.teamScore={humans:0,bots:0};state.winnerTeam=null;state.lastBotTick=0;}
+      state.players[input.slot]=blankPlayer(input.token,cleanName(input.name),input.slot,state.map,cleanCharacter(input.character),cleanWeapon(input.weapon),cleanLoadout(input.loadout),state.mode==='duel'?DUEL_HITS:100);await this.save(state);await this.scheduleAlarm(state);return json({slot:input.slot,map:state.map,mode:state.mode,botCount:state.bots.length,difficulty:state.difficulty});
     }
     if(url.pathname==='/room'&&request.headers.get('upgrade')==='websocket'){
       const token=url.searchParams.get('token')||'',state=await this.load(),player=state.players.find(p=>p?.token===token);

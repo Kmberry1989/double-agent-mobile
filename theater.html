@@ -8,9 +8,9 @@
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#120a08;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
   canvas{display:block}
-  #overlay,#win{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
+  #overlay,#win,#fail{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,3,.88);z-index:10;text-align:center;padding:20px}
   .padControls{font-size:13px;line-height:1.6;opacity:.8;margin:14px 0 0;max-width:520px}
-  #win{display:none}
+  #win,#fail{display:none}
   button{font-size:18px;padding:12px 22px;border-radius:10px;border:0;background:#c9a227;color:#111;font-weight:700;cursor:pointer;margin-top:14px}
   a{color:#ffd97a}
   .levels{position:fixed;top:10px;right:10px;z-index:11;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:46vw}
@@ -18,6 +18,10 @@
   .levels a.cur{opacity:.45;pointer-events:none}
   #mission{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5;max-width:min(480px,92vw)}
   #mission b{color:#ffd97a}
+  #duelHud{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5;max-width:min(480px,92vw);display:none}
+  #duelHud b{color:#ffd97a}
+  #duelHud .pips{letter-spacing:2px;font-size:16px}
+  #duelStatus{min-height:20px;color:#bfcbda;font-size:13px}
   #meterWrap{width:120px;height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:6px;overflow:hidden}
   #meterFill{height:100%;width:0%;background:#c9a227;border-radius:3px;transition:width .2s}
   #dmgFlash{position:fixed;inset:0;background:rgba(192,57,43,.35);z-index:8;pointer-events:none;opacity:0;transition:opacity .35s}
@@ -46,17 +50,37 @@
 <body>
 <nav class="levels"><a href="menu.html">Main Menu</a><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html" class="cur" aria-current="page">Theater</a><a href="halloween.html">Halloween</a><a href="mall.html">Mall</a><a href="deathmatch.html">Deathmatch</a><a href="stage-editor.html">Stage Editor</a></nav>
 <div id="mission"><b>Enemies:</b> <span id="enemyCount">0 / 8</span><div id="meterWrap"><div id="meterFill"></div></div></div>
+<div id="duelHud"><b>Katana Duel</b> · first to 3 hits<div class="pips"><span id="duelPips">○○○ — ○○○</span></div><div id="duelStatus"></div></div>
 <div id="dmgFlash"></div>
 <div id="joy"><div id="knob"></div></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>The Theater</h1><button id="startBtn">Enter the theater</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / Square / R1 / L1 Attack</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
+<div id="fail"><h1>Defeat</h1><p id="failText"></p><button onclick="location.reload()">Play again</button></div>
 <script type="module">
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { createGamepad, GP } from './assets/js/gamepad.js';
+import { DeathmatchClient } from './assets/js/deathmatch-client.js';
+import { DEATHMATCH_RELAY_URL } from './assets/js/deathmatch-config.js';
+import { createBot, updateBot, cleanBotCount, cleanDifficulty } from './assets/js/dm-bot-brain.js';
+// Katana Duel mode (?mode=katana-duel over the relay, ?mode=solo-duel
+// vs a bot, local). The theater is Rochelle's sword arena — the duel
+// wires it the way mall.html wired deathmatch: the duel HUD, the relay
+// client, the mission content (8 enemies, the story) hidden, and the
+// duel ending in a VICTORY/DEFEAT screen. Single-player theater is
+// untouched — all duel code is gated behind duelAnyMode.
+const duelParams = new URLSearchParams(location.search);
+const duelMode = duelParams.get('mode') === 'katana-duel';
+const soloDuelMode = duelParams.get('mode') === 'solo-duel';
+const duelAnyMode = duelMode || soloDuelMode;
+const DUEL_HITS = 3, DUEL_LOCK_RANGE = 15; // 3 hits wins (theater's ENEMY_HITS_TO_KILL); duel lock-on reaches across the stage (spawns are ~12.6 m apart)
+const DUEL_SPAWNS = [{ x: -6, z: 2, yaw: -1.25 }, { x: 6, z: -2, yaw: 1.89 }]; // stage, facing each other (mirrors the worker's MAPS.theater.spawns)
+const DUEL_CHARACTER_ROSTER = new Set(['Agent_Kyle.fbx','Kyle_undercover.fbx','Kyle_combat.fbx','Kyle_tux.glb','Rochelle_undercover.fbx','Rochelle_combat.fbx','Rochelle_gown.glb','Rochelle_undercover_textured.glb','Donald.fbx','Donald_tux.fbx','Eric.fbx','Eric_tux.glb','Kristen.fbx','Kristen_gown.glb','Vickie.fbx','Vickie_gown.glb','enemy-terror1.fbx','enemy-terror2.fbx','enemy-terror3.fbx','enemy-terror4.fbx','enemy-terror5.fbx','enemy-elf.fbx','enemy-frankenstein.fbx','enemy-ghost.fbx','enemy-lights.fbx','enemy-pumpkin.fbx','enemy-reindeer.fbx','enemy-santa.fbx','enemy-skeleton.fbx','enemy-witch.fbx','enemy-xmassweater.fbx','trickortreat-frankenstein.fbx','trickortreater-ghost.fbx','trickortreater-hero.fbx','trickortreater-mummy.fbx','trickortreater-pirate.fbx','trickortreater-pumpkin.fbx','trickortreater-vampire.fbx','trickortreater-werewolf.fbx','trickortreater-witch.fbx','trickortreater_princess.fbx','trickortreaterskeleton.fbx','shopper1.fbx','shopper2.fbx','shopper3.fbx','shopper4.fbx','shopper5.fbx','shopper6.fbx','shopper7.fbx']);
+function duelCharacter(){ return duelAnyMode && DUEL_CHARACTER_ROSTER.has(duelParams.get('character')||'') ? duelParams.get('character') : 'Rochelle_combat.fbx'; }
+const duelBotDifficulty = cleanDifficulty(duelParams.get('difficulty'));
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
@@ -793,15 +817,21 @@ const player = new THREE.Group(); player.position.set(0, STAGE_TOP + CHAR_LIFT, 
 let playerModel = null, mixer = null;
 const mxClips = {};
 function playMxCharClip(char, key) {
-  if (!char.mixer || !mxClips[key]) return;
-  const act = char.mixer.clipAction(mxClips[key]);
+  if (!char.mixer) return;
+  // The player may be a Tripo shopper in a duel — their clips are
+  // converted (playerClip); any other char uses the shared clip.
+  const clip = char === player ? playerClip(key) : mxClips[key];
+  if (!clip) return;
+  const act = char.mixer.clipAction(clip);
   if (char._cur === act && act.isRunning()) return;
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset().fadeIn(0.15).play(); char._cur = act;
 }
 function playMxCharClipOnce(char, key) {
-  if (!char.mixer || !mxClips[key]) return;
-  const act = char.mixer.clipAction(mxClips[key]);
+  if (!char.mixer) return;
+  const clip = char === player ? playerClip(key) : mxClips[key];
+  if (!clip) return;
+  const act = char.mixer.clipAction(clip);
   if (char._cur === act) return;
   if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
   act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); char._cur = act;
@@ -961,17 +991,25 @@ function fitWeapon(obj) {
   if (!longest || longest <= 0) return false;
   return true;
 }
-function attachKatana(side) {
-  if (!playerModel) return;
+// Katana attach, generalized so the duel opponent and the solo bot get
+// the same pair: the katana is loaded once per hand, fitted to the
+// hand bone of the given model, and the baked KATANA_OFFSETS are applied
+// (they apply to every character). handAxesFor is that model's measured
+// hand axes ({R, L}); when null the default finger/dorsal directions
+// are used. onDone(ok) reports whether the hand bone was found — a
+// model with no hand bone cannot carry a katana, and the caller falls
+// back to Rochelle_combat (see loadDuelRemoteCharacter).
+function attachKatanaTo(model, side, handAxesFor, onDone) {
+  if (!model) { if (onDone) onDone(false); return; }
   const forLeft = side === 'L';
   gltfLoader.load('assets/weapons/katana.glb', (gltf) => {
     const pivot = new THREE.Group(); pivot.add(gltf.scene);
-    if (!fitWeapon(gltf.scene)) return;
+    if (!fitWeapon(gltf.scene)) { if (onDone) onDone(false); return; }
     scene.add(pivot);
-    const hand = findHandBone(playerModel, side);
-    if (!hand) { pivot.removeFromParent(); return; }
+    const hand = findHandBone(model, side);
+    if (!hand) { pivot.removeFromParent(); if (onDone) onDone(false); return; }
     try {
-      playerModel.updateMatrixWorld(true); pivot.updateMatrixWorld(true);
+      model.updateMatrixWorld(true); pivot.updateMatrixWorld(true);
       const box3 = new THREE.Box3().setFromObject(gltf.scene);
       const size = new THREE.Vector3(); box3.getSize(size);
       let meshNode = null;
@@ -984,7 +1022,7 @@ function attachKatana(side) {
       const slideTop = new THREE.Vector3(0, 1, 0);
       const e1 = muzzleDir.clone(), e2 = slideTop.clone();
       const e3 = new THREE.Vector3().crossVectors(e1, e2).normalize();
-      const axesH = forLeft ? (handAxes.L || { finger: LEFT_FINGER_DIR, dorsal: LEFT_DORSAL_DIR }) : (handAxes.R || { finger: FINGER_DIR, dorsal: DORSAL_DIR });
+      const axesH = forLeft ? ((handAxesFor && handAxesFor.L) || { finger: LEFT_FINGER_DIR, dorsal: LEFT_DORSAL_DIR }) : ((handAxesFor && handAxesFor.R) || { finger: FINGER_DIR, dorsal: DORSAL_DIR });
       const f1 = axesH.finger.clone(), f2 = axesH.dorsal.clone();
       const f3 = new THREE.Vector3().crossVectors(f1, f2).normalize();
       const R = new THREE.Matrix4().multiplyMatrices(
@@ -1005,31 +1043,420 @@ function attachKatana(side) {
         THREE.MathUtils.degToRad(o.rx), THREE.MathUtils.degToRad(o.ry), THREE.MathUtils.degToRad(o.rz)));
       pivot.quaternion.copy(pivot.userData.baseQuat).multiply(off);
       pivot.scale.set(pivot.userData.baseScale.x * o.s, pivot.userData.baseScale.y * o.s, pivot.userData.baseScale.z * o.s);
-    } catch (e) { pivot.removeFromParent(); }
-  }, undefined, () => {});
+      if (onDone) onDone(true);
+    } catch (e) { pivot.removeFromParent(); if (onDone) onDone(false); }
+  }, undefined, () => { if (onDone) onDone(false); });
+}
+function attachKatana(side) {
+  attachKatanaTo(playerModel, side, handAxes);
 }
 
-fbxLoader.load('assets/characters/Rochelle_combat.fbx', (obj) => {
-  // Measured in Three.js (Node/FBXLoader): bbox 0.920 x 1.000 x 0.226 m,
-  // height 1.000 m, so fitCharacter(obj, 1.8) scales her to 1.8 m — the
-  // same as Rochelle_undercover. Facing: both feet point +Z (toe minus
-  // foot is +Z on both sides), so she faces +Z like undercover did, and
-  // the player turn stays PI. Hand bones are Index + Thumb only (no
-  // Middle/Ring/Pinky) — measureHandAxes handles that (finger = index
-  // direction, dorsal = cross(finger, thumb)), same as the viewer.
-  fitCharacter(obj, 1.8);
-  obj.rotation.y = Math.PI;
-  applyPBR(obj, ROCHELLE_COMBAT_PBR);
-  player.add(obj); playerModel = obj;
-  mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
-  handAxes = { R: measureHandAxes(obj, 'R'), L: measureHandAxes(obj, 'L') };
-  attachKatana('R'); attachKatana('L');
-}, undefined, () => {
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
-  body.position.y = 1.0; player.add(body);
+// The player character: single-player is always Rochelle_combat; a
+// duel loads the lobby's pick (duelCharacter, default Rochelle_combat).
+// .fbx or .glb, fitted to 1.8 m. The PBR set is Rochelle_combat's only
+// — any other character keeps its own materials. A shopper pick is a
+// Tripo skeleton (Z-up), so its clips are converted (see playerClip).
+// If the pick fails to load, fall back to Rochelle_combat, then to the
+// capsule body.
+let playerIsTripo = false;
+const playerTripoClips = {};
+function playerClip(key) {
+  if (!playerIsTripo || !playerModel || !mxClips[key]) return mxClips[key];
+  return playerTripoClips[key] || (playerTripoClips[key] = convertClipForTripo(mxClips[key], playerModel));
+}
+function loadPlayerCharacter(file, isFallback) {
+  const f = DUEL_CHARACTER_ROSTER.has(file || '') ? file : 'Rochelle_combat.fbx';
+  const isGlb = f.toLowerCase().endsWith('.glb');
+  const onLoad = (obj) => {
+    // Measured in Three.js (Node/FBXLoader): Rochelle_combat bbox
+    // 0.920 x 1.000 x 0.226 m, height 1.000 m, so fitCharacter(obj, 1.8)
+    // scales her to 1.8 m. Facing: both feet point +Z (toe minus foot
+    // is +Z on both sides), so she faces +Z like undercover did, and
+    // the player turn stays PI. Hand bones are Index + Thumb only (no
+    // Middle/Ring/Pinky) — measureHandAxes handles that (finger = index
+    // direction, dorsal = cross(finger, thumb)), same as the viewer.
+    fitCharacter(obj, 1.8);
+    obj.rotation.y = Math.PI;
+    if (f === 'Rochelle_combat.fbx') applyPBR(obj, ROCHELLE_COMBAT_PBR);
+    player.add(obj); playerModel = obj;
+    mixer = new THREE.AnimationMixer(obj); player.mixer = mixer; player._cur = null;
+    playerIsTripo = f.indexOf('shopper') === 0;
+    handAxes = { R: measureHandAxes(obj, 'R'), L: measureHandAxes(obj, 'L') };
+    attachKatana('R'); attachKatana('L');
+  };
+  const onError = () => {
+    if (!isFallback) { loadPlayerCharacter('Rochelle_combat.fbx', true); return; }
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+    body.position.y = 1.0; player.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
+    head.position.y = 1.95; player.add(head); playerModel = body;
+  };
+  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf) => onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+}
+loadPlayerCharacter(duelCharacter());
+
+// ---------- Katana Duel (1v1 over the relay, solo vs a bot) ----------
+// The duel is a single fight to 3 hits on the Theater stage. Both
+// duelists fight with Rochelle's dual katanas (the baked offsets — they
+// apply to every character). The relay is the authority on hits in 1v1
+// (Katana: melee, 2.5 m, 1 damage); solo runs locally with the shared
+// bot brain. Single-player theater is untouched — everything here is
+// gated behind duelAnyMode.
+function playDuelCharClip(char, key) {
+  if (!char.mixer || !mxClips[key]) return;
+  const clip = char.isTripo
+    ? (char._tripoClips[key] || (char._tripoClips[key] = convertClipForTripo(mxClips[key], char.model)))
+    : mxClips[key];
+  const act = char.mixer.clipAction(clip);
+  if (char._cur === act && act.isRunning()) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset().fadeIn(0.15).play(); char._cur = act;
+}
+function playDuelCharClipOnce(char, key) {
+  if (!char.mixer || !mxClips[key]) return;
+  const clip = char.isTripo
+    ? (char._tripoClips[key] || (char._tripoClips[key] = convertClipForTripo(mxClips[key], char.model)))
+    : mxClips[key];
+  const act = char.mixer.clipAction(clip);
+  if (char._cur === act) return;
+  if (char._cur && char._cur !== act) char._cur.fadeOut(0.15);
+  act.reset(); act.setLoop(THREE.LoopOnce, 1); act.clampWhenFinished = true; act.fadeIn(0.15).play(); char._cur = act;
+}
+// The 1v1 opponent: their picked character, rendered on the stage,
+// katanas attached. A capsule + head stand in until the model loads
+// (or if the file fails to load entirely).
+const duelRemote = new THREE.Group();
+const duelRemoteBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0xc83e43 }));
+duelRemoteBody.position.y = 1.0; duelRemote.add(duelRemoteBody);
+const duelRemoteHead = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
+duelRemoteHead.position.y = 1.95; duelRemote.add(duelRemoteHead);
+duelRemote.visible = false; scene.add(duelRemote);
+let duelRemoteCharFile = null, duelRemoteMixer = null, duelRemoteModel = null, duelRemoteLastPos = null, duelRemoteSlashUntil = 0;
+const duelRemoteChar = { mixer: null, model: null, isTripo: false, _cur: null, _tripoClips: {} };
+function loadDuelRemoteCharacter(file, isFallback) {
+  const f = DUEL_CHARACTER_ROSTER.has(file || '') ? file : 'Rochelle_combat.fbx';
+  if (f === duelRemoteCharFile) return;
+  duelRemoteCharFile = f;
+  if (duelRemoteModel) { duelRemote.remove(duelRemoteModel); duelRemoteModel = null; }
+  if (duelRemoteMixer) { duelRemoteMixer.stopAllAction(); duelRemoteMixer = null; }
+  duelRemoteChar._cur = null; duelRemoteChar._tripoClips = {};
+  const isGlb = f.toLowerCase().endsWith('.glb');
+  const onLoad = (obj) => {
+    // No hand bones, no katana: fall back to Rochelle_combat (whose
+    // hands carry the pair) rather than leaving the opponent weaponless.
+    // The baked offsets apply to every character, so the pair lands the
+    // same way on the fallback as on the pick.
+    if ((!findHandBone(obj, 'R') || !findHandBone(obj, 'L')) && f !== 'Rochelle_combat.fbx' && !isFallback) {
+      loadDuelRemoteCharacter('Rochelle_combat.fbx', true);
+      return;
+    }
+    fitCharacter(obj, 1.8);
+    obj.rotation.y = Math.PI;
+    duelRemoteModel = obj; duelRemote.add(obj);
+    duelRemoteBody.visible = false; duelRemoteHead.visible = false;
+    duelRemoteChar.model = obj; duelRemoteChar.isTripo = f.indexOf('shopper') === 0;
+    duelRemoteChar.mixer = new THREE.AnimationMixer(obj); duelRemoteMixer = duelRemoteChar.mixer;
+    playDuelCharClip(duelRemoteChar, 'idle');
+    const axes = { R: measureHandAxes(obj, 'R'), L: measureHandAxes(obj, 'L') };
+    attachKatanaTo(obj, 'R', axes);
+    attachKatanaTo(obj, 'L', axes);
+  };
+  const onError = () => {
+    if (!isFallback) { loadDuelRemoteCharacter('Rochelle_combat.fbx', true); return; }
+    duelRemoteBody.visible = true; duelRemoteHead.visible = true;
+  };
+  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf) => onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+}
+function updateDuelRemoteAnim(dt) {
+  if (!duelRemoteMixer) return;
+  duelRemoteMixer.update(dt);
+  if (!duelRemote.visible) return;
+  // A slash on the opponent overrides idle/walk briefly.
+  if (performance.now() < duelRemoteSlashUntil) return;
+  const moved = duelRemoteLastPos ? duelRemote.position.distanceTo(duelRemoteLastPos) > 0.02 : false;
+  duelRemoteLastPos = duelRemote.position.clone();
+  playDuelCharClip(duelRemoteChar, moved ? 'walk' : 'idle');
+}
+// The solo duel bot: always BOT 1, Rochelle_combat with katanas, driven
+// by the shared bot brain (Katana: closes to 2.5 m and swings).
+let duelBotEnt = null;
+function loadDuelBotCharacter(ent, file) {
+  const f = DUEL_CHARACTER_ROSTER.has(file || '') ? file : 'Rochelle_combat.fbx';
+  ent.charFile = f;
+  const isGlb = f.toLowerCase().endsWith('.glb');
+  const onLoad = (obj) => {
+    fitCharacter(obj, 1.8);
+    obj.rotation.y = Math.PI;
+    ent.model = obj; ent.group.add(obj);
+    ent.body.visible = false; ent.head.visible = false;
+    ent.char.model = obj; ent.char.isTripo = f.indexOf('shopper') === 0;
+    ent.char.mixer = new THREE.AnimationMixer(obj);
+    playDuelCharClip(ent.char, 'idle');
+    const axes = { R: measureHandAxes(obj, 'R'), L: measureHandAxes(obj, 'L') };
+    attachKatanaTo(obj, 'R', axes);
+    attachKatanaTo(obj, 'L', axes);
+  };
+  const onError = () => { ent.body.visible = true; ent.head.visible = true; };
+  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf) => onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+}
+function makeDuelBotEnt(bot) {
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0xc83e43 }));
+  body.position.y = 1.0; group.add(body);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
-  head.position.y = 1.95; player.add(head); playerModel = body;
-});
+  head.position.y = 1.95; group.add(head);
+  group.position.set(bot.x, groundHeight(bot.x, bot.z) + CHAR_LIFT, bot.z);
+  group.rotation.y = bot.yaw;
+  scene.add(group);
+  const ent = { bot, group, body, head, model: null, char: { mixer: null, model: null, isTripo: false, _cur: null, _tripoClips: {} }, charFile: null, lastPos: null, slashUntil: 0 };
+  loadDuelBotCharacter(ent, bot.character);
+  return ent;
+}
+function spawnDuelBot() {
+  if (duelBotEnt) return;
+  const sp = DUEL_SPAWNS[1];
+  const bot = createBot({ id: 'bot-1', name: 'BOT 1', character: 'Rochelle_combat.fbx', weapon: 'Katana', loadout: 'black', difficulty: duelBotDifficulty, x: sp.x, z: sp.z, yaw: sp.yaw, waypoints: [[-8, -3], [8, -3], [8, 3], [-8, 3]] });
+  bot.health = DUEL_HITS; // a duel is 3 hits, not 100 hp
+  duelBotEnt = makeDuelBotEnt(bot);
+  duelStarted = true;
+  updateDuelHud();
+}
+function duelBotCanMove(x, z) {
+  if (Math.abs(x) > 13 || z < -9 || z > 29) return false;
+  for (const c of colliders) {
+    if (Math.hypot(x - c.x, z - c.z) < c.r + 0.5) return false;
+  }
+  return true;
+}
+// Duel state (1v1 relay + solo).
+let duelClient = null, duelSlot = -1, duelPlayers = [null, null], duelStarted = false, duelFinished = false, duelLastSent = 0, duelLastSwing = 0;
+let duelPrevHealthMe = DUEL_HITS, duelPrevHealthOp = DUEL_HITS, duelPlayerHitsTaken = 0, duelEndShown = false;
+function duelPips(hits) { return '●'.repeat(hits) + '○'.repeat(Math.max(0, DUEL_HITS - hits)); }
+function updateDuelHud() {
+  const el = document.getElementById('duelPips');
+  if (!el) return;
+  let myHits = 0, opHits = 0;
+  if (duelMode) {
+    const me = duelPlayers[duelSlot], op = duelPlayers[1 - duelSlot];
+    if (me) opHits = DUEL_HITS - me.health; // hits I have taken
+    if (op) myHits = DUEL_HITS - op.health; // hits I have landed
+  } else if (soloDuelMode) {
+    myHits = duelBotEnt ? DUEL_HITS - duelBotEnt.bot.health : 0;
+    opHits = duelPlayerHitsTaken;
+  }
+  el.textContent = duelPips(myHits) + ' — ' + duelPips(opHits);
+}
+// The duel target's ground position (opponent in 1v1, bot in solo) —
+// the lock-on, the dash and the hit check all aim at it.
+function duelTargetPos() {
+  if (!duelStarted || duelFinished) return null;
+  if (duelMode) {
+    if (!duelRemote.visible) return null;
+    return { x: duelRemote.position.x, z: duelRemote.position.z };
+  }
+  if (soloDuelMode) {
+    if (!duelBotEnt || duelBotEnt.bot.dead) return null;
+    return { x: duelBotEnt.group.position.x, z: duelBotEnt.group.position.z };
+  }
+  return null;
+}
+function duelLockTarget() { return duelTargetPos(); }
+// A katana hit check against the duel target (range + front arc, the
+// theater's STRIKE_RANGE / dash ranges). In a solo duel this is the
+// authority: it damages the bot and draws blood. In a 1v1 it only
+// decides the local feedback (combo + sound) — the relay is the
+// authority on damage, and its ShotEvent draws the blood.
+function duelHitCheck(range, dot) {
+  const t = duelTargetPos();
+  if (!t) return 0;
+  // The relay resolves a katana swing at 2.5 m and a 45° front arc
+  // (dot 0.707) — the local check matches it, so a local hit is a
+  // relay hit and the combo/sound never lie.
+  const r = Math.min(range, 2.5), arc = Math.max(dot, 0.707);
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const dx = t.x - player.position.x, dz = t.z - player.position.z;
+  const d = Math.hypot(dx, dz);
+  if (d > r) return 0;
+  if ((dx * fx + dz * fz) / (d || 1) <= arc) return 0;
+  if (soloDuelMode) duelBotDamage(1);
+  return 1;
+}
+function duelBotDamage(n) {
+  const ent = duelBotEnt;
+  if (!ent || !ent.bot || ent.bot.dead) return;
+  ent.bot.health = Math.max(0, ent.bot.health - n);
+  spawnBlood(ent.group.position.x, ent.group.position.y + 1.4, ent.group.position.z);
+  playDuelCharClipOnce(ent.char, 'hitReact');
+  updateDuelHud();
+  if (ent.bot.health <= 0) {
+    ent.bot.dead = true;
+    if (ent.model) ent.model.rotation.x = Math.PI / 2; // tip over
+    showDuelEnd(true, 'Three hits — the duel is yours.');
+  }
+}
+// Send a katana swing to the relay (1v1). The relay resolves it (melee,
+// 2.5 m, front arc) and broadcasts the ShotEvent. Rate-limited to the
+// katana's 490 ms, mirroring the relay's gate.
+function duelSendSwing() {
+  if (!duelMode || !duelClient || !duelStarted || duelFinished) return;
+  const now = performance.now();
+  if (now - duelLastSwing < 490) return;
+  duelLastSwing = now;
+  duelClient.send('shoot', { weapon: 'Katana' });
+}
+// The relay's resolved katana swings: the opponent's swing plays a
+// slash on their model, and a hit draws blood on the victim.
+function renderDuelShotEvent(ev) {
+  if (!ev || ev.type !== 'shot' || ev.weapon !== 'Katana') return;
+  const isMine = ev.slot === duelSlot;
+  if (!isMine) {
+    const key = CLOSE_CYCLE[Math.floor(Math.random() * CLOSE_CYCLE.length)];
+    playDuelCharClipOnce(duelRemoteChar, key);
+    duelRemoteSlashUntil = performance.now() + (mxClips[key] ? mxClips[key].duration * 1000 : 600);
+  }
+  if (ev.hit && ev.point) {
+    spawnBlood(ev.point.x, ev.point.y, ev.point.z);
+    // The opponent's swing hitting me: the relay's event is the only
+    // sound. My own swing's sound comes from the local onConnect, so
+    // a relay sound here would double it.
+    if (!isMine) playSlashHit();
+  }
+}
+function showDuelEnd(won, text) {
+  if (duelEndShown) return;
+  duelEndShown = true; duelFinished = true;
+  if (document.pointerLockElement) document.exitPointerLock();
+  duelClient?.close();
+  if (won) {
+    document.querySelector('#win h1').textContent = 'VICTORY';
+    document.getElementById('winText').textContent = text;
+    document.getElementById('win').style.display = 'flex';
+  } else {
+    document.querySelector('#fail h1').textContent = 'DEFEAT';
+    document.getElementById('failText').textContent = text;
+    document.getElementById('fail').style.display = 'flex';
+  }
+  document.getElementById('overlay').style.display = 'none';
+}
+function applyDuelState(message) {
+  if (message.type === 'welcome') {
+    duelSlot = message.slot;
+    const sp = DUEL_SPAWNS[duelSlot] || DUEL_SPAWNS[0];
+    player.position.set(sp.x, groundHeight(sp.x, sp.z) + CHAR_LIFT, sp.z);
+    yaw = sp.yaw; player.rotation.y = yaw;
+    const code = duelParams.get('code') || '------';
+    document.getElementById('duelStatus').textContent = 'ROOM ' + code + ' · first to 3 hits';
+    return;
+  }
+  if (message.type !== 'state') return;
+  duelPlayers = message.players || [null, null];
+  duelStarted = !!message.started;
+  duelFinished = !!message.finished;
+  const me = duelPlayers[duelSlot], op = duelPlayers[1 - duelSlot];
+  if (me) {
+    player.position.x = me.x; player.position.z = me.z;
+    if (!dash) player.position.y = groundHeight(me.x, me.z) + CHAR_LIFT;
+    yaw = me.yaw; player.rotation.y = yaw;
+  }
+  if (op) {
+    duelRemote.visible = true;
+    duelRemote.position.set(op.x, groundHeight(op.x, op.z) + CHAR_LIFT, op.z);
+    duelRemote.rotation.y = op.yaw;
+    loadDuelRemoteCharacter(op.character);
+  } else duelRemote.visible = false;
+  for (const ev of message.events || []) renderDuelShotEvent(ev);
+  // Health deltas: a hit whose ShotEvent was already consumed still
+  // draws blood once (the duel has no other damage source).
+  if (me && me.health < duelPrevHealthMe) {
+    spawnBlood(player.position.x, player.position.y + 1.4, player.position.z);
+  }
+  if (op && op.health < duelPrevHealthOp) {
+    spawnBlood(duelRemote.position.x, duelRemote.position.y + 1.4, duelRemote.position.z);
+  }
+  if (me) duelPrevHealthMe = me.health;
+  if (op) duelPrevHealthOp = op.health;
+  updateDuelHud();
+  const status = document.getElementById('duelStatus');
+  if (message.paused) status.textContent = 'Match paused · reconnect window 30 seconds';
+  else if (!op) status.textContent = 'Waiting for opponent to join';
+  else if (!message.started) status.textContent = 'Opponent connected · duel starting';
+  else status.textContent = 'First to 3 hits';
+  if (duelFinished) {
+    document.exitPointerLock?.(); duelClient?.close();
+    const expired = message.reason === 'expired';
+    const wonMatch = message.winner === duelSlot;
+    if (wonMatch) showDuelEnd(true, expired ? 'This private room expired after two hours.' : 'Three hits — the duel is yours.');
+    else showDuelEnd(false, expired ? 'This private room expired after two hours.' : message.reason === 'forfeit' ? 'Your reconnect window expired; the duel was forfeited.' : 'The other duelist landed three hits.');
+  }
+}
+// The solo bot's brain tick: it closes to katana range and swings. A
+// hit lands 1 of the 3 on the player; a miss still swings (the slash
+// clip plays, no damage). Three hits on the player ends the duel.
+function updateDuelBot(dt) {
+  const ent = duelBotEnt;
+  if (!ent || !ent.bot || !started || duelFinished || ent.bot.dead) return;
+  const events = updateBot(ent.bot, {
+    now: performance.now(),
+    dt,
+    targets: [{ id: 'player', x: player.position.x, z: player.position.z, alive: !duelFinished }],
+    bounds: { x: 13, z: 29 },
+    canMove: duelBotCanMove,
+    hasLOS: () => true,
+  }, dt);
+  ent.group.position.set(ent.bot.x, groundHeight(ent.bot.x, ent.bot.z) + CHAR_LIFT, ent.bot.z);
+  ent.group.rotation.y = ent.bot.yaw;
+  if (ent.char.mixer) ent.char.mixer.update(dt);
+  const moved = ent.lastPos ? ent.group.position.distanceTo(ent.lastPos) > 0.02 : false;
+  ent.lastPos = ent.group.position.clone();
+  if (performance.now() >= (ent.slashUntil || 0)) playDuelCharClip(ent.char, moved ? 'walk' : 'idle');
+  for (const ev of events) {
+    if (ev.type !== 'shoot') continue;
+    const key = CLOSE_CYCLE[Math.floor(Math.random() * CLOSE_CYCLE.length)];
+    playDuelCharClipOnce(ent.char, key);
+    ent.slashUntil = performance.now() + (mxClips[key] ? mxClips[key].duration * 1000 : 600);
+    if (!ev.hit) continue;
+    duelPlayerHitsTaken++;
+    spawnBlood(player.position.x, player.position.y + 1.4, player.position.z);
+    playSlashHit();
+    const flash = document.getElementById('dmgFlash');
+    if (flash) {
+      flash.style.transition = 'none'; flash.style.opacity = '1';
+      requestAnimationFrame(() => { flash.style.transition = 'opacity .35s'; flash.style.opacity = '0'; });
+    }
+    updateDuelHud();
+    if (duelPlayerHitsTaken >= DUEL_HITS) showDuelEnd(false, 'BOT 1 landed three hits.');
+  }
+}
+// Hide the single-player mission content for a duel: the 8 enemies
+// (their meshes start invisible; the state stops the updateEnemies
+// watchdog from spawning one) and the mission HUD (enemy counter +
+// meter). The stage dressing (sandbags, chandelier, flats, drape,
+// crates, spotlights, footlights) stays — it is the arena's scenery,
+// and the duel hit check never triggers it.
+function hideMissionForDuel() {
+  for (const e of enemies) {
+    if (e.mesh) e.mesh.visible = false;
+    e.state = 'hidden';
+  }
+  const mission = document.getElementById('mission');
+  if (mission) mission.style.display = 'none';
+}
+// Per-frame duel work: the opponent's animation, the solo bot's brain,
+// and the 1v1 move packets (20 Hz, like the mall — the relay echoes
+// the position back, and applyDuelState sets the player from it).
+function updateDuelFrame(dt) {
+  if (duelMode) {
+    updateDuelRemoteAnim(dt);
+    if (started && !duelFinished && performance.now() - duelLastSent > 50) {
+      duelLastSent = performance.now();
+      duelClient?.send('move', { x: player.position.x, z: player.position.z, yaw });
+    }
+  }
+  if (soloDuelMode) updateDuelBot(dt);
+}
 
 // ---- Enemies (all 3D masked enemies, data-driven roster) ----
 // 8 slots, all real 3D masquerade characters (Mixamo-rigged GLBs), each
@@ -1750,6 +2177,15 @@ const CLOSE_CYCLE = ['atkQuick', 'atkQuickL', 'atkRise', 'atkRiseL', 'atkSlashL'
 const DASH_CYCLE = ['atkLunge', 'atkLungeL', 'atkThrust', 'atkThrustL'];
 let slashCooldown = 0, slashTimer = 0;
 function nearestLockTarget() {
+  // Duel: the other duelist is the only lock-on. The duel lock range
+  // (15 m) reaches across the stage, so the players can lunge from
+  // their spawn distance instead of walking in first.
+  if (duelAnyMode) {
+    const t = duelTargetPos();
+    if (!t) return null;
+    const d = Math.hypot(t.x - player.position.x, t.z - player.position.z);
+    return d < DUEL_LOCK_RANGE ? { x: t.x, z: t.z } : null;
+  }
   let best = null, bestD = LOCK_RANGE;
   for (const e of enemies) {
     if (!(e.state === 'walking' || e.state === 'chasing' || e.state === 'menacing' || e.state === 'attacking' || e.state === 'taunting')) continue;
@@ -1811,6 +2247,13 @@ function staggerEnemy(e) {
   if (e.is3D) playEnemyAnim(e, 'hitReact');
 }
 function hitCheck(range, dot) {
+  // Duel: the only target is the other duelist, and the props/enemies
+  // are hidden — the single-player hit logic must not run. The relay
+  // swing goes out with the slash in a 1v1; solo runs locally.
+  if (duelAnyMode) {
+    duelSendSwing();
+    return duelHitCheck(range, dot);
+  }
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   const inFront = (x, z) => {
     const dx = x - player.position.x, dz = z - player.position.z;
@@ -1851,7 +2294,9 @@ function onConnect(hits) {
     combo += hits; meter += hits;
     hitsTaken = 0; // she is fighting back — the knockdown count resets
     playSlashHit();
-    if (meter >= METER_HITS) { meter = 0; specialQueued = true; }
+    // No special in a duel: the meter is a single-player finisher, and
+    // a duel is decided by 3 katana hits alone.
+    if (meter >= METER_HITS) { meter = 0; if (!duelAnyMode) specialQueued = true; }
     updateMeter();
   } else {
     combo = 0; playSlashMiss(); updateMeter();
@@ -1859,7 +2304,7 @@ function onConnect(hits) {
 }
 function doChainAttack() {
   noteActivity(); // an attack ends any idle orbit
-  if (!started || won || knockedDown || cine || bowPhase) return;
+  if (!started || won || duelFinished || knockedDown || cine || bowPhase) return;
   if (slashCooldown > 0 || dash) return;
   // Katana draw: the unsheath plays once, before the first slash.
   if (!katanaDrawn) { katanaDrawn = true; playSfx(SFX_FILES.katanaUnsheath); }
@@ -2105,7 +2550,13 @@ function showWin() {
 document.getElementById('startBtn').onclick = () => {
   document.getElementById('overlay').style.display = 'none'; started = true;
   ensureAudio(); // unlock audio on the same gesture that starts the game
-  startCinematic();
+  // Duel: no cinematic — the fight starts on the stage. A solo duel
+  // spawns BOT 1 now; a 1v1 starts when the relay says both duelists
+  // are in (duelStarted). The duel HUD shows from here on.
+  if (duelAnyMode) {
+    if (soloDuelMode) spawnDuelBot();
+    document.getElementById('duelHud').style.display = 'flex';
+  } else startCinematic();
   if (!isTouch) renderer.domElement.requestPointerLock();
 };
 // ---- Input: one chain attack ----
@@ -2153,7 +2604,7 @@ function pollGamepad(dt) {
     const ov = document.getElementById('overlay');
     if (ov && getComputedStyle(ov).display !== 'none') { document.getElementById('startBtn').click(); return; }
   }
-  if (!started || won || cine || bowPhase) return;
+  if (!started || won || duelFinished || cine || bowPhase) return;
   // Right stick: camera look (same as pointer-lock mouse look).
   if (gp.rx || gp.ry) {
     yaw -= gp.rx * GP.LOOK_SPEED * dt;
@@ -2277,9 +2728,11 @@ function animate() {
   if (specialQueued && slashTimer <= 0 && !dash && started && !won && !knockedDown && !cine && !bowPhase) fireSpecial();
   updateCinematic(dt);
   if (bowPhase) updateBow(dt);
-  updateEnemies(dt, t);
-  updateDestructibles(dt);
+  // Duel: the mission enemies and props are hidden — they do not update
+  // (updateEnemies' watchdog would otherwise spawn an enemy mid-duel).
+  if (!duelAnyMode) { updateEnemies(dt, t); updateDestructibles(dt); }
   updateBloodFx(dt);
+  if (duelAnyMode) updateDuelFrame(dt);
   if (started && !won && !cine && !bowPhase) {
     // Knockdown recovery: while she is down the timer runs and the
     // fall clip plays; at RECOVER_TIME she gets back up and the fight
@@ -2357,6 +2810,31 @@ function animate() {
     camera.lookAt(0, 2, 0);
   }
   renderer.render(scene, camera);
+}
+// ---------- Katana Duel: init ----------
+// The overlay is rewritten for the duel, the mission content is hidden,
+// and the relay client connects (1v1) or the solo bot is armed. The
+// character/map/mode/loadout/weapon are set at room creation by the
+// lobby — the client joins by code + token + name, and the relay's
+// state message carries the opponent's character.
+if (duelAnyMode) {
+  document.querySelector('#overlay h1').textContent = 'Katana Duel';
+  document.getElementById('startBtn').textContent = 'Enter the duel';
+  const controls = document.querySelector('#overlay .padControls');
+  if (controls) controls.textContent = 'PS4 controller — Left stick move · Right stick look · X / Square / R1 / L1 Attack · First to 3 hits';
+  hideMissionForDuel();
+  if (duelMode) {
+    const code = duelParams.get('code'), token = duelParams.get('token');
+    const name = duelParams.get('name') || 'Player';
+    duelClient = new DeathmatchClient({
+      relayUrl: DEATHMATCH_RELAY_URL, code, token, name,
+      onMessage: applyDuelState,
+      onStatus: (text) => { const el = document.getElementById('duelStatus'); if (el) el.textContent = text; },
+    });
+  } else {
+    document.getElementById('duelStatus').textContent = 'BOT 1 · first to 3 hits';
+  }
+  updateDuelHud();
 }
 updateEnemyCount();
 if (new URLSearchParams(location.search).has('test')) {
