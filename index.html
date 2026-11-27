@@ -135,6 +135,17 @@ import { DEATHMATCH_RELAY_URL } from './assets/js/deathmatch-config.js';
 const dmParams = new URLSearchParams(location.search);
 const deathmatchMode = dmParams.get('mode') === 'deathmatch';
 let dmClient = null, dmSlot = -1, dmPlayers = [null,null], dmLastSent = 0, dmStarted = false, dmPaused = false, dmFinished = false;
+// Deathmatch character roster — every playable character file in
+// assets/characters/. The lobby passes ?character=<file>; only a file on
+// this list is loaded (anything else falls back to Agent_Kyle.fbx, so a
+// tampered URL cannot pull an arbitrary file).
+const DM_CHARACTER_ROSTER = new Set(['Agent_Kyle.fbx','Kyle_undercover.fbx','Kyle_combat.fbx','Kyle_tux.glb','Rochelle_undercover.fbx','Rochelle_combat.fbx','Rochelle_gown.glb','Rochelle_undercover_textured.glb','Donald.fbx','Donald_tux.fbx','Eric.fbx','Eric_tux.glb','Kristen.fbx','Kristen_gown.glb','Vickie.fbx','Vickie_gown.glb','enemy-terror1.fbx','enemy-terror2.fbx','enemy-terror3.fbx','enemy-terror4.fbx','enemy-terror5.fbx','enemy-elf.fbx','enemy-frankenstein.fbx','enemy-ghost.fbx','enemy-lights.fbx','enemy-pumpkin.fbx','enemy-reindeer.fbx','enemy-santa.fbx','enemy-skeleton.fbx','enemy-witch.fbx','enemy-xmassweater.fbx','trickortreat-frankenstein.fbx','trickortreater-ghost.fbx','trickortreater-hero.fbx','trickortreater-mummy.fbx','trickortreater-pirate.fbx','trickortreater-pumpkin.fbx','trickortreater-vampire.fbx','trickortreater-werewolf.fbx','trickortreater-witch.fbx','trickortreater_princess.fbx','trickortreaterskeleton.fbx','shopper1.fbx','shopper2.fbx','shopper3.fbx','shopper4.fbx','shopper5.fbx','shopper6.fbx','shopper7.fbx']);
+function dmCharacter(){ return deathmatchMode && DM_CHARACTER_ROSTER.has(dmParams.get('character')||'') ? dmParams.get('character') : 'Agent_Kyle.fbx'; }
+// Deathmatch spawns per map (mirror the relay's MAPS in workers/deathmatch).
+// The welcome handler places the player here; the relay's state broadcast
+// is authoritative afterwards.
+const DM_MAP_SPAWNS = { courtyard: [{x:-14,z:20,yaw:-0.61},{x:14,z:-20,yaw:2.53}], ballroom: [{x:-14,z:9,yaw:-0.61},{x:14,z:-9,yaw:2.53}], theater: [{x:-10,z:16,yaw:-0.61},{x:10,z:-16,yaw:2.53}], mall: [{x:-14,z:24,yaw:-0.61},{x:14,z:-24,yaw:2.53}] };
+function dmSpawn(){ const m = DM_MAP_SPAWNS[dmParams.get('map')] || DM_MAP_SPAWNS.courtyard; return m[dmSlot] || m[0]; }
 if(deathmatchMode){document.body.classList.add('deathmatch');document.title='Courtyard Deathmatch — Undercover: Double Agent';document.querySelector('#overlay h1').textContent='COURTYARD DEATHMATCH';document.getElementById('startBtn').textContent='Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · 1 Glock · 2 MP5K · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent='Two agents · private room · no guards, cameras or mission objectives · 30 second reconnect window';}
 
 // Human characters stand 5 cm off the floor (feet less likely to clip
@@ -1690,6 +1701,48 @@ const dmRemoteBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.48,1.15,4,8),new
 dmRemoteBody.position.y=1.05;dmRemote.add(dmRemoteBody);
 const dmRemoteHead = new THREE.Mesh(new THREE.SphereGeometry(.3,12,10),new THREE.MeshStandardMaterial({color:0xd8b08a}));
 dmRemoteHead.position.y=1.95;dmRemote.add(dmRemoteHead);dmRemote.visible=false;scene.add(dmRemote);
+// Deathmatch remote opponent: renders the opponent's picked character
+// (from the relay's broadcast state) instead of the red capsule. The
+// capsule stays as the fallback if the model fails to load. The shared
+// Mixamo idle/walk clips play on it when its bones match; a model whose
+// skeleton does not match stays in bind pose (still the right character).
+let dmRemoteCharFile = null, dmRemoteMixer = null, dmRemoteModel = null, dmRemoteCurClip = null, dmRemoteLastPos = null;
+const dmRemoteClips = {};
+function dmRemotePlay(action){
+  const clip = dmRemoteClips[action]; if (!clip || !dmRemoteMixer) return;
+  if (dmRemoteCurClip === action) return;
+  const prev = dmRemoteMixer._dmCur; if (prev) prev.fadeOut(0.15);
+  const a = dmRemoteMixer.clipAction(clip); a.reset().fadeIn(0.15).play();
+  dmRemoteMixer._dmCur = a; dmRemoteCurClip = action;
+}
+function loadDmRemoteCharacter(file){
+  const f = DM_CHARACTER_ROSTER.has(file||'') ? file : 'Agent_Kyle.fbx';
+  if (f === dmRemoteCharFile) return;
+  dmRemoteCharFile = f;
+  if (dmRemoteModel) { dmRemote.remove(dmRemoteModel); dmRemoteModel = null; }
+  if (dmRemoteMixer) { dmRemoteMixer.stopAllAction(); dmRemoteMixer = null; }
+  dmRemoteCurClip = null; dmRemoteClips.idle = null; dmRemoteClips.walk = null;
+  const isGlb = f.toLowerCase().endsWith('.glb');
+  const onLoad = (obj)=>{
+    if (!normalizeCharacter(obj, 2.2, Math.PI)) return;
+    dmRemoteModel = obj; dmRemote.add(obj);
+    dmRemoteBody.visible = false; dmRemoteHead.visible = false;
+    dmRemoteMixer = new THREE.AnimationMixer(obj);
+    loadClipFile('idle', obj).then((clip)=>{ if (clip) { dmRemoteClips.idle = clip; dmRemotePlay('idle'); } });
+    loadClipFile('walk', obj).then((clip)=>{ if (clip) dmRemoteClips.walk = clip; });
+  };
+  const onError = ()=>{ dmRemoteBody.visible = true; dmRemoteHead.visible = true; };
+  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf)=>onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+}
+function updateDmRemoteAnim(dt){
+  if (!dmRemoteMixer) return;
+  dmRemoteMixer.update(dt);
+  if (!dmRemote.visible) return;
+  const moved = dmRemoteLastPos ? dmRemote.position.distanceTo(dmRemoteLastPos) > 0.02 : false;
+  dmRemoteLastPos = dmRemote.position.clone();
+  dmRemotePlay(moved ? 'walk' : 'idle');
+}
 let yaw = -Math.PI/4, pitch = 0.12, vy = 0, grounded = true, crouching = false, aiming = false;
 // ---------- Movement stream (2026-11-14): lean / crawl / roll / sneak ----------
 // crawling = prone (third C stance); sneaking = quiet-mode flag (composes
@@ -1871,7 +1924,11 @@ function attachGuardWeapon(g){
   if (attachPivotToHand(g.enemyWeapon, hand, g.yaw)) console.info('[double-agent] guard weapon attached to hand bone:', hand.name);
 }
 function loadPlayerModel(file){
-  fbxLoader.load('assets/characters/' + file, (obj)=>{
+  // Deathmatch: the character is the lobby's pick (dmCharacter), .fbx or
+  // .glb. Single-player always loads Agent_Kyle.fbx. A failed pick falls
+  // back to Agent_Kyle.fbx, then Agent.fbx, then the procedural capsule.
+  const isGlb = file.toLowerCase().endsWith('.glb');
+  const onLoad = (obj)=>{
     if (!normalizeCharacter(obj, 2.2, Math.PI)) return;
     // Capsule stays visible until the idle clip is ready (initPlayerAnimation
     // hides it then), so there is no T-pose flash while clips preload.
@@ -1882,12 +1939,16 @@ function loadPlayerModel(file){
     else console.warn('[double-agent] player model has no right-hand bone — weapons stay on the group pivot');
     attachAccessories();
     console.info('[double-agent] Player model loaded:', file);
-  }, undefined, ()=>{
+  };
+  const onError = ()=>{
     if (file === 'Agent_Kyle.fbx') loadPlayerModel('Agent.fbx');
+    else if (file !== 'Agent.fbx') loadPlayerModel('Agent_Kyle.fbx');
     else console.info('[double-agent] No player model found (Agent_Kyle.fbx / Agent.fbx) — using procedural capsule for the player.');
-  });
+  };
+  if (isGlb) gltfLoader.load('assets/characters/' + file, (gltf)=>onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load('assets/characters/' + file, onLoad, undefined, onError);
 }
-loadPlayerModel('Agent_Kyle.fbx');
+loadPlayerModel(dmCharacter());
 let playerLoadout = 'black'; // 'white' | 'black' — two distinct player sets.
 // Default is 'black' (2026-11-22, Kyle): the player begins the courtyard
 // with a suppressed pistol equipped — the black Glock (threaded barrel)
@@ -4275,6 +4336,7 @@ function animate(){
   // Advance real FBX playback (player + experimental guards are updated
   // in their own mixers; player mixer runs even on the menu so idle plays).
   if (playerMixer && fbxPlaying){ try { playerMixer.update(dt); } catch (e) {} }
+  if (deathmatchMode) updateDmRemoteAnim(dt);
   // Heavy kick impact: the damage lands when the leg reaches full
   // extension (clip time KICK_HIT_T), not on the press — the leg has
   // to arrive first. Tied to the one-shot's own time, so slow-mo and
@@ -4348,12 +4410,12 @@ function animate(){
   renderer.render(scene,camera);
 }
 function applyDeathmatchState(message){
-  if(message.type==='welcome'){dmSlot=message.slot;player.position.set(dmSlot===0?-14:14,CHAR_LIFT,dmSlot===0?20:-20);yaw=dmSlot===0?-0.61:2.53;modelYaw=yaw;const code=dmParams.get('code')||'------';document.getElementById('dmScore').textContent='ROOM '+code+' · first to 10';return;}
+  if(message.type==='welcome'){dmSlot=message.slot;const sp=dmSpawn();player.position.set(sp.x,CHAR_LIFT,sp.z);yaw=sp.yaw;modelYaw=yaw;const code=dmParams.get('code')||'------';document.getElementById('dmScore').textContent='ROOM '+code+' · first to 10';return;}
   if(message.type!=='state')return;
   dmPlayers=message.players||[null,null];dmStarted=!!message.started;dmPaused=!!message.paused;dmFinished=!!message.finished;
   const me=dmPlayers[dmSlot],op=dmPlayers[1-dmSlot];
   if(me){player.position.set(me.x,CHAR_LIFT,me.z);yaw=me.yaw;modelYaw=me.yaw;health=me.health;ammoInMag=me.ammo;weapon=me.weapon;}
-  if(op){dmRemote.visible=true;dmRemote.position.set(op.x,CHAR_LIFT,op.z);dmRemote.rotation.y=op.yaw;}
+  if(op){dmRemote.visible=true;dmRemote.position.set(op.x,CHAR_LIFT,op.z);dmRemote.rotation.y=op.yaw;loadDmRemoteCharacter(op.character);}
   else dmRemote.visible=false;
   const score=document.getElementById('dmScore'),status=document.getElementById('dmStatus');
   if(me&&op)score.textContent=`${me.name} ${me.score}  —  ${op.score} ${op.name}`;

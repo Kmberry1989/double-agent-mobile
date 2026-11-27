@@ -18,6 +18,11 @@
   .levels a.cur{opacity:.45;pointer-events:none}
   #mission{position:fixed;top:10px;left:10px;background:rgba(0,0,0,.55);padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;z-index:5;max-width:min(480px,92vw)}
   #mission b{color:#ffd27a}
+  #dmHud{display:none;position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:6;background:#080d17dd;border:1px solid #8290a8;border-radius:10px;padding:8px 14px;text-align:center;min-width:220px;text-shadow:0 1px 3px #000;pointer-events:none}
+  body.deathmatch #dmHud{display:block}
+  body.deathmatch #mission{display:none}
+  body.deathmatch #defuseBtn,body.deathmatch #defuseUI{display:none}
+  #dmStatus{font-size:12px;color:#ffd27a;margin-top:2px}
   #bombStatus{color:#ffd27a;min-height:1.2em}
   #fireBtn{position:fixed;right:18px;bottom:24px;width:92px;height:92px;border-radius:50%;background:rgba(176,58,46,.9);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:17px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
   #defuseBtn{position:fixed;right:26px;bottom:132px;width:76px;height:76px;border-radius:50%;background:rgba(46,125,50,.9);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:14px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
@@ -34,6 +39,7 @@
 <body>
 <nav class="levels"><a href="menu.html">Main Menu</a><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html">Halloween</a><a href="mall.html" class="cur" aria-current="page">Mall</a><a href="deathmatch.html">Deathmatch</a><a href="stage-editor.html">Stage Editor</a></nav>
 <div id="mission"><b>Bombs defused:</b> <span id="bombCount">0 / 4</span> &nbsp; <b>Time:</b> <span id="timerText">5:00</span><div id="bombStatus"></div></div>
+<div id="dmHud"><strong id="dmScore">Deathmatch · connecting</strong><div id="dmStatus">Waiting for relay</div><div id="dmAmmo">Pistol · 12 / 12</div></div>
 <button id="fireBtn">FIRE</button>
 <button id="defuseBtn">DEFUSE</button>
 <div id="joy"><div id="joyKnob"></div></div>
@@ -41,12 +47,28 @@
 <div id="overlay"><h1>The Mall</h1><p>On the roof at sunset. Climb down the south wall and slip in.<br>Four bombs. Five minutes. Rochelle is on the radio.</p><button id="startBtn">Enter the mall</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / R2 Shoot · Square hold Defuse</p><p class="padControls">Mouse — look · Click Shoot · E hold Defuse · F Shoot · Touch — joystick · FIRE / DEFUSE</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="fail"><h1>Mission failed</h1><p id="failText"></p><button onclick="location.reload()">Try again</button></div>
+<script>
+if(new URLSearchParams(location.search).get('mode')==='deathmatch'&&(!new URLSearchParams(location.search).get('code')||!new URLSearchParams(location.search).get('token')))location.replace('deathmatch.html');
+</script>
 <script type="module">
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { createGamepad, GP } from './assets/js/gamepad.js';
+import { DeathmatchClient } from './assets/js/deathmatch-client.js';
+import { DEATHMATCH_RELAY_URL } from './assets/js/deathmatch-config.js';
+// Deathmatch mode (?mode=deathmatch): 1v1 over the relay. The mission
+// (bombs, terrorists, shoppers, timer, roof-climb intro) is hidden and
+// the arena is the mall ground floor. Single-player is untouched.
+const dmParams = new URLSearchParams(location.search);
+const deathmatchMode = dmParams.get('mode') === 'deathmatch';
+let dmClient = null, dmSlot = -1, dmPlayers = [null,null], dmLastSent = 0, dmStarted = false, dmPaused = false, dmFinished = false, dmAmmo = 12, dmLastShot = 0;
+const DM_CHARACTER_ROSTER = new Set(['Agent_Kyle.fbx','Kyle_undercover.fbx','Kyle_combat.fbx','Kyle_tux.glb','Rochelle_undercover.fbx','Rochelle_combat.fbx','Rochelle_gown.glb','Rochelle_undercover_textured.glb','Donald.fbx','Donald_tux.fbx','Eric.fbx','Eric_tux.glb','Kristen.fbx','Kristen_gown.glb','Vickie.fbx','Vickie_gown.glb','enemy-terror1.fbx','enemy-terror2.fbx','enemy-terror3.fbx','enemy-terror4.fbx','enemy-terror5.fbx','enemy-elf.fbx','enemy-frankenstein.fbx','enemy-ghost.fbx','enemy-lights.fbx','enemy-pumpkin.fbx','enemy-reindeer.fbx','enemy-santa.fbx','enemy-skeleton.fbx','enemy-witch.fbx','enemy-xmassweater.fbx','trickortreat-frankenstein.fbx','trickortreater-ghost.fbx','trickortreater-hero.fbx','trickortreater-mummy.fbx','trickortreater-pirate.fbx','trickortreater-pumpkin.fbx','trickortreater-vampire.fbx','trickortreater-werewolf.fbx','trickortreater-witch.fbx','trickortreater_princess.fbx','trickortreaterskeleton.fbx','shopper1.fbx','shopper2.fbx','shopper3.fbx','shopper4.fbx','shopper5.fbx','shopper6.fbx','shopper7.fbx']);
+function dmCharacter(){ return deathmatchMode && DM_CHARACTER_ROSTER.has(dmParams.get('character')||'') ? dmParams.get('character') : 'Kyle_combat.fbx'; }
+const DM_MAP_SPAWNS = { courtyard: [{x:-14,z:20,yaw:-0.61},{x:14,z:-20,yaw:2.53}], ballroom: [{x:-14,z:9,yaw:-0.61},{x:14,z:-9,yaw:2.53}], theater: [{x:-10,z:16,yaw:-0.61},{x:10,z:-16,yaw:2.53}], mall: [{x:-14,z:24,yaw:-0.61},{x:14,z:-24,yaw:2.53}] };
+function dmSpawn(){ const m = DM_MAP_SPAWNS[dmParams.get('map')] || DM_MAP_SPAWNS.mall; return m[dmSlot] || m[0]; }
+if(deathmatchMode){document.body.classList.add('deathmatch');document.title='Mall Deathmatch — Undercover: Double Agent';document.querySelector('#overlay h1').textContent='MALL DEATHMATCH';document.getElementById('startBtn').textContent='Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · Pistol · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent='Two agents · private room · no bombs, terrorists or shoppers · 30 second reconnect window';}
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
@@ -886,22 +908,35 @@ const player = new THREE.Group(); player.position.set(SPAWN.x, CHAR_LIFT, SPAWN.
 let playerModel = null, mixer = null;
 const playerChar = { mixer: null, model: null, isTripo: false, _cur: null, _tripoClips: {} };
 function loadPlayerModel(file, onFail) {
-  fbxLoader.load(file, (obj) => {
+  // Deathmatch: the character is the lobby's pick (dmCharacter), .fbx or
+  // .glb. Single-player always loads Kyle_combat.fbx. `file` is a plain
+  // filename in assets/characters/.
+  const isGlb = file.toLowerCase().endsWith('.glb');
+  const onLoad = (obj)=>{
     fitCharacter(obj, 1.8);
     obj.rotation.y = Math.PI;
     player.add(obj); playerModel = obj;
     playerChar.model = obj;
     playerChar.mixer = new THREE.AnimationMixer(obj); mixer = playerChar.mixer;
-  }, undefined, onFail);
+  };
+  if (isGlb) gltfLoader.load('assets/characters/' + file, (gltf)=>onLoad(gltf.scene), undefined, onFail);
+  else fbxLoader.load('assets/characters/' + file, onLoad, undefined, onFail);
 }
-loadPlayerModel('assets/characters/Kyle_combat.fbx', () => {
-  loadPlayerModel('assets/characters/Kyle_undercover.fbx', () => {
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a2a }));
-    body.position.y = 1.0; player.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
-    head.position.y = 1.95; player.add(head); playerModel = body;
-  });
-});
+function loadPlayerCapsule() {
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1.1, 4, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a2a }));
+  body.position.y = 1.0; player.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshStandardMaterial({ color: 0xd9a06b }));
+  head.position.y = 1.95; player.add(head); playerModel = body;
+}
+// Fallback chain: the lobby pick, then the mall default, then undercover,
+// then the procedural capsule. A pick equal to an earlier link is skipped
+// so no file is attempted twice.
+(function loadPlayerChain() {
+  const chain = [dmCharacter(), 'Kyle_combat.fbx', 'Kyle_undercover.fbx'].filter((f, i, a) => a.indexOf(f) === i);
+  let i = 0;
+  const next = () => { if (i < chain.length) loadPlayerModel(chain[i++], next); else loadPlayerCapsule(); };
+  next();
+})();
 function playPlayerClip(key) {
   if (!playerChar.mixer) return;
   playCharClip(playerChar, key); mixer = playerChar.mixer;
@@ -1229,9 +1264,107 @@ function updateTracers(rawDt) {
     }
   }
 }
+// ---------- Deathmatch (1v1 over the relay) ----------
+// dmRemote renders the opponent's picked character; dmShoot sends the
+// relay-synced shot (pistol, 12 rounds — the mall has no weapon switch).
+// The mall has no gunshot sound wired, so deathmatch shots are silent
+// apart from the tracer (gap, not a placeholder).
+const dmRemote = new THREE.Group();
+const dmRemoteBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.48, 1.15, 4, 8), new THREE.MeshStandardMaterial({ color: 0xc83e43, roughness: 0.75 }));
+dmRemoteBody.position.y = 1.05; dmRemote.add(dmRemoteBody);
+const dmRemoteHead = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), new THREE.MeshStandardMaterial({ color: 0xd8b08a }));
+dmRemoteHead.position.y = 1.95; dmRemote.add(dmRemoteHead);
+dmRemote.visible = false; scene.add(dmRemote);
+let dmRemoteCharFile = null, dmRemoteMixer = null, dmRemoteModel = null, dmRemoteLastPos = null;
+const dmRemoteChar = { mixer: null, model: null, isTripo: false, _cur: null, _tripoClips: {} };
+function loadDmRemoteCharacter(file) {
+  const f = DM_CHARACTER_ROSTER.has(file || '') ? file : 'Kyle_combat.fbx';
+  if (f === dmRemoteCharFile) return;
+  dmRemoteCharFile = f;
+  if (dmRemoteModel) { dmRemote.remove(dmRemoteModel); dmRemoteModel = null; }
+  if (dmRemoteMixer) { dmRemoteMixer.stopAllAction(); dmRemoteMixer = null; }
+  dmRemoteChar._cur = null; dmRemoteChar._tripoClips = {};
+  const isGlb = f.toLowerCase().endsWith('.glb');
+  const onLoad = (obj) => {
+    fitCharacter(obj, 1.8);
+    obj.rotation.y = Math.PI;
+    dmRemoteModel = obj; dmRemote.add(obj);
+    dmRemoteBody.visible = false; dmRemoteHead.visible = false;
+    dmRemoteChar.model = obj; dmRemoteChar.isTripo = f.indexOf('shopper') === 0;
+    dmRemoteChar.mixer = new THREE.AnimationMixer(obj); dmRemoteMixer = dmRemoteChar.mixer;
+    playCharClip(dmRemoteChar, 'idle');
+  };
+  const onError = () => { dmRemoteBody.visible = true; dmRemoteHead.visible = true; };
+  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf) => onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+}
+function updateDmRemoteAnim(dt) {
+  if (!dmRemoteMixer) return;
+  dmRemoteMixer.update(dt);
+  if (!dmRemote.visible) return;
+  const moved = dmRemoteLastPos ? dmRemote.position.distanceTo(dmRemoteLastPos) > 0.02 : false;
+  dmRemoteLastPos = dmRemote.position.clone();
+  playCharClip(dmRemoteChar, moved ? 'walk' : 'idle');
+}
+function dmShoot() {
+  if (!dmStarted || dmPaused || dmFinished) return;
+  const now = performance.now();
+  if (now - dmLastShot < 280) return; // pistol rate
+  if (dmAmmo <= 0) { dmClient?.send('reload'); return; }
+  dmLastShot = now; dmAmmo--;
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+  dmClient?.send('shoot', { weapon: 'pistol', dir: { x: dir.x, y: dir.y, z: dir.z }, origin: { x: camera.position.x, y: camera.position.y, z: camera.position.z } });
+  const muzzle = muzzlePos(), end = muzzle.clone().addScaledVector(dir, 60);
+  spawnTracer(muzzle, end);
+  const ammoEl = document.getElementById('dmAmmo'); if (ammoEl) ammoEl.textContent = 'Pistol · ' + dmAmmo + ' / 12';
+}
+function applyDeathmatchState(message) {
+  if (message.type === 'welcome') {
+    dmSlot = message.slot; const sp = dmSpawn();
+    player.position.set(sp.x, CHAR_LIFT, sp.z); yaw = sp.yaw; player.rotation.y = yaw;
+    const code = dmParams.get('code') || '------';
+    document.getElementById('dmScore').textContent = 'ROOM ' + code + ' · first to 10'; return;
+  }
+  if (message.type !== 'state') return;
+  dmPlayers = message.players || [null, null]; dmStarted = !!message.started; dmPaused = !!message.paused; dmFinished = !!message.finished;
+  const me = dmPlayers[dmSlot], op = dmPlayers[1 - dmSlot];
+  if (me) { player.position.set(me.x, CHAR_LIFT, me.z); yaw = me.yaw; player.rotation.y = yaw; dmAmmo = me.ammo; const ammoEl = document.getElementById('dmAmmo'); if (ammoEl) ammoEl.textContent = 'Pistol · ' + me.ammo + ' / 12'; }
+  if (op) { dmRemote.visible = true; dmRemote.position.set(op.x, CHAR_LIFT, op.z); dmRemote.rotation.y = op.yaw; loadDmRemoteCharacter(op.character); }
+  else dmRemote.visible = false;
+  const score = document.getElementById('dmScore'), status = document.getElementById('dmStatus');
+  if (me && op) score.textContent = me.name + ' ' + me.score + '  —  ' + op.score + ' ' + op.name;
+  if (message.paused) status.textContent = 'Match paused · reconnect window 30 seconds';
+  else if (!op) status.textContent = 'Waiting for opponent to join';
+  else if (!message.started) status.textContent = 'Opponent connected · match starting';
+  else status.textContent = 'First to 10 takedowns';
+  if (dmFinished) {
+    document.exitPointerLock?.(); dmClient?.close();
+    const expired = message.reason === 'expired', wonMatch = message.winner === dmSlot;
+    const winH = document.querySelector('#win h1'), failH = document.querySelector('#fail h1');
+    if (wonMatch) {
+      if (winH) winH.textContent = 'VICTORY';
+      document.getElementById('winText').textContent = expired ? 'This private room expired after two hours.' : 'You reached 10 takedowns.';
+      document.getElementById('win').style.display = 'flex'; document.getElementById('overlay').style.display = 'none';
+    } else {
+      if (failH) failH.textContent = 'DEFEAT';
+      document.getElementById('failText').textContent = expired ? 'This private room expired after two hours.' : message.reason === 'forfeit' ? 'Your reconnect window expired; the match was forfeited.' : 'The other agent reached 10 takedowns.';
+      document.getElementById('fail').style.display = 'flex'; document.getElementById('overlay').style.display = 'none';
+    }
+  }
+}
+if (deathmatchMode) {
+  if (DEATHMATCH_RELAY_URL && dmParams.get('code') && dmParams.get('token')) {
+    dmClient = new DeathmatchClient({ relayUrl: DEATHMATCH_RELAY_URL, code: dmParams.get('code'), token: dmParams.get('token'), name: dmParams.get('name') || 'Agent', onMessage: applyDeathmatchState, onStatus: text => { const el = document.getElementById('dmStatus'); if (el) el.textContent = text; } });
+  } else {
+    document.getElementById('dmStatus').textContent = 'Multiplayer relay is not configured';
+    document.getElementById('overlay').style.display = 'flex';
+    document.querySelector('#overlay').insertAdjacentHTML('beforeend', '<p>The relay URL is missing. Configure assets/js/deathmatch-config.js after deploying the Worker.</p><a href="deathmatch.html">Return to lobby</a>');
+  }
+}
 function doShoot(ndcX, ndcY) {
   if (!started || won || failed) return;
   if (introActive) { endIntro(); return; } // FIRE during the intro skips it
+  if (deathmatchMode) { dmShoot(); return; } // relay-synced shot, no mission logic
   const nx = ndcX === undefined ? 0 : ndcX;
   const ny = ndcY === undefined ? 0 : ndcY;
   bulletTimeT = 1.0; // slow-mo on every shot
@@ -1382,7 +1515,9 @@ function playGlassShatter() {
 const clock = new THREE.Clock();
 document.getElementById('startBtn').onclick = () => {
   document.getElementById('overlay').style.display = 'none'; started = true;
-  startIntro(); // the mission opens on the roof at sunset
+  // Deathmatch starts on the ground floor at the arena spawn — no roof
+  // climb. Single-player opens on the roof at sunset (startIntro).
+  if (!deathmatchMode) startIntro();
   if (!isTouch) renderer.domElement.requestPointerLock();
 };
 addEventListener('keydown', (e) => {
@@ -1519,11 +1654,18 @@ function animate() {
   let dt = rawDt;
   if (bulletTimeT > 0) { bulletTimeT -= rawDt; dt = rawDt * 0.25; }
   pollGamepad(rawDt); // PS4 controller: look stays responsive in slow-mo
-  updateNpcs(dt);
+  // Deathmatch: no mission NPCs (shoppers/terrorists) and no bombs — the
+  // arena is empty. Their groups load async, so hide them every frame.
+  if (deathmatchMode) {
+    for (const b of bombs) if (b.group) b.group.visible = false;
+    for (const n of npcs) if (n.outer) n.outer.visible = false;
+  } else updateNpcs(dt);
   updateTracers(rawDt); // tracers fade in real time, even in slow-mo
   updateGlassShards(rawDt); // glass canopy shards fall + fade
   updateEscalatorSteps(dt); // escalator steps cycle along the incline
   // Bomb blink lights (live bombs only; defused ones stay green).
+  // Skipped in deathmatch (the bombs are hidden).
+  if (!deathmatchMode) {
   blinkT += rawDt;
   const blinkOn = Math.sin(blinkT * 6) > 0;
   for (const b of bombs) {
@@ -1531,10 +1673,12 @@ function animate() {
     b.blinkMat.emissiveIntensity = blinkOn ? 2.5 : 0.2;
     if (b.blinkLight) b.blinkLight.intensity = blinkOn ? 2 : 0.3;
   }
+  }
   if (started && !won && !failed) {
     // Timer runs on real time — bullet time does not extend it. It starts
     // only when the player enters the atrium (ground floor, z < 29.5) —
-    // not during the roof-climb intro.
+    // not during the roof-climb intro. No mission timer in deathmatch.
+    if (!deathmatchMode) {
     if (!enteredAtrium && player.position.y < 1 && player.position.z < 29.5) enteredAtrium = true;
     if (enteredAtrium) {
       timeLeft -= rawDt;
@@ -1542,6 +1686,7 @@ function animate() {
         timeLeft = 0; updateTimer(); failMission('timer');
       } else updateTimer();
     } else updateTimer();
+    }
     // Roof-climb intro: the descent drives the player. Any movement input
     // skips to the end (player on the ground outside the entrance).
     if (introActive) {
@@ -1562,10 +1707,16 @@ function animate() {
     const dx = fx * Math.cos(yaw) - fz * Math.sin(yaw);
     const dz = -fx * Math.sin(yaw) - fz * Math.cos(yaw);
     const speed = (keys['shift'] ? 5.5 : 4) * dt;
+    // Deathmatch arena is the ground floor only (x ±19, z ±29) — the
+    // relay clamps to the same bounds, so the client must match it or
+    // the player rubber-bands at the apron.
+    const dmZMax = deathmatchMode ? 29 : MALL.zMax;
     player.position.x = Math.max(MALL.xMin, Math.min(MALL.xMax, player.position.x + dx * speed));
-    player.position.z = Math.max(MALL.zMin, Math.min(MALL.zMax, player.position.z + dz * speed));
+    player.position.z = Math.max(MALL.zMin, Math.min(dmZMax, player.position.z + dz * speed));
     // Escalators: board at the entry end, ride the incline, step off.
-    updateEscalatorRide(dt);
+    // Deathmatch is ground floor only (the relay's shot validation
+    // assumes a ground-floor camera height), so no riding there.
+    if (!deathmatchMode) updateEscalatorRide(dt);
     // Upper floor: the central atrium opening (x -8..8, z -12..12) is a
     // void — push the player back onto the ring (the railing is visual;
     // this is the real constraint). Not while riding the escalator.
@@ -1608,8 +1759,9 @@ function animate() {
     }
     // Defuse: hold USE (E / DEFUSE button / Square) near a live bomb
     // for 3 s. Releasing or walking away resets progress. No defusing
-    // during the intro (the player is outside, on the wall).
-    const bomb = introActive ? null : nearestLiveBomb();
+    // during the intro (the player is outside, on the wall) or in
+    // deathmatch (the bombs are hidden).
+    const bomb = (introActive || deathmatchMode) ? null : nearestLiveBomb();
     const defuseUI = document.getElementById('defuseUI');
     if (bomb) {
       if (defuseUI) defuseUI.style.display = 'block';
@@ -1628,9 +1780,16 @@ function animate() {
       defuseProgress = 0; defuseBeeps = 0;
       if (defuseUI) defuseUI.style.display = 'none';
     }
+    // Deathmatch: relay the player's position (20 Hz) so the opponent
+    // sees them move; the relay is authoritative for position/health.
+    if (deathmatchMode && dmClient && dmStarted && !dmPaused && !dmFinished && performance.now() - dmLastSent >= 50) {
+      dmLastSent = performance.now();
+      dmClient.send('move', { x: player.position.x, z: player.position.z, yaw });
+    }
   } else if (mixer) {
     mixer.update(dt);
   }
+  if (deathmatchMode) updateDmRemoteAnim(dt);
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
   // The look-down beat: the camera swings to the side and looks down at
   // the night city far below (suspense hold while the player hangs).
@@ -1638,7 +1797,7 @@ function animate() {
   if (lookDownStage) {
     camera.position.set(player.position.x + 5, player.position.y + 2.5, player.position.z + 1.5);
     camera.lookAt(player.position.x - 0.5, 0.5, player.position.z + 3);
-  } else if (idleOrbitActive(dt, started && !introActive && !won && !failed)) {
+  } else if (idleOrbitActive(dt, started && !introActive && !deathmatchMode && !won && !failed)) {
     const op = orbitCamPos(new THREE.Vector3());
     camera.position.lerp(op, Math.min(1, dt * 3));
     camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
