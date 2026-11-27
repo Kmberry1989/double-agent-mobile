@@ -140,13 +140,12 @@ function cyl(x, y, z, rTop, rBot, h, color) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 24), new THREE.MeshStandardMaterial({ color }));
   m.position.set(x, y, z); scene.add(m); return m;
 }
-// Floor + dance floor + walls, with the new ballroom textures.
+// Floor + walls, with the new ballroom textures. The dance floor
+// (parquet with a white border) was removed — the wood floor is one
+// continuous surface now.
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(HALL_X * 2, HALL_Z * 2), new THREE.MeshStandardMaterial({ color: 0x6b4a26 }));
 floor.rotation.x = -Math.PI / 2; scene.add(floor);
 applyTex(floor, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 8, 6);
-const dance = new THREE.Mesh(new THREE.PlaneGeometry(13, 9), new THREE.MeshStandardMaterial({ color: 0x8a5a2e }));
-dance.rotation.x = -Math.PI / 2; dance.position.set(0, 0.02, -1); scene.add(dance);
-applyTex(dance, 'assets/textures/ballroom/ballroom_floor_herringbone_marble_border_1024.webp', 1, 1);
 const walls = [
   box(0, 3, -HALL_Z - 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // north wall
   box(0, 3, HALL_Z + 0.5, HALL_X * 2 + 2, 6, 1, 0x5a2f22), // south wall (entrance side)
@@ -356,22 +355,20 @@ balcGlass.position.set(0, 8.25, 14.7); balcGlass.rotation.y = Math.PI; scene.add
     applyTex(cp2, 'assets/textures/ballroom/ballroom_curtain_velvet_1024.webp', 1, 1);
   });
 }
-// Continuous carpet (2026-11-11): one red-gold runner the full length of
-// the room, south entrance door (z=13) to north exit door (z=-13), 2.5 m
-// wide at y=0.03 (above the dance floor at y=0.02, no z-fight), plus a
-// branch runner east to the bar rug so the bar rug joins the main run.
-flatPlane(0, 0.03, 0, 2.5, 26, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 9);
-flatPlane(6.125, 0.03, 6, 9.75, 2.5, 0x7a1a1a, 'assets/textures/ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 4, undefined, Math.PI / 2); // runner texture rotated 90 deg so the gold borders run along the branch's long edges, not across it as stripes
+// The red-gold carpet runners (main run + east branch) were removed —
+// their outlined border texture never lined up. The wood floor is
+// continuous now. The bar rug (medallion, single rug) stays.
 flatPlane(14, 0.04, 6, 6, 4, 0x5a2a3a, 'assets/textures/ballroom/ballroom_rug_medallion_large_1024.webp', 1, 1);
-// Spiral staircase + second-story balcony, NE corner (2026-11-06, walkable,
-// ported from ballroom-handoff.html — one room, same in all three pages).
-// Helix: 15 steps, one full turn, 0.4 m rise per step, floor (y=0) to balcony
-// (y=6). Entry/exit is on the west side (180 deg), facing the room, so the
-// top step lands straight onto the balcony. Treads span r 0.55-1.75 (about
-// 1.2 m deep), centre column r 0.55. No hint text.
-const STAIR_C = { x: 17, z: -11 }; // helix centre, NE corner
+// Straight staircase + second-story balcony, NE corner (replaces the
+// spiral staircase — its top ran into a wall). A straight flight, 24
+// steps, 0.25 m rise, 0.35 m tread, floor (y=0) to balcony (y=6). It runs
+// south-to-north at x 15..17 and lands on the balcony through the
+// stairwell opening (x 15..17, z -12.5..-10.5); the top step arrives at
+// the open gap in the south railing (x 15.5-16.5), not at a wall.
+// Treads are wood (same honey-brown as the balcony floor); stringers and
+// railings are dark wood, like the balcony. No hint text.
 const STAIR_TOP = 6; // balcony level
-const STAIR_R_OUT = 1.75; // outer edge of the treads
+const STAIR = { x0: 15, x1: 17, zTop: -10.5, zBot: -2.1, steps: 24, rise: 0.25, depth: 0.35 };
 const BALC = { x0: 5, x1: 17, z0: -14, z1: -10.5 }; // balcony floor rectangle
 // South balcony + walkways (2026-11-06): a second-floor balcony above the
 // entrance, reached from the north balcony by a walkway along the east wall.
@@ -381,17 +378,39 @@ const BALC2 = [
   { x0: 6, x1: 17, z0: 12.5, z1: 13.9 },     // south strip along the south wall
   { x0: 17, x1: 19.9, z0: -13.9, z1: 13.9 }, // east walkway
 ];
-const stairCol = cyl(STAIR_C.x, 3.2, STAIR_C.z, 0.55, 0.55, 6.4, 0x3a2a18); // centre column
-for (let i = 0; i < 15; i++) {
-  const th = (180 + i * 24) * Math.PI / 180;
-  const st = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 1.0), new THREE.MeshStandardMaterial({ color: 0x6b4a26 }));
-  st.position.set(STAIR_C.x + 1.15 * Math.cos(th), i * 0.4 - 0.09, STAIR_C.z + 1.15 * Math.sin(th));
-  st.rotation.y = -th; scene.add(st);
+// Treads: step i (0..23) tops at y=(i+1)*0.25, centred at
+// z = -10.5 + (23-i)*0.35 (bottom step z=-2.45, top step z=-10.5, y=6).
+// Treads are 0.4 deep on a 0.35 spacing, so they overlap and read as one
+// continuous stepped surface.
+for (let i = 0; i < STAIR.steps; i++) {
+  const st = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.18, 0.4), new THREE.MeshStandardMaterial({ color: 0x6b4a26 }));
+  st.position.set(16, (i + 1) * STAIR.rise - 0.09, STAIR.zTop + (STAIR.steps - 1 - i) * STAIR.depth);
+  scene.add(st);
   applyTex(st, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 1, 1);
 }
+// Stringers: solid sloped boards under the treads on both sides, so the
+// flight reads as a real staircase, not floating steps. Slope angle
+// atan(6/8.4) = 35.5 deg; length sqrt(8.4^2+6^2) = 10.32 m. Centred just
+// below the tread line (0.3 m down the slope normal).
+const STAIR_ANG = Math.atan2(6, 8.4), STAIR_LEN = Math.hypot(8.4, 6);
+for (const sx of [STAIR.x0, STAIR.x1]) {
+  const str = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.6, STAIR_LEN + 0.1), new THREE.MeshStandardMaterial({ color: 0x3a2a18 }));
+  str.position.set(sx, 2.75, -6.47); str.rotation.x = STAIR_ANG; scene.add(str);
+}
+// Handrails: sloped top rails 1 m above the tread line on both sides,
+// plus vertical balusters every 1.5 m from the treads up to the rail.
+for (const sx of [STAIR.x0, STAIR.x1]) {
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, STAIR_LEN + 0.1), new THREE.MeshStandardMaterial({ color: 0x3a2a18 }));
+  rail.position.set(sx, 4.0, -6.3); rail.rotation.x = STAIR_ANG; scene.add(rail);
+  for (let z = -3; z >= -10; z -= 1.5) {
+    const ty = (STAIR.zBot - z) / (STAIR.zBot - STAIR.zTop) * STAIR_TOP; // tread height at this z
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.0, 0.08), new THREE.MeshStandardMaterial({ color: 0x3a2a18 }));
+    post.position.set(sx, ty + 0.5, z); scene.add(post);
+  }
+}
 // Balcony floor at y=6: two boxes (west floor + north strip) leaving the
-// stairwell open where the top steps arrive, so the climber's head never
-// passes through the floor. North edge inset 0.1 from the wall (no coplanar face).
+// stairwell open where the top of the straight flight arrives, so the
+// climber's head never passes through the floor. North edge inset 0.1 from the wall (no coplanar face).
 const balcW = box(10, 5.9, -12.2, 10, 0.2, 3.4, 0x6b4a26); // x 5-15, z -13.9..-10.5
 applyTex(balcW, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 3, 1);
 const balcN = box(16, 5.9, -13.2, 2, 0.2, 1.4, 0x6b4a26); // x 15-17, z -13.9..-12.5
@@ -412,8 +431,8 @@ box(5, 6.5, -11.75, 0.08, 1, 0.08, 0x3a2a18); // west rail post (the z=-13.25 po
 // player can stand above the entrance and look down into the ballroom.
 // South strip (x 6..17, z 12.5..13.9) joins it to the east walkway
 // (x 17..19.9, z -13.9..13.9), which runs along the east wall from the north
-// balcony. Route: spiral stairs -> north balcony -> east walkway -> south
-// strip -> south balcony. The dance floor stays open below.
+// balcony. Route: straight stairs -> north balcony -> east walkway -> south
+// strip -> south balcony. The wood floor stays open below.
 const balcS = box(0, 5.9, 12.2, 12, 0.2, 3.4, 0x6b4a26); // x -6..6, z 10.5..13.9
 applyTex(balcS, 'assets/textures/ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 4, 1);
 const walkS = box(11.5, 5.9, 13.2, 11, 0.2, 1.4, 0x6b4a26); // south strip, x 6..17, z 12.5..13.9
@@ -590,10 +609,18 @@ gltfLoader.load('assets/props/ballroom_chair.glb', (gltf)=>{
 }, undefined, ()=>{});
 colliders.push({ x: 17.5, z: 6, r: 2.6, y: 0 }); // bar, ground floor only
 // Staircase + balcony colliders (2026-11-06, ported from ballroom-handoff.html):
-// centre column blocks at every height; balcony railings (yMin) only block
-// up on the balcony, never the climber below. Room walls (yMin) only block
-// up on the second story; the door gaps have no colliders.
-colliders.push({ x: STAIR_C.x, z: STAIR_C.z, r: 0.7 });
+// the straight flight's stringers block at every height (they are solid
+// boards from the ground up), so the climber cannot walk off the side of
+// the flight; balcony railings (yMin) only block up on the balcony, never
+// the climber below. Room walls (yMin) only block up on the second story;
+// the door gaps have no colliders.
+// Flight sides: circles along both stringers (x=15 and x=17), r=0.45,
+// spaced 0.7 m so they overlap into a solid wall; the bottom entry
+// (z=-2.1) and top exit (z=-10.5) stay open.
+for (let z = -10; z >= -2.8; z -= 0.7) {
+  colliders.push({ x: STAIR.x0, z, r: 0.45 });
+  colliders.push({ x: STAIR.x1, z, r: 0.45 });
+}
 [5.75, 7.25, 8.75, 10.25, 11.75, 13.25, 14.75, 17].forEach((x)=>colliders.push({ x, z: -10.5, r: 0.8, yMin: 5.5 })); // south railing (gap x 15.5-16.5 is the stair arrival)
 colliders.push({ x: 5, z: -11.75, r: 0.8, yMin: 5.5 }); // west railing (the z=-13.25 post is inside bedroom 1)
 [-0.75, 0.75, 2.25, 3.75, 5.25].forEach((x)=>colliders.push({ x, z: 10.5, r: 0.8, yMin: 5.5 })); // south balcony north railing (bathroom north wall covers x -6..-2)
@@ -1562,26 +1589,34 @@ function nearestTalk() {
 
 // ---- Loop ----
 const clock = new THREE.Clock();
-// Spiral-stair + balcony heights (2026-11-06, ported from ballroom-handoff.html):
-// on the stairs, y follows the helix (0.4 m per step, 24 deg per step);
-// on a balcony/walkway/room rectangle, y=6; everywhere else, y=0.
-// The balcony rectangles are BALC (north) + BALC2 (south + strips + east
-// walkway) — the rooms sit inside those rectangles, so they are walkable.
-const stairOn = { on: false, prevTheta: 0 };
-function stairAngleDeg(p) { return Math.atan2(p.z - STAIR_C.z, p.x - STAIR_C.x) * 180 / Math.PI; }
-function wrap180(a) { while (a > 180) a -= 360; while (a < -180) a += 360; return a; }
+// Straight-stair + balcony heights (replaces the spiral helix):
+// on the flight, y follows the ramp (0.25 m rise per step); on a
+// balcony/walkway/room rectangle, y=6; everywhere else, y=0.
+// The flight is engaged only from its bottom entry (ground level, south)
+// or its top exit (balcony level, north), so walking under it on the
+// ground floor stays at y=0 and walking the balcony past the stairwell
+// stays at y=6. The balcony check is y-gated (y>=5), so a ground-floor
+// player under the balcony is never teleported up. The balcony rectangles
+// are BALC (north) + BALC2 (south + strips + east walkway) — the rooms sit
+// inside those rectangles, so they are walkable.
+let stairOn = false;
 function stairBalconyY(p) {
-  if (p.x >= BALC.x0 && p.x <= BALC.x1 && p.z >= BALC.z0 && p.z <= BALC.z1) { stairOn.on = false; return STAIR_TOP; }
-  for (const r of BALC2) if (p.x >= r.x0 && p.x <= r.x1 && p.z >= r.z0 && p.z <= r.z1) { stairOn.on = false; return STAIR_TOP; }
-  const dx = p.x - STAIR_C.x, dz = p.z - STAIR_C.z, r = Math.hypot(dx, dz);
-  if (r > 0.4 && r < STAIR_R_OUT + 0.7) {
-    let th = stairAngleDeg(p), d = 0;
-    if (stairOn.on) d = wrap180(th - stairOn.prevTheta);
-    else if (Math.abs(wrap180(th - 180)) < 60) { stairOn.on = true; d = 0; }
-    stairOn.prevTheta = th;
-    if (stairOn.on) { const step = (wrap180(th - 180) + 360) % 360; return Math.min(Math.max(step / 24 * 0.4, 0), STAIR_TOP); }
+  if (p.y >= 5) {
+    if (p.x >= BALC.x0 && p.x <= BALC.x1 && p.z >= BALC.z0 && p.z <= BALC.z1) { stairOn = false; return STAIR_TOP; }
+    for (const r of BALC2) if (p.x >= r.x0 && p.x <= r.x1 && p.z >= r.z0 && p.z <= r.z1) { stairOn = false; return STAIR_TOP; }
   }
-  stairOn.on = false; return 0;
+  const onFlight = p.x >= STAIR.x0 && p.x <= STAIR.x1 && p.z >= STAIR.zTop && p.z <= STAIR.zBot;
+  if (!stairOn && onFlight) {
+    if ((p.y < 0.5 && p.z > STAIR.zBot - 1.2) || (p.y > 5.5 && p.z < STAIR.zTop + 1.2)) stairOn = true;
+  }
+  if (stairOn) {
+    if (!onFlight) { stairOn = false; }
+    else {
+      const t = (STAIR.zBot - p.z) / (STAIR.zBot - STAIR.zTop);
+      return Math.min(Math.max(t * STAIR_TOP, 0), STAIR_TOP);
+    }
+  }
+  return 0;
 }
 // ---- Idle-orbit cinematic camera ----
 // When the player stands still for 2 s, the camera slowly orbits them
@@ -1644,7 +1679,7 @@ function orbitCamPos(out) {
 // The balcony floors, ceiling, railings, trim, windows and furniture
 // are NOT occluders (the floors/ceiling never sit on the camera ray;
 // the rest are too thin or too low to block it).
-const BALLROOM_WALLS = [...walls, ...upperWalls, b1sA, b1sB, b1sL, b1w, b2sA, b2sB, b2sL, b2e, bPart, baN, baW, baEA, baEB, baEL, stairCol];
+const BALLROOM_WALLS = [...walls, ...upperWalls, b1sA, b1sB, b1sL, b1w, b2sA, b2sB, b2sL, b2e, bPart, baN, baW, baEA, baEB, baEL];
 const camRay = new THREE.Raycaster();
 const _camDir = new THREE.Vector3();
 const _chest = new THREE.Vector3();
