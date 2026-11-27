@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2712%27 fill=%27%230b1321%27/%3E%3Cpath d=%27M16 15h32v8H24v7h19v8H24v11h-8z%27 fill=%27%23ffd27a%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
 <title>Double Agent — Rochelle's Photo Mission</title>
 <style>
@@ -49,8 +50,9 @@
 </head>
 <body>
 <div id="dialog"><div class="name" id="dlgName"></div><div class="line" id="dlgLine"></div></div>
-<nav class="levels"><a href="menu.html">Main Menu</a><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html" class="cur" aria-current="page">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html">Halloween</a><a href="mall.html">Mall</a><a href="stage-editor.html">Stage Editor</a></nav>
+<nav class="levels"><a href="menu.html">Main Menu</a><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html" class="cur" aria-current="page">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html">Halloween</a><a href="mall.html">Mall</a><a href="deathmatch.html">Deathmatch</a><a href="stage-editor.html">Stage Editor</a></nav>
 <div id="mission"><b>Photos:</b> <span id="photoSlots">— — —</span></div>
+<div id="prompt" role="status" aria-live="polite"></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>Rochelle's Photo Mission</h1><p>Photographer first, agent second. Kyle is on your earpiece.</p><button id="startBtn">Enter as Rochelle</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X Talk / advance</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
@@ -1716,12 +1718,9 @@ function animate() {
     let best = null, bd = 3.2;
     for (const n of NPCS) { if (!n.group.visible) continue; const d = n.group.position.distanceTo(player.position); if (d < bd) { bd = d; best = n; } }
     const prompt = document.getElementById('prompt');
-    // The prompt element was removed with the HUD text, so prompt is null:
-    // only end a conversation when nobody is nearby, not on every frame.
-    // (Without this, dialogue closed one frame after opening.)
-    if (best) { if (prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — tap USE'; prompt.style.display = 'block'; } }
+    if (best) { if (!talking && prompt) { prompt.textContent = (best.role === 'cat' ? (best.fed ? 'Scan ' + best.name + '\'s collar tag' : 'Give ' + best.name + ' a treat') : 'Talk to ' + best.name) + ' — press E / USE'; prompt.style.display = 'block'; } }
     else if (Math.hypot(player.position.x, player.position.z + HALL_Z) < 2.5) {
-      if (prompt) { prompt.textContent = photos.length === 3 ? 'North exit open — tap USE to leave' : 'North exit is locked — photograph all 3 collars first (moon, note, rose)'; prompt.style.display = 'block'; }
+      if (prompt) { prompt.textContent = photos.length === 3 ? 'Go north to the green exit door — press E / USE to leave' : 'North exit is locked — photograph all 3 collars first (moon, note, rose)'; prompt.style.display = 'block'; }
     } else { if (prompt) prompt.style.display = 'none'; if (talking) endTalk(); }
     updatePlayFight(dt);
     // NPC wander + sway

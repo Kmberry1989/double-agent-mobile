@@ -37,6 +37,14 @@ Asset wishlist with a copy button for every item: open
 `wishlist.html` — the same list as `ASSETS-WISHLIST.md`, with a
 search filter and a Copy all button per section.
 
+## Deathmatch
+
+The main menu includes a private 1v1 Courtyard deathmatch. Deploy the
+Cloudflare relay and set its Worker origin in
+`assets/js/deathmatch-config.js` before hosting the static site; setup and
+local test instructions are in `workers/deathmatch/README.md`. The relay
+uses Durable Objects and pauses for up to 30 seconds if a player disconnects.
+
 ## Touch controls (phones only)
 
 Touch controls appear automatically on touch devices. They use
