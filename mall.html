@@ -68,7 +68,15 @@ const DM_CHARACTER_ROSTER = new Set(['Agent_Kyle.fbx','Kyle_undercover.fbx','Kyl
 function dmCharacter(){ return deathmatchMode && DM_CHARACTER_ROSTER.has(dmParams.get('character')||'') ? dmParams.get('character') : 'Kyle_combat.fbx'; }
 const DM_MAP_SPAWNS = { courtyard: [{x:-14,z:20,yaw:-0.61},{x:14,z:-20,yaw:2.53}], ballroom: [{x:-14,z:9,yaw:-0.61},{x:14,z:-9,yaw:2.53}], theater: [{x:-10,z:16,yaw:-0.61},{x:10,z:-16,yaw:2.53}], mall: [{x:-14,z:24,yaw:-0.61},{x:14,z:-24,yaw:2.53}] };
 function dmSpawn(){ const m = DM_MAP_SPAWNS[dmParams.get('map')] || DM_MAP_SPAWNS.mall; return m[dmSlot] || m[0]; }
-if(deathmatchMode){document.body.classList.add('deathmatch');document.title='Mall Deathmatch — Undercover: Double Agent';document.querySelector('#overlay h1').textContent='MALL DEATHMATCH';document.getElementById('startBtn').textContent='Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · Pistol · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent='Two agents · private room · no bombs, terrorists or shoppers · 30 second reconnect window';}
+// Deathmatch loadout — the lobby's starting weapon, mirrored from the
+// game's WEAPON_CYCLE stats (index.html). The mall has no weapon models
+// and no in-match weapon switch, so the pick sets the relay's damage /
+// rate / magazine and the local fire cadence, while the shot itself
+// stays the simple pistol tracer. The Shotgun's rate is its pump gate
+// (600 ms) — the mall has no pump sound, so the gate is the cadence.
+const DM_WEAPON_STATS = { Glock:{rate:280,cap:12}, Walther:{rate:280,cap:12}, Makarov:{rate:280,cap:12}, Revolver:{rate:350,cap:6}, MP5K:{rate:110,cap:30}, AKS74U:{rate:110,cap:30}, Shotgun:{rate:600,cap:5}, RPG7:{rate:110,cap:30} };
+function dmWeapon(){ const w = dmParams.get('weapon'); return (deathmatchMode && w && DM_WEAPON_STATS[w]) ? w : 'Glock'; }
+if(deathmatchMode){document.body.classList.add('deathmatch');document.title='Mall Deathmatch — Undercover: Double Agent';document.querySelector('#overlay h1').textContent='MALL DEATHMATCH';document.getElementById('startBtn').textContent='Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · '+dmWeapon()+' · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent='Two agents · private room · no bombs, terrorists or shoppers · 30 second reconnect window';}
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
@@ -1266,7 +1274,9 @@ function updateTracers(rawDt) {
 }
 // ---------- Deathmatch (1v1 over the relay) ----------
 // dmRemote renders the opponent's picked character; dmShoot sends the
-// relay-synced shot (pistol, 12 rounds — the mall has no weapon switch).
+// relay-synced shot with the lobby's starting weapon (rate / magazine
+// from DM_WEAPON_STATS above). The mall has no weapon switch, so the
+// starting weapon is the match's weapon.
 // The mall has no gunshot sound wired, so deathmatch shots are silent
 // apart from the tracer (gap, not a placeholder).
 const dmRemote = new THREE.Group();
@@ -1309,14 +1319,15 @@ function updateDmRemoteAnim(dt) {
 function dmShoot() {
   if (!dmStarted || dmPaused || dmFinished) return;
   const now = performance.now();
-  if (now - dmLastShot < 280) return; // pistol rate
+  const st = DM_WEAPON_STATS[dmWeapon()];
+  if (now - dmLastShot < st.rate) return;
   if (dmAmmo <= 0) { dmClient?.send('reload'); return; }
   dmLastShot = now; dmAmmo--;
   const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-  dmClient?.send('shoot', { weapon: 'pistol', dir: { x: dir.x, y: dir.y, z: dir.z }, origin: { x: camera.position.x, y: camera.position.y, z: camera.position.z } });
+  dmClient?.send('shoot', { weapon: dmWeapon(), dir: { x: dir.x, y: dir.y, z: dir.z }, origin: { x: camera.position.x, y: camera.position.y, z: camera.position.z } });
   const muzzle = muzzlePos(), end = muzzle.clone().addScaledVector(dir, 60);
   spawnTracer(muzzle, end);
-  const ammoEl = document.getElementById('dmAmmo'); if (ammoEl) ammoEl.textContent = 'Pistol · ' + dmAmmo + ' / 12';
+  const ammoEl = document.getElementById('dmAmmo'); if (ammoEl) ammoEl.textContent = dmWeapon() + ' · ' + dmAmmo + ' / ' + st.cap;
 }
 function applyDeathmatchState(message) {
   if (message.type === 'welcome') {
@@ -1328,7 +1339,7 @@ function applyDeathmatchState(message) {
   if (message.type !== 'state') return;
   dmPlayers = message.players || [null, null]; dmStarted = !!message.started; dmPaused = !!message.paused; dmFinished = !!message.finished;
   const me = dmPlayers[dmSlot], op = dmPlayers[1 - dmSlot];
-  if (me) { player.position.set(me.x, CHAR_LIFT, me.z); yaw = me.yaw; player.rotation.y = yaw; dmAmmo = me.ammo; const ammoEl = document.getElementById('dmAmmo'); if (ammoEl) ammoEl.textContent = 'Pistol · ' + me.ammo + ' / 12'; }
+  if (me) { player.position.set(me.x, CHAR_LIFT, me.z); yaw = me.yaw; player.rotation.y = yaw; dmAmmo = me.ammo; const ammoEl = document.getElementById('dmAmmo'); if (ammoEl) ammoEl.textContent = dmWeapon() + ' · ' + me.ammo + ' / ' + DM_WEAPON_STATS[dmWeapon()].cap; }
   if (op) { dmRemote.visible = true; dmRemote.position.set(op.x, CHAR_LIFT, op.z); dmRemote.rotation.y = op.yaw; loadDmRemoteCharacter(op.character); }
   else dmRemote.visible = false;
   const score = document.getElementById('dmScore'), status = document.getElementById('dmStatus');

@@ -8,7 +8,7 @@
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#23314a,#080d17 60%);color:#edf2fa;font:16px/1.5 system-ui,sans-serif;display:grid;place-items:center;padding:20px}.card{width:min(100%,560px);padding:clamp(22px,5vw,40px);background:#0b1321ed;border:1px solid #52627b;border-radius:18px;box-shadow:0 20px 80px #0008}h1{margin:0 0 8px;font-size:clamp(28px,6vw,42px)}p{color:#bfcbda}.choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}button,input{font:inherit;border-radius:9px;padding:12px 14px}button{cursor:pointer;color:#09101b;background:#ffd27a;border:0;font-weight:700}button.secondary{background:#1d2a3e;color:#e8eef8;border:1px solid #56677e}input{width:100%;background:#080d16;color:#fff;border:1px solid #52627b}select{width:100%;background:#080d16;color:#fff;border:1px solid #52627b;font:inherit;border-radius:9px;padding:12px 14px;margin:8px 0 16px}label{display:block;margin-top:12px}.maps{border:1px solid #52627b;border-radius:9px;padding:12px 14px;margin:8px 0 16px}.maps legend{color:#bfcbda;padding:0 6px}.maps label{display:inline-block;margin:0 18px 0 0;color:#edf2fa}.maps input{width:auto;margin-right:6px}.row{display:grid;grid-template-columns:1fr auto;gap:8px;margin:8px 0 16px}.hidden{display:none!important}#status{min-height:26px;color:#ffd27a}a{color:#ffd27a}.rules{border-top:1px solid #334156;padding-top:14px;margin-top:18px;color:#b6c3d5;font-size:14px}@media(max-width:430px){.choices{grid-template-columns:1fr}}
 </style>
 </head>
-<body><main class="card"><a href="menu.html">← Main menu</a><h1>Deathmatch</h1><p>Private 1v1, first to 10 takedowns. Pick your character and arena — pistol and rifle loadout, and the game’s desktop, controller, or touch controls.</p>
+<body><main class="card"><a href="menu.html">← Main menu</a><h1>Deathmatch</h1><p>Private 1v1, first to 10 takedowns. Pick your character, loadout, and arena — any of the 8 weapons, in black or white — and the game’s desktop, controller, or touch controls.</p>
 <label for="name">Agent name</label><input id="name" maxlength="18" autocomplete="nickname" value="Agent">
 <label for="character">Character</label><select id="character">
 <optgroup label="Agents">
@@ -71,10 +71,21 @@
 <option value="shopper7.fbx">Shopper 7</option>
 </optgroup>
 </select>
+<fieldset class="maps"><legend>Loadout</legend><label><input type="radio" name="loadout" value="black" checked> Black</label><label><input type="radio" name="loadout" value="white"> White</label></fieldset>
+<label for="weapon">Starting weapon</label><select id="weapon">
+<option value="Glock" selected>Glock · pistol · 12</option>
+<option value="Walther">Walther · pistol · 12</option>
+<option value="Makarov">Makarov · pistol · 12</option>
+<option value="Revolver">Revolver · pistol · 6</option>
+<option value="MP5K">MP5K · rifle · 30</option>
+<option value="AKS74U">AKS74U · rifle · 30</option>
+<option value="Shotgun">Shotgun · 5 shells</option>
+<option value="RPG7">RPG7 · rifle · 30</option>
+</select>
 <fieldset class="maps"><legend>Arena</legend><label><input type="radio" name="map" value="courtyard" checked> Courtyard</label><label><input type="radio" name="map" value="mall"> Mall</label></fieldset>
 <div class="choices"><button id="create">Create private room</button><button id="showJoin" class="secondary">Join with code</button></div>
 <section id="joinPanel" class="hidden"><label for="code">Room code</label><div class="row"><input id="code" maxlength="6" autocomplete="off" placeholder="6-character code"><button id="join">Join</button></div></section>
-<div id="status" role="status" aria-live="polite"></div><p class="rules">The relay pauses the match during a disconnect and allows 30 seconds to reconnect. Leaving longer forfeits the match. Arenas: Courtyard and Mall — pick your character and arena above; the room plays on the creator’s arena, and the joiner’s arena pick is ignored. Ballroom and Theater need a gun system before they can host a deathmatch. Deathmatch needs the project’s Cloudflare Worker deployed and its URL set in <code>assets/js/deathmatch-config.js</code>.</p></main>
+<div id="status" role="status" aria-live="polite"></div><p class="rules">The relay pauses the match during a disconnect and allows 30 seconds to reconnect. Leaving longer forfeits the match. Loadout: pick a black or white finish and a starting weapon above; in the match, Tab cycles weapons and 1–8 select one directly (courtyard). Arenas: Courtyard and Mall — pick your character, loadout, and arena above; the room plays on the creator’s arena, and the joiner’s arena pick is ignored. Ballroom and Theater need a gun system before they can host a deathmatch. Deathmatch needs the project’s Cloudflare Worker deployed and its URL set in <code>assets/js/deathmatch-config.js</code>.</p></main>
 <script type="module">
 import { DEATHMATCH_RELAY_URL } from './assets/js/deathmatch-config.js';
 const $ = id => document.getElementById(id), status = $('status');
@@ -84,7 +95,9 @@ async function enter(action){
   if(!DEATHMATCH_RELAY_URL){setupNeeded();return;}
   status.textContent='Creating secure room…';
   const character=$('character').value;
-  const body={name:$('name').value.trim().slice(0,18)||'Agent',character};
+  const loadout=document.querySelector('input[name="loadout"]:checked')?.value||'black';
+  const weapon=$('weapon').value||'Glock';
+  const body={name:$('name').value.trim().slice(0,18)||'Agent',character,loadout,weapon};
   if(action==='create') body.map=document.querySelector('input[name="map"]:checked')?.value||'courtyard';
   if(action==='join') body.code=$('code').value.trim().toUpperCase();
   try{
@@ -93,7 +106,7 @@ async function enter(action){
     if(!response.ok) throw new Error(result.error||'Could not enter that room.');
     const map=result.map||body.map||'courtyard';
     const url=new URL(MAP_PAGES[map]||'index.html',location.href);
-    url.searchParams.set('mode','deathmatch');url.searchParams.set('code',result.code);url.searchParams.set('token',result.token);url.searchParams.set('name',body.name);url.searchParams.set('character',character);url.searchParams.set('map',map);location.href=url;
+    url.searchParams.set('mode','deathmatch');url.searchParams.set('code',result.code);url.searchParams.set('token',result.token);url.searchParams.set('name',body.name);url.searchParams.set('character',character);url.searchParams.set('loadout',loadout);url.searchParams.set('weapon',weapon);url.searchParams.set('map',map);location.href=url;
   }catch(error){status.textContent=error.message||'Could not reach the relay.';}
 }
 $('create').addEventListener('click',()=>enter('create'));

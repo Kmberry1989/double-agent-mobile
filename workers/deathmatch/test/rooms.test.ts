@@ -34,4 +34,13 @@ describe('deathmatch room service', () => {
     const badCharacter = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Host',character:'../../evil.fbx'}) }),env);
     expect(badCharacter.status).toBe(400);
   });
+
+  it('carries the loadout and starting weapon, and rejects an unknown weapon or loadout', async () => {
+    const created = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Host',loadout:'white',weapon:'Shotgun'}) }),env);
+    expect(created.status).toBe(200);
+    const badWeapon = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Host',weapon:'Blaster'}) }),env);
+    expect(badWeapon.status).toBe(400);
+    const badLoadout = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Host',loadout:'gold'}) }),env);
+    expect(badLoadout.status).toBe(400);
+  });
 });

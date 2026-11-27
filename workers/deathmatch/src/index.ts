@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 
 export interface Env { ROOMS: DurableObjectNamespace<DeathmatchRoom> }
-type Player = { token: string; name: string; character: string; slot: number; x: number; z: number; yaw: number; health: number; score: number; ammo: number; weapon: 'pistol'|'rifle'; lastMove: number; lastShot: number; reloadAt: number; disconnectedAt: number|null; respawnAt: number };
+type Player = { token: string; name: string; character: string; loadout: 'white'|'black'; slot: number; x: number; z: number; yaw: number; health: number; score: number; ammo: number; weapon: string; lastMove: number; lastShot: number; reloadAt: number; disconnectedAt: number|null; respawnAt: number };
 type RoomState = { map: MapId; players: (Player|null)[]; startedAt: number|null; createdAt: number; finished: boolean; winner: number|null; finishReason: 'score'|'forfeit'|'expired'|null };
 // Per-map arena bounds (x/z half-extents) and diagonal-opposite spawns,
 // mirroring the courtyard's pattern. The lobby only offers the maps whose
@@ -18,6 +18,26 @@ const cleanMap = (v: unknown): MapId => (typeof v === 'string' && v in MAPS ? (v
 // A character is a plain .fbx/.glb filename (no directories, no '..') —
 // the game page validates it against the real roster before loading.
 const cleanCharacter = (v: unknown): string => (typeof v === 'string' && /^[A-Za-z0-9_.\-]+\.(fbx|glb)$/.test(v) && !v.includes('..') ? v : 'Agent_Kyle.fbx');
+// Weapon table — mirrors the game's WEAPON_CYCLE stats in index.html
+// (damage / rate / magazine). The worker's rate is the client's rate
+// minus ~10 ms, the same tolerance the old pistol/rifle table used
+// (pistol 280→270, rifle 110→105). The Shotgun's rate IS its pump gate
+// (PUMP_T 600 ms in index.html) — the pump is the shotgun's real fire
+// cadence, so the relay enforces it server-side. The RPG7 is a
+// rifle-class visual variant (no launcher / AoE), so it takes rifle stats.
+const WEAPONS = {
+  Glock: { dmg: 34, rate: 270, cap: 12 },
+  Walther: { dmg: 34, rate: 270, cap: 12 },
+  Makarov: { dmg: 34, rate: 270, cap: 12 },
+  Revolver: { dmg: 40, rate: 340, cap: 6 },
+  MP5K: { dmg: 50, rate: 105, cap: 30 },
+  AKS74U: { dmg: 50, rate: 105, cap: 30 },
+  Shotgun: { dmg: 70, rate: 600, cap: 5 },
+  RPG7: { dmg: 50, rate: 105, cap: 30 },
+} as const;
+type WeaponId = keyof typeof WEAPONS;
+const cleanWeapon = (v: unknown): WeaponId => (typeof v === 'string' && v in WEAPONS ? (v as WeaponId) : 'Glock');
+const cleanLoadout = (v: unknown): 'white'|'black' => (v === 'white' ? 'white' : 'black');
 const ROOM_TTL_MS=2*60*60*1000;
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomId = (length:number) => Array.from(crypto.getRandomValues(new Uint8Array(length)), n => alphabet[n % alphabet.length]).join('');
@@ -38,8 +58,10 @@ export default {
       const code = randomId(6), token = randomId(32);
       if (body.map !== undefined && !(typeof body.map === 'string' && body.map in MAPS)) return json({error:'Unknown map.'},400);
       if (body.character !== undefined && cleanCharacter(body.character) !== body.character) return json({error:'Unknown character.'},400);
+      if (body.weapon !== undefined && !(typeof body.weapon === 'string' && body.weapon in WEAPONS)) return json({error:'Unknown weapon.'},400);
+      if (body.loadout !== undefined && body.loadout !== 'white' && body.loadout !== 'black') return json({error:'Unknown loadout.'},400);
       const room = env.ROOMS.get(env.ROOMS.idFromName(code));
-      const response = await room.fetch('https://room/reserve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token,name:cleanName(body.name),slot:0,map:cleanMap(body.map),character:cleanCharacter(body.character)})});
+      const response = await room.fetch('https://room/reserve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token,name:cleanName(body.name),slot:0,map:cleanMap(body.map),character:cleanCharacter(body.character),weapon:cleanWeapon(body.weapon),loadout:cleanLoadout(body.loadout)})});
       if (!response.ok) return json({error:'Could not create room'},500);
       return json({code,token,map:cleanMap(body.map)});
     }
@@ -47,8 +69,10 @@ export default {
       const code = String(body.code||'').toUpperCase();
       if (!/^[A-HJ-NP-Z2-9]{6}$/.test(code)) return json({error:'Enter a valid six-character room code.'},400);
       if (body.character !== undefined && cleanCharacter(body.character) !== body.character) return json({error:'Unknown character.'},400);
+      if (body.weapon !== undefined && !(typeof body.weapon === 'string' && body.weapon in WEAPONS)) return json({error:'Unknown weapon.'},400);
+      if (body.loadout !== undefined && body.loadout !== 'white' && body.loadout !== 'black') return json({error:'Unknown loadout.'},400);
       const token = randomId(32), room = env.ROOMS.get(env.ROOMS.idFromName(code));
-      const response = await room.fetch('https://room/reserve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token,name:cleanName(body.name),slot:1,character:cleanCharacter(body.character)})});
+      const response = await room.fetch('https://room/reserve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token,name:cleanName(body.name),slot:1,character:cleanCharacter(body.character),weapon:cleanWeapon(body.weapon),loadout:cleanLoadout(body.loadout)})});
       if (!response.ok) return json({error:(await response.json() as any).error||'Room is unavailable.'},response.status);
       return json({code,token,map:((await response.json()) as any).map||'courtyard'});
     }
@@ -57,7 +81,7 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 function cleanName(value:unknown){return String(value||'Agent').replace(/[<>\u0000-\u001f]/g,'').trim().slice(0,18)||'Agent';}
-function blankPlayer(token:string,name:string,slot:number,map:MapId,character:string):Player{const spawn=MAPS[map].spawns[slot];return {token,name,character,slot,x:spawn.x,z:spawn.z,yaw:spawn.yaw,health:100,score:0,ammo:12,weapon:'pistol',lastMove:0,lastShot:0,reloadAt:0,disconnectedAt:null,respawnAt:0};}
+function blankPlayer(token:string,name:string,slot:number,map:MapId,character:string,weapon:WeaponId,loadout:'white'|'black'):Player{const spawn=MAPS[map].spawns[slot];return {token,name,character,loadout,slot,x:spawn.x,z:spawn.z,yaw:spawn.yaw,health:100,score:0,ammo:WEAPONS[weapon].cap,weapon,lastMove:0,lastShot:0,reloadAt:0,disconnectedAt:null,respawnAt:0};}
 
 export class DeathmatchRoom extends DurableObject<Env> {
   private statePromise:Promise<RoomState>;
@@ -66,7 +90,7 @@ export class DeathmatchRoom extends DurableObject<Env> {
   private async save(state:RoomState){await this.ctx.storage.put('room',state);}
   private async scheduleAlarm(state:RoomState){const times:number[]=[state.createdAt+ROOM_TTL_MS];for(const p of state.players){if(!p)continue;if(p.reloadAt>0)times.push(p.reloadAt);if(p.respawnAt>0)times.push(p.respawnAt);if(p.disconnectedAt&&!state.finished)times.push(p.disconnectedAt+30_000);}await this.ctx.storage.setAlarm(Math.min(...times));}
   private onlineTokens(exclude?:WebSocket){return new Set(this.ctx.getWebSockets().filter(ws=>ws!==exclude).map(ws=>{try{return (ws.deserializeAttachment() as any).token;}catch{return '';}}));}
-  private publicState(state:RoomState){const online=this.onlineTokens();return {type:'state',map:state.map,started:state.startedAt!==null&&!state.finished,finished:state.finished,reason:state.finishReason,paused:state.players.some(p=>!!p?.disconnectedAt),winner:state.winner,players:state.players.map(p=>p?{slot:p.slot,name:p.name,character:p.character,x:p.x,z:p.z,yaw:p.yaw,health:p.health,score:p.score,ammo:p.ammo,weapon:p.weapon,respawnAt:p.respawnAt,connected:online.has(p.token)}:null)};}
+  private publicState(state:RoomState){const online=this.onlineTokens();return {type:'state',map:state.map,started:state.startedAt!==null&&!state.finished,finished:state.finished,reason:state.finishReason,paused:state.players.some(p=>!!p?.disconnectedAt),winner:state.winner,players:state.players.map(p=>p?{slot:p.slot,name:p.name,character:p.character,loadout:p.loadout,x:p.x,z:p.z,yaw:p.yaw,health:p.health,score:p.score,ammo:p.ammo,weapon:p.weapon,respawnAt:p.respawnAt,connected:online.has(p.token)}:null)};}
   private async broadcast(state:RoomState){const message=JSON.stringify(this.publicState(state));for(const ws of this.ctx.getWebSockets())try{ws.send(message);}catch{}}
   async fetch(request:Request):Promise<Response>{
     const url=new URL(request.url);
@@ -78,7 +102,7 @@ export class DeathmatchRoom extends DurableObject<Env> {
       if(input.slot===1&&state.players[0]===null)return json({error:'Room code was not found.'},404);
       if(state.players[input.slot])return json({error:'Room already has two agents.'},409);
       if(input.slot===0)state.map=cleanMap(input.map);
-      state.players[input.slot]=blankPlayer(input.token,cleanName(input.name),input.slot,state.map,cleanCharacter(input.character));await this.save(state);await this.scheduleAlarm(state);return json({slot:input.slot,map:state.map});
+      state.players[input.slot]=blankPlayer(input.token,cleanName(input.name),input.slot,state.map,cleanCharacter(input.character),cleanWeapon(input.weapon),cleanLoadout(input.loadout));await this.save(state);await this.scheduleAlarm(state);return json({slot:input.slot,map:state.map});
     }
     if(url.pathname==='/room'&&request.headers.get('upgrade')==='websocket'){
       const token=url.searchParams.get('token')||'',state=await this.load(),player=state.players.find(p=>p?.token===token);
@@ -107,9 +131,10 @@ export class DeathmatchRoom extends DurableObject<Env> {
       await this.save(state);await this.broadcast(state);return;
     }
     if(packet.type==='shoot'&&!state.finished&&state.startedAt&&other&&other.health>0&&!state.players.some(pl=>pl?.disconnectedAt)){
-      const weapon=packet.weapon==='rifle'?'rifle':'pistol',rate=weapon==='rifle'?105:270,capacity=weapon==='rifle'?30:12,damage=weapon==='rifle'?50:34;
+      if(typeof packet.weapon!=='string'||!(packet.weapon in WEAPONS))return;
+      const w=WEAPONS[packet.weapon as WeaponId],rate=w.rate,capacity=w.cap,damage=w.dmg;
       if(now<p.reloadAt||now-p.lastShot<rate)return;
-      if(p.weapon!==weapon){p.weapon=weapon;p.ammo=capacity;p.reloadAt=0;}
+      if(p.weapon!==packet.weapon){p.weapon=packet.weapon;p.ammo=capacity;p.reloadAt=0;}
       if(p.ammo<=0){p.reloadAt=now+1400;await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);return;}
       const d=packet.dir||{},o=packet.origin||{},dx=Number(d.x),dy=Number(d.y),dz=Number(d.z),ox=Number(o.x),oy=Number(o.y),oz=Number(o.z),len=Math.hypot(dx,dy,dz);
       if(!Number.isFinite(len)||len<0.9||len>1.1||![ox,oy,oz].every(Number.isFinite)||Math.hypot(ox-p.x,oz-p.z)>5||oy<1.1||oy>4.5)return;
@@ -118,11 +143,16 @@ export class DeathmatchRoom extends DurableObject<Env> {
       if(p.ammo===0)p.reloadAt=now+1400;
       await this.save(state);if(p.reloadAt)await this.scheduleAlarm(state);await this.broadcast(state);return;
     }
+    if(packet.type==='weapon'&&!state.finished){
+      if(typeof packet.weapon!=='string'||!(packet.weapon in WEAPONS))return;
+      if(p.weapon!==packet.weapon){p.weapon=packet.weapon;p.ammo=WEAPONS[packet.weapon as WeaponId].cap;p.reloadAt=0;await this.save(state);await this.broadcast(state);}
+      return;
+    }
     if(packet.type==='reload'&&!state.finished){p.reloadAt=now+1400;await this.save(state);await this.scheduleAlarm(state);}
   }
   async webSocketClose(ws:WebSocket){const a:any=ws.deserializeAttachment();if(!a||this.onlineTokens(ws).has(a.token))return;const state=await this.load(),p=state.players[a.slot];if(!p||p.token!==a.token)return;p.disconnectedAt=Date.now();await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);}
   async webSocketError(ws:WebSocket){await this.webSocketClose(ws);}
-  async alarm(){const state=await this.load(),now=Date.now();if(now>=state.createdAt+ROOM_TTL_MS){state.finished=true;state.finishReason='expired';await this.save(state);await this.broadcast(state);for(const ws of this.ctx.getWebSockets())try{ws.close(1000,'Room expired');}catch{}await this.ctx.storage.deleteAll();return;}for(const p of state.players){if(!p)continue;if(p.reloadAt&&p.reloadAt<=now){p.ammo=p.weapon==='rifle'?30:12;p.reloadAt=0;}if(p.respawnAt&&p.respawnAt<=now){const spawn=MAPS[state.map].spawns[p.slot];p.x=spawn.x;p.z=spawn.z;p.yaw=spawn.yaw;p.health=100;p.ammo=p.weapon==='rifle'?30:12;p.respawnAt=0;}if(p.disconnectedAt&&now-p.disconnectedAt>=30_000&&!state.finished){state.finished=true;state.winner=1-p.slot;state.finishReason='forfeit';}}
+  async alarm(){const state=await this.load(),now=Date.now();if(now>=state.createdAt+ROOM_TTL_MS){state.finished=true;state.finishReason='expired';await this.save(state);await this.broadcast(state);for(const ws of this.ctx.getWebSockets())try{ws.close(1000,'Room expired');}catch{}await this.ctx.storage.deleteAll();return;}for(const p of state.players){if(!p)continue;if(p.reloadAt&&p.reloadAt<=now){p.ammo=WEAPONS[p.weapon as WeaponId].cap;p.reloadAt=0;}if(p.respawnAt&&p.respawnAt<=now){const spawn=MAPS[state.map].spawns[p.slot];p.x=spawn.x;p.z=spawn.z;p.yaw=spawn.yaw;p.health=100;p.ammo=WEAPONS[p.weapon as WeaponId].cap;p.respawnAt=0;}if(p.disconnectedAt&&now-p.disconnectedAt>=30_000&&!state.finished){state.finished=true;state.winner=1-p.slot;state.finishReason='forfeit';}}
     await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);
   }
 }

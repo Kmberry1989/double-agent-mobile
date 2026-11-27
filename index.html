@@ -146,7 +146,7 @@ function dmCharacter(){ return deathmatchMode && DM_CHARACTER_ROSTER.has(dmParam
 // is authoritative afterwards.
 const DM_MAP_SPAWNS = { courtyard: [{x:-14,z:20,yaw:-0.61},{x:14,z:-20,yaw:2.53}], ballroom: [{x:-14,z:9,yaw:-0.61},{x:14,z:-9,yaw:2.53}], theater: [{x:-10,z:16,yaw:-0.61},{x:10,z:-16,yaw:2.53}], mall: [{x:-14,z:24,yaw:-0.61},{x:14,z:-24,yaw:2.53}] };
 function dmSpawn(){ const m = DM_MAP_SPAWNS[dmParams.get('map')] || DM_MAP_SPAWNS.courtyard; return m[dmSlot] || m[0]; }
-if(deathmatchMode){document.body.classList.add('deathmatch');document.title='Courtyard Deathmatch — Undercover: Double Agent';document.querySelector('#overlay h1').textContent='COURTYARD DEATHMATCH';document.getElementById('startBtn').textContent='Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · 1 Glock · 2 MP5K · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent='Two agents · private room · no guards, cameras or mission objectives · 30 second reconnect window';}
+if(deathmatchMode){document.body.classList.add('deathmatch');document.title='Courtyard Deathmatch — Undercover: Double Agent';document.querySelector('#overlay h1').textContent='COURTYARD DEATHMATCH';document.getElementById('startBtn').textContent='Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · Tab cycle weapon · 1–8 select weapon · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent='Two agents · private room · no guards, cameras or mission objectives · 30 second reconnect window';}
 
 // Human characters stand 5 cm off the floor (feet less likely to clip
 // into / sink below it). Added to every human character's standing Y:
@@ -1950,6 +1950,8 @@ function loadPlayerModel(file){
 }
 loadPlayerModel(dmCharacter());
 let playerLoadout = 'black'; // 'white' | 'black' — two distinct player sets.
+// Deathmatch: the lobby picks the finish (single-player stays black by default).
+if (deathmatchMode) { const lo = dmParams.get('loadout'); if (lo === 'white' || lo === 'black') playerLoadout = lo; }
 // Default is 'black' (2026-11-22, Kyle): the player begins the courtyard
 // with a suppressed pistol equipped — the black Glock (threaded barrel)
 // with the black suppressor attached, firing the quiet suppressed-pistol
@@ -1978,6 +1980,9 @@ function setWeaponVariant(name){
   weaponVariant = info.name; weapon = info.cls;
   ammoInMag = info.cls === 'pistol' ? Math.min(ammoInMag, info.mag) : info.mag;
   updateWeaponVisibility();
+  // Deathmatch: tell the relay the new weapon at once, so its damage /
+  // rate / magazine follow the pick even before the next shot.
+  if (deathmatchMode) dmClient?.send('weapon',{weapon:weaponVariant});
 }
 function cycleWeapon(){
   const i = WEAPON_CYCLE.findIndex(v=>v.name===weaponVariant);
@@ -2035,6 +2040,8 @@ WEAPON_CYCLE.forEach((v)=>{
   loadPlayerWeapon('white', v.name, PLAYER_LOADOUTS.white[v.name]);
   loadPlayerWeapon('black', v.name, PLAYER_LOADOUTS.black[v.name]);
 });
+// Deathmatch: start on the lobby's weapon (single-player starts on Glock).
+if (deathmatchMode) { const w = dmParams.get('weapon'); if (w && WEAPON_CYCLE.some(v=>v.name===w)) setWeaponVariant(w); }
 // ---------- Suppressor + visual accessories (wired, visual only) ----------
 // Suppressor GLBs exist per set; glasses exist per set; watch exists only
 // as black_watch.glb (shared across sets). Pen, cufflinks and bag have no
@@ -2877,7 +2884,16 @@ addEventListener('keydown', e=>{
   if (e.code==='KeyC') cycleStance();
   if (e.code==='KeyY') cycleWeather();
   if (e.code==='Digit1'){ setWeaponVariant('Glock'); }
-  if (e.code==='Digit2'){ setWeaponVariant('MP5K'); }
+  if (e.code==='Digit2'){ setWeaponVariant(deathmatchMode ? 'Walther' : 'MP5K'); }
+  // Deathmatch: 1–8 pick any weapon in WEAPON_CYCLE order, Tab cycles it.
+  // Single-player keeps 1 = Glock, 2 = MP5K.
+  if (deathmatchMode && e.code==='Digit3'){ setWeaponVariant('Makarov'); }
+  if (deathmatchMode && e.code==='Digit4'){ setWeaponVariant('Revolver'); }
+  if (deathmatchMode && e.code==='Digit5'){ setWeaponVariant('MP5K'); }
+  if (deathmatchMode && e.code==='Digit6'){ setWeaponVariant('AKS74U'); }
+  if (deathmatchMode && e.code==='Digit7'){ setWeaponVariant('Shotgun'); }
+  if (deathmatchMode && e.code==='Digit8'){ setWeaponVariant('RPG7'); }
+  if (deathmatchMode && e.code==='Tab'){ e.preventDefault(); cycleWeapon(); }
   if (e.code==='KeyL'){ playerLoadout = playerLoadout==='white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
   if (e.code==='KeyR') startReload();
   if (e.code==='KeyG') toggleCarryDrop();
@@ -2968,7 +2984,7 @@ function pollGamepad(dt) {
   if (gp.pressed(GP.L3)) { gpSprintToggle = !gpSprintToggle; noteActivity(); }
   if (gp.pressed(GP.R1)) { sneaking = !sneaking; noteActivity(); }
   if (gp.pressed(GP.R3)) { startReload(); noteActivity(); } // R3 (right-stick press) = reload — the free shoulder button after the L2/R2 trigger swap
-  if (gp.pressed(GP.DPAD_UP)) playPlayerOneShot('wave');
+  if (gp.pressed(GP.DPAD_UP)) { if (deathmatchMode) cycleWeapon(); else playPlayerOneShot('wave'); }
   if (gp.pressed(GP.DPAD_DOWN)) doKick(); // heavy kick
   // D-pad Left/Right: lean (held, while aiming — read in animate()).
   gpLean = (gp.held(GP.DPAD_RIGHT) ? 1 : 0) - (gp.held(GP.DPAD_LEFT) ? 1 : 0);
@@ -3128,7 +3144,7 @@ function kickHit(){
     document.getElementById('btnFire').classList.add('on');
     tryShoot();
     if (fireTimer) clearInterval(fireTimer);
-    fireTimer = setInterval(()=>{ if (!gameOver && !won) tryShoot(); }, deathmatchMode ? (weapon==='rifle'?110:280) : 180);
+    fireTimer = setInterval(()=>{ if (!gameOver && !won) tryShoot(); }, deathmatchMode ? 100 : 180);
   }, ()=>{
     aiming = false;
     document.getElementById('btnFire').classList.remove('on');
@@ -3435,11 +3451,13 @@ function playFootstep(){
 let stepAccum = 0, stepPrevX = null, stepPrevZ = null;
 let dmLastShot = 0;
 function deathmatchShoot(){
-  noteActivity();const now=performance.now();if(now-dmLastShot<(weapon==='rifle'?110:280)||health<=0||!dmStarted||dmPaused||dmFinished)return;
+  noteActivity();const now=performance.now();if(now-dmLastShot<weaponStats().rate*1000||health<=0||!dmStarted||dmPaused||dmFinished)return;
+  if(weaponVariant==='Shotgun'&&now<pumpUntil)return; // the pump must finish before the next shot
   if(ammoInMag<=0){startReload();return;}
   dmLastShot=now;lastShot=now;ammoInMag--;const dir=new THREE.Vector3();camera.getWorldDirection(dir);
-  dmClient?.send('shoot',{weapon,dir:{x:dir.x,y:dir.y,z:dir.z},origin:{x:camera.position.x,y:camera.position.y,z:camera.position.z}});
+  dmClient?.send('shoot',{weapon:weaponVariant,dir:{x:dir.x,y:dir.y,z:dir.z},origin:{x:camera.position.x,y:camera.position.y,z:camera.position.z}});
   playShotSound();playPlayerOneShot(weapon==='rifle'?'fireRifle':'firePistol');
+  if(weaponVariant==='Shotgun'){pumpUntil=now+PUMP_T;playSfx(SFX_FILES.shotgunPump);}
   const muzzle=getPlayerMuzzle(_muzzleV),end=muzzle.clone().addScaledVector(dir,60);showMuzzleFlash(muzzle,dir);spawnTracer(muzzle,end);
   if(ammoInMag<=0)startReload();
 }
@@ -4401,7 +4419,7 @@ function animate(){
   const _st=document.getElementById('stateText'); if(_st) _st.textContent = anyAlert?'ALERT':(detection>=30?'CAUTION':(detection>0?'SUSPICIOUS':'UNDETECTED'));
   const _wt=document.getElementById('weaponText'); if(_wt) _wt.textContent = weaponVariant + ' (' + weapon + ') · ' + playerLoadout + ' set';
   const _at=document.getElementById('ammoText'); if(_at) _at.textContent = 'Ammo: '+ammoInMag+' / '+weapons[weapon].max + (now<reloadUntil?' (reloading)':'');
-  if(deathmatchMode){const _dmAmmo=document.getElementById('dmAmmo');if(_dmAmmo)_dmAmmo.textContent=weaponVariant+' · '+ammoInMag+' / '+weapons[weapon].max+(now<reloadUntil?' · reloading':'');}
+  if(deathmatchMode){const _dmAmmo=document.getElementById('dmAmmo');if(_dmAmmo)_dmAmmo.textContent=weaponVariant+' · '+ammoInMag+' / '+weaponStats().max+(now<reloadUntil?' · reloading':'');}
   const _dispAnim = playerHeldPose || playerOneShotName || currentAnim;
   const _ant=document.getElementById('animText'); if(_ant) _ant.textContent = 'Anim: '+_dispAnim+' ('+(fbxPlaying ? 'Agent_Kyle.fbx, FBX' : 'procedural capsule')+') — FBX: '+(ANIM_MAP[_dispAnim]||ANIM_MAP[currentAnim]||'—');
   const _pt=document.getElementById('posText'); if(_pt) _pt.textContent = 'Intel: '+intel+'/3  •  X '+player.position.x.toFixed(0)+' Z '+player.position.z.toFixed(0);
@@ -4414,7 +4432,7 @@ function applyDeathmatchState(message){
   if(message.type!=='state')return;
   dmPlayers=message.players||[null,null];dmStarted=!!message.started;dmPaused=!!message.paused;dmFinished=!!message.finished;
   const me=dmPlayers[dmSlot],op=dmPlayers[1-dmSlot];
-  if(me){player.position.set(me.x,CHAR_LIFT,me.z);yaw=me.yaw;modelYaw=me.yaw;health=me.health;ammoInMag=me.ammo;weapon=me.weapon;}
+  if(me){player.position.set(me.x,CHAR_LIFT,me.z);yaw=me.yaw;modelYaw=me.yaw;health=me.health;ammoInMag=me.ammo;}
   if(op){dmRemote.visible=true;dmRemote.position.set(op.x,CHAR_LIFT,op.z);dmRemote.rotation.y=op.yaw;loadDmRemoteCharacter(op.character);}
   else dmRemote.visible=false;
   const score=document.getElementById('dmScore'),status=document.getElementById('dmStatus');
