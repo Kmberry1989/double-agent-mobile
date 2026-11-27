@@ -25,7 +25,9 @@
   #zoomBtn{position:fixed;right:26px;bottom:132px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:15px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
   body.touch #fireBtn,body.touch #scopeBtn,body.touch #zoomBtn{display:block}
   #scopeUI{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:none;z-index:6;pointer-events:none;text-align:center}
-  #scopeUI img{width:min(58vmin,400px);height:auto;display:block}
+  #scopeWrap{position:relative;width:min(58vmin,400px);height:min(58vmin,400px);margin:0 auto}
+  #scopeWrap img{width:100%;height:100%;display:block;position:relative;z-index:1}
+  #scopeRing{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78.9%;height:78.9%;box-sizing:content-box;border:clamp(10px,2.5vmin,18px) solid #000;border-radius:50%;pointer-events:none}
   #zoomLabel{margin-top:10px;font-size:15px;font-weight:700;color:#fff;text-shadow:0 1px 4px #000}
   #barTop,#barBottom{position:fixed;left:0;right:0;height:0;background:#000;z-index:4;pointer-events:none}
   #barTop{top:0} #barBottom{bottom:0}
@@ -38,7 +40,7 @@
 <button id="fireBtn">FIRE</button>
 <button id="scopeBtn">SCOPE</button>
 <button id="zoomBtn">ZOOM</button>
-<div id="scopeUI"><img id="crosshairImg" src="assets/ui/crosshair-sniper.png" alt=""><div id="zoomLabel">2x</div></div>
+<div id="scopeUI"><div id="scopeWrap"><div id="scopeRing"></div><img id="crosshairImg" src="assets/ui/crosshair-sniper.png" alt=""></div><div id="zoomLabel">2x</div></div>
 <div id="barTop"></div><div id="barBottom"></div>
 <div id="overlay"><h1>Trick or Treat</h1><p>Sniper nest — the street is yours to watch.</p><button id="startBtn">Enter the nest</button><p class="padControls">PS4 controller — Right stick look · L2 Scope · L3 Zoom 2x/4x · X / R1 / R2 Shoot</p><p class="padControls">Mouse — look · Right-mouse Scope · Click Shoot · Wheel Zoom · F Scope · Touch — drag look · SCOPE / FIRE / ZOOM</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
