@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Controller Test — Undercover: Double Agent</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#23314a,#080d17 60%);color:#edf2fa;font:16px/1.5 system-ui,sans-serif;padding:20px}
+.card{width:min(100%,640px);margin:0 auto;padding:clamp(22px,5vw,36px);background:#0b1321ed;border:1px solid #52627b;border-radius:18px;box-shadow:0 20px 80px #0008}
+h1{margin:0 0 8px;font-size:clamp(26px,6vw,36px)}p{color:#bfcbda}
+a{color:#ffd27a}
+#status{font-size:18px;font-weight:700;min-height:26px;color:#ffd27a}
+#status.ok{color:#7be495}
+.hint{border:1px solid #52627b;border-radius:9px;padding:12px 14px;margin:14px 0;color:#b6c3d5;font-size:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}
+.btn{border:1px solid #52627b;border-radius:9px;padding:10px 12px;background:#080d16}
+.btn.on{background:#ffd27a;color:#09101b;border-color:#ffd27a;font-weight:700}
+.btn .name{font-weight:700}
+.btn .act{font-size:13px;color:#bfcbda}
+.btn.on .act{color:#3a2c05}
+.axis{margin:10px 0}
+.axis .bar{height:10px;background:#1d2a3e;border-radius:5px;overflow:hidden}
+.axis .fill{height:100%;background:#ffd27a;width:50%}
+.axis .val{font-size:13px;color:#bfcbda}
+nav{margin-top:18px;border-top:1px solid #334156;padding-top:14px;font-size:14px}
+nav a{margin-right:14px}
+@media(max-width:480px){.grid{grid-template-columns:1fr}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body><main class="card">
+<a href="menu.html">← Main menu</a>
+<h1>Controller Test</h1>
+<p>Pair your PS4 DualShock 4 over Bluetooth, then press any button on it. This page reads the controller live through the same gamepad module the game uses, so what you see here is exactly what the game sees.</p>
+<div id="status">No controller detected.</div>
+<div class="hint">On iPhone Safari the controller only appears after you press a button on it — that is how Safari works, not a fault in the game. If nothing appears after pressing a button, check the controller is paired in the phone's Bluetooth settings (hold Share + PS until the light bar flashes, then pair "Wireless Controller").</div>
+<div id="info"></div>
+<h2>Buttons</h2>
+<div class="grid" id="buttons"></div>
+<h2>Sticks</h2>
+<div id="axes"></div>
+<nav><a href="index.html">Courtyard</a><a href="mall.html">Mall</a><a href="halloween.html">Halloween</a><a href="theater.html">Theater</a><a href="deathmatch.html">Deathmatch</a></nav>
+</main>
+<script type="module">
+import { createGamepad, GP } from './assets/js/gamepad.js';
+// DualShock 4 button names + what each does in Double Agent (courtyard mapping).
+const BUTTONS = [
+  [GP.CROSS, 'Cross', 'Use / Enter'],
+  [GP.CIRCLE, 'Circle', 'Roll'],
+  [GP.SQUARE, 'Square', 'Melee'],
+  [GP.TRIANGLE, 'Triangle', 'Switch loadout (black/white)'],
+  [GP.L1, 'L1', 'Melee'],
+  [GP.R1, 'R1', 'Sneak'],
+  [GP.L2, 'L2 (analog)', 'Aim (hold)'],
+  [GP.R2, 'R2 (analog)', 'Fire (hold, auto-fire)'],
+  [GP.SHARE, 'Share', '—'],
+  [GP.OPTIONS, 'Options', '—'],
+  [GP.L3, 'L3 (left stick press)', 'Sprint toggle'],
+  [GP.R3, 'R3 (right stick press)', 'Reload'],
+  [GP.DPAD_UP, 'D-pad Up', 'Cycle weapon / Wave'],
+  [GP.DPAD_DOWN, 'D-pad Down', 'Heavy kick'],
+  [GP.DPAD_LEFT, 'D-pad Left', 'Lean left (while aiming)'],
+  [GP.DPAD_RIGHT, 'D-pad Right', 'Lean right (while aiming)'],
+  [GP.PS, 'PS', '—'],
+  [GP.TOUCHPAD, 'Touchpad', '—'],
+];
+const AXES = [
+  [GP.LX, 'Left stick X', 'Move left / right'],
+  [GP.LY, 'Left stick Y', 'Move forward / back'],
+  [GP.RX, 'Right stick X', 'Look left / right'],
+  [GP.RY, 'Right stick Y', 'Look up / down'],
+];
+const gp = createGamepad();
+const statusEl = document.getElementById('status');
+const infoEl = document.getElementById('info');
+const btnEl = document.getElementById('buttons');
+const axEl = document.getElementById('axes');
+for (const [i, name, act] of BUTTONS) {
+  const d = document.createElement('div');
+  d.className = 'btn'; d.id = 'btn' + i;
+  d.innerHTML = '<div class="name">' + name + '</div><div class="act">' + act + '</div>';
+  btnEl.appendChild(d);
+}
+for (const [i, name, act] of AXES) {
+  const d = document.createElement('div');
+  d.className = 'axis'; d.id = 'ax' + i;
+  d.innerHTML = '<div><b>' + name + '</b> — ' + act + '</div><div class="bar"><div class="fill"></div></div><div class="val">0.00</div>';
+  axEl.appendChild(d);
+}
+function tick() {
+  const ok = gp.update();
+  if (ok) {
+    statusEl.textContent = 'Controller connected.';
+    statusEl.className = 'ok';
+    // Read the raw pad for the id/mapping (the module only exposes the polled state).
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let pad = null;
+    for (const p of pads) { if (p && p.connected) { pad = p; break; } }
+    if (pad) infoEl.innerHTML = '<p><b>' + pad.id + '</b><br>Mapping: ' + (pad.mapping || '—') + ' · Buttons: ' + pad.buttons.length + ' · Axes: ' + pad.axes.length + '</p>';
+  } else {
+    statusEl.textContent = 'No controller detected.';
+    statusEl.className = '';
+    infoEl.innerHTML = '';
+  }
+  for (const [i] of BUTTONS) {
+    const el = document.getElementById('btn' + i);
+    if (el) el.classList.toggle('on', gp.held(i));
+  }
+  const vals = [gp.lx, gp.ly, gp.rx, gp.ry];
+  for (let k = 0; k < AXES.length; k++) {
+    const [i] = AXES[k];
+    const el = document.getElementById('ax' + i);
+    if (!el) continue;
+    const v = vals[k] || 0;
+    el.querySelector('.fill').style.width = ((v + 1) / 2 * 100) + '%';
+    el.querySelector('.val').textContent = v.toFixed(2) + (v === 0 ? ' (dead zone)' : '');
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
