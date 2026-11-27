@@ -1,15 +1,22 @@
 import { DurableObject } from 'cloudflare:workers';
-import { BOT_DEFAULT_CHARACTERS, BOT_DIFFICULTIES, BOT_MAX_COUNT, BOT_MIN_COUNT, BOT_SCORE_TARGET, BOT_RESPAWN_MS, cleanBotCount, cleanDifficulty, cleanBotWeapon, createBot, updateBot, respawnBot } from '../../../assets/js/dm-bot-brain.js';
+import { BOT_DEFAULT_CHARACTERS, BOT_DIFFICULTIES, BOT_MAX_COUNT, BOT_MIN_COUNT, BOT_SCORE_TARGET, BOT_RESPAWN_MS, cleanBotCount, cleanDifficulty, cleanBotWeapon, isBotWeapon, createBot, updateBot, respawnBot } from '../../../assets/js/dm-bot-brain.js';
 
 export interface Env { ROOMS: DurableObjectNamespace<DeathmatchRoom> }
-type Player = { token: string; name: string; character: string; loadout: 'white'|'black'; slot: number; x: number; z: number; yaw: number; health: number; score: number; ammo: number; weapon: string; lastMove: number; lastShot: number; reloadAt: number; disconnectedAt: number|null; respawnAt: number };
+type Player = { token: string; name: string; character: string; loadout: 'white'|'black'; slot: number; x: number; z: number; yaw: number; health: number; score: number; ammo: number; weapon: string; lastMove: number; lastShot: number; reloadAt: number; disconnectedAt: number|null; respawnAt: number; counts: Record<string, number> };
+// A pending grenade: thrown at the point, it detonates at detonateAt
+// (2 s fuse) and the blast is applied by the alarm, not by the throw
+// packet — so the damage lands when the grenade lands, on every client.
+// A placed claymore: armed at armedAt (1 s), it detonates when an
+// ENEMY crosses its front 60° arc within 6 m (never its owner).
+export type Grenade = { x: number; z: number; detonateAt: number; owner: number };
+export type Mine = { owner: number; x: number; z: number; yaw: number; armedAt: number };
 // A bot is the brain's createBot() shape (see assets/js/dm-bot-brain.js)
 // plus lastShotAt, the ms timestamp of its last shot, so clients can
 // draw the bot's tracer. The brain keeps lastShot (cadence) separately.
 export type Bot = { id: string; name: string; character: string; weapon: string; loadout: 'white'|'black'; difficulty: string; x: number; z: number; yaw: number; health: number; score: number; ammo: number; dead: boolean; respawnAt: number; lastShot: number; lastShotAt: number; reloadUntil: number; [key: string]: any };
 export type RoomMode = 'pvp'|'coop';
 export type Difficulty = 'easy'|'normal'|'hard';
-export type RoomState = { map: MapId; players: (Player|null)[]; startedAt: number|null; createdAt: number; finished: boolean; winner: number|null; finishReason: 'score'|'forfeit'|'expired'|null; mode: RoomMode; bots: Bot[]; difficulty: Difficulty; teamScore: { humans: number; bots: number }; winnerTeam: 'humans'|'bots'|null; lastBotTick: number };
+export type RoomState = { map: MapId; players: (Player|null)[]; startedAt: number|null; createdAt: number; finished: boolean; winner: number|null; finishReason: 'score'|'forfeit'|'expired'|null; mode: RoomMode; bots: Bot[]; difficulty: Difficulty; teamScore: { humans: number; bots: number }; winnerTeam: 'humans'|'bots'|null; lastBotTick: number; grenades: Grenade[]; mines: Mine[] };
 // Per-map arena bounds (x/z half-extents) and diagonal-opposite spawns,
 // mirroring the courtyard's pattern. The lobby only offers the maps whose
 // pages wire deathmatch mode (courtyard, mall); ballroom and theater are
@@ -32,17 +39,44 @@ const cleanCharacter = (v: unknown): string => (typeof v === 'string' && /^[A-Za
 // (PUMP_T 600 ms in index.html) — the pump is the shotgun's real fire
 // cadence, so the relay enforces it server-side. The RPG7 is a
 // rifle-class visual variant (no launcher / AoE), so it takes rifle stats.
+// kind / range: 'hitscan' and 'thrown' resolve on the ray (range is the
+// ray's max reach — the sniper's 80 m beats the old 60 m); 'melee' is
+// the knife (no ammo, cap 0 — it never reloads, and its hit is a
+// distance + front-arc check, not a ray); 'blast' is the grenade (the
+// throw packet carries the landing point, the blast is applied on the
+// fuse by the alarm, damage falling off to 20 at the 5 m edge);
+// 'mine' is the claymore (placed by a 'place' packet, never shot).
+// A weapon reloads only when it is a hitscan gun — consumables
+// (throwing knife, grenade, claymore) are spent for the life, and the
+// per-weapon counts on the Player track them across switches.
 const WEAPONS = {
-  Glock: { dmg: 34, rate: 270, cap: 12 },
-  Walther: { dmg: 34, rate: 270, cap: 12 },
-  Makarov: { dmg: 34, rate: 270, cap: 12 },
-  Revolver: { dmg: 40, rate: 340, cap: 6 },
-  MP5K: { dmg: 50, rate: 105, cap: 30 },
-  AKS74U: { dmg: 50, rate: 105, cap: 30 },
-  Shotgun: { dmg: 70, rate: 600, cap: 5 },
-  RPG7: { dmg: 50, rate: 105, cap: 30 },
+  Glock: { dmg: 34, rate: 270, cap: 12, kind: 'hitscan', range: 60 },
+  Walther: { dmg: 34, rate: 270, cap: 12, kind: 'hitscan', range: 60 },
+  Makarov: { dmg: 34, rate: 270, cap: 12, kind: 'hitscan', range: 60 },
+  Revolver: { dmg: 40, rate: 340, cap: 6, kind: 'hitscan', range: 60 },
+  MP5K: { dmg: 50, rate: 105, cap: 30, kind: 'hitscan', range: 60 },
+  AKS74U: { dmg: 50, rate: 105, cap: 30, kind: 'hitscan', range: 60 },
+  Shotgun: { dmg: 70, rate: 600, cap: 5, kind: 'hitscan', range: 60 },
+  RPG7: { dmg: 50, rate: 105, cap: 30, kind: 'hitscan', range: 60 },
+  Knife: { dmg: 50, rate: 490, cap: 0, kind: 'melee', range: 2.2 },
+  ThrowingKnife: { dmg: 40, rate: 690, cap: 6, kind: 'thrown', range: 30 },
+  Grenade: { dmg: 90, rate: 990, cap: 3, kind: 'blast', range: 25, blast: 5 },
+  Claymore: { dmg: 100, rate: 990, cap: 2, kind: 'mine', range: 6, blast: 6 },
+  SniperRifle: { dmg: 100, rate: 1190, cap: 5, kind: 'hitscan', range: 80 },
 } as const;
 type WeaponId = keyof typeof WEAPONS;
+// A weapon reloads only when it is a hitscan gun (the 8 + the sniper).
+// Anything else is a consumable or has no magazine at all.
+const isReloadable = (w: (typeof WEAPONS)[WeaponId]) => w.kind === 'hitscan';
+const usesAmmo = (w: (typeof WEAPONS)[WeaponId]) => w.cap > 0;
+export const GRENADE_FUSE_MS = 2000;
+export const GRENADE_BLAST_M = 5;
+export const MINE_ARM_MS = 1000;
+export const MINE_RANGE_M = 6;
+// Grenade falloff: full damage at the centre, 20 at the blast edge.
+export function grenadeDamageAt(dmg: number, dist: number, blast: number) {
+  return Math.max(20, Math.round(dmg * (1 - dist / blast)));
+}
 const cleanWeapon = (v: unknown): WeaponId => (typeof v === 'string' && v in WEAPONS ? (v as WeaponId) : 'Glock');
 const cleanLoadout = (v: unknown): 'white'|'black' => (v === 'white' ? 'white' : 'black');
 const ROOM_TTL_MS=2*60*60*1000;
@@ -123,11 +157,21 @@ export function tickBots(state: RoomState, now: number, random?: () => number) {
 }
 
 // The shoot packet's hit resolution, shared by the DO handler and the
-// tests: the same ray math as the PvP path (target point at 1.25 m
-// height, 0.78 m hit radius, up to 60 m), tested against the opponent
-// and against each living bot, and applied to the nearest target the
-// ray actually crosses. A bot kill scores for the shooter and for the
-// humans' team; the humans win the match at BOT_SCORE_TARGET (10).
+// tests. The ray weapons (hitscan + the thrown knife) use the same ray
+// math as the PvP path (target point at 1.25 m height, 0.78 m hit
+// radius, the weapon's own range — the sniper's 80 m beats the old
+// 60 m), tested against the opponent and against each living bot, and
+// applied to the nearest target the ray actually crosses. The knife
+// is a distance + front-arc check, not a ray (2.2 m, 45° either side
+// of the shooter's facing). The grenade carries its landing point in
+// the packet — the relay validates it (within throw range and inside
+// the arena) and stores the pending blast; the fuse is applied by the
+// alarm (applyGrenadeBlasts), so the damage lands when the grenade
+// lands, on every client. The claymore never comes through 'shoot'
+// (it uses the 'place' packet — see placeMine). A bot kill scores for
+// the shooter and for the humans' team; the humans win the match at
+// BOT_SCORE_TARGET (10). A spent consumable never reloads — the
+// per-weapon counts on the shooter track what is left across switches.
 // Returns {fired, hit, changed} — changed is true whenever the helper
 // mutated state (a shot fired, or an empty mag starting its reload),
 // so the caller knows whether to save/broadcast.
@@ -137,44 +181,228 @@ export function resolveHumanShot(state: RoomState, shooterSlot: number, packet: 
   if (!shooter || state.finished || !state.startedAt) return result;
   if (typeof packet.weapon !== 'string' || !(packet.weapon in WEAPONS)) return result;
   const w = WEAPONS[packet.weapon as WeaponId], rate = w.rate, capacity = w.cap, damage = w.dmg;
+  if (w.kind === 'mine') return result; // a claymore is placed, never shot
   if (now < shooter.reloadAt || now - shooter.lastShot < rate) return result;
-  if (shooter.weapon !== packet.weapon) { shooter.weapon = packet.weapon; shooter.ammo = capacity; shooter.reloadAt = 0; }
-  if (shooter.ammo <= 0) { shooter.reloadAt = now + 1400; result.changed = true; return result; }
+  if (shooter.weapon !== packet.weapon) {
+    shooter.weapon = packet.weapon;
+    shooter.ammo = isReloadable(w) ? capacity : (shooter.counts[packet.weapon] ?? capacity);
+    shooter.reloadAt = 0; result.changed = true; // the switch itself is a state change
+  }
+  if (usesAmmo(w)) {
+    if (shooter.ammo <= 0) {
+      if (!isReloadable(w)) return result; // consumable spent — switch weapons
+      shooter.reloadAt = now + 1400; result.changed = true; return result;
+    }
+  }
+  const other = state.players[1 - shooterSlot];
+  // Shared kill handling: a bot death scores for the shooter and the
+  // humans' team; an opponent death scores for the shooter (PvP only —
+  // co-op has no friendly fire, so the opponent is never a target).
+  const killBot = (bot: Bot) => {
+    bot.dead = true; bot.respawnAt = now + BOT_RESPAWN_MS;
+    shooter.score++; state.teamScore.humans++;
+    if (state.teamScore.humans >= BOT_SCORE_TARGET) { state.finished = true; state.winnerTeam = 'humans'; state.finishReason = 'score'; }
+  };
+  const killOpponent = () => {
+    if (!other) return;
+    other.respawnAt = now + 2500; shooter.score++;
+    if (shooter.score >= 10) { state.finished = true; state.winner = shooterSlot; if (state.mode === 'coop') state.winnerTeam = 'humans'; state.finishReason = 'score'; }
+  };
+  // Grenade: validate the landing point, spend one, store the pending
+  // blast. The fuse is the alarm's job (applyGrenadeBlasts).
+  if (w.kind === 'blast') {
+    const pt = packet.point || {}, px = Number(pt.x), pz = Number(pt.z), bounds = MAPS[state.map].bounds;
+    if (!Number.isFinite(px) || !Number.isFinite(pz) || Math.hypot(px - shooter.x, pz - shooter.z) > w.range || Math.abs(px) > bounds.x || Math.abs(pz) > bounds.z) return result;
+    shooter.lastShot = now; shooter.ammo--; shooter.counts[packet.weapon] = shooter.ammo;
+    state.grenades.push({ x: px, z: pz, detonateAt: now + GRENADE_FUSE_MS, owner: shooterSlot });
+    result.fired = true; result.changed = true; return result;
+  }
+  // Knife: nearest living target inside 2.2 m and in front of the shooter.
+  if (w.kind === 'melee') {
+    shooter.lastShot = now; result.fired = true; result.changed = true;
+    const fx = Math.sin(shooter.yaw), fz = Math.cos(shooter.yaw);
+    let best: { dist: number; apply: () => void } | null = null;
+    const considerMelee = (tx: number, tz: number, apply: () => void) => {
+      const dx = tx - shooter.x, dz = tz - shooter.z, dist = Math.hypot(dx, dz);
+      if (dist > w.range || dist <= 0) return;
+      if ((dx * fx + dz * fz) / dist < 0.707) return; // outside the front 45°
+      if (!best || dist < best.dist) best = { dist, apply };
+    };
+    if (state.mode !== 'coop' && other && other.health > 0) considerMelee(other.x, other.z, () => {
+      other.health = Math.max(0, other.health - damage);
+      if (other.health === 0) killOpponent();
+    });
+    for (const bot of state.bots) {
+      if (bot.dead || bot.health <= 0) continue;
+      considerMelee(bot.x, bot.z, () => {
+        bot.health = Math.max(0, bot.health - damage);
+        if (bot.health === 0) killBot(bot);
+      });
+    }
+    if (best) { best.apply(); result.hit = true; }
+    return result;
+  }
+  // Ray weapons (hitscan + thrown knife): the ray must be a unit
+  // direction from near the shooter's position, as before.
   const d = packet.dir || {}, o = packet.origin || {}, dx = Number(d.x), dy = Number(d.y), dz = Number(d.z), ox = Number(o.x), oy = Number(o.y), oz = Number(o.z), len = Math.hypot(dx, dy, dz);
   if (!Number.isFinite(len) || len < 0.9 || len > 1.1 || ![ox, oy, oz].every(Number.isFinite) || Math.hypot(ox - shooter.x, oz - shooter.z) > 5 || oy < 1.1 || oy > 4.5) return result;
-  shooter.lastShot = now; shooter.ammo--;
+  shooter.lastShot = now;
+  if (usesAmmo(w)) { shooter.ammo--; if (!isReloadable(w)) shooter.counts[packet.weapon] = shooter.ammo; }
   result.fired = true; result.changed = true;
   const dir = new Vec3(dx / len, dy / len, dz / len);
   // Nearest target the ray crosses: the opponent, then each living bot.
   let best: { along: number; apply: () => void } | null = null;
   const consider = (tx: number, tz: number, apply: () => void) => {
     const target = new Vec3(tx - ox, 1.25 - oy, tz - oz), along = target.dot(dir), miss = Math.sqrt(Math.max(0, target.lengthSq() - along * along));
-    if (along > 0 && along <= 60 && miss <= 0.78 && (!best || along < best.along)) best = { along, apply };
+    if (along > 0 && along <= w.range && miss <= 0.78 && (!best || along < best.along)) best = { along, apply };
   };
-  const other = state.players[1 - shooterSlot];
   // Co-op: humans are one team — a teammate is never a target, so a
   // shot passes through them to the bot behind (no friendly fire).
   if (state.mode !== 'coop' && other && other.health > 0) consider(other.x, other.z, () => {
     other.health = Math.max(0, other.health - damage);
-    if (other.health === 0) {
-      shooter.score++; other.respawnAt = now + 2500;
-      if (shooter.score >= 10) { state.finished = true; state.winner = shooterSlot; if (state.mode === 'coop') state.winnerTeam = 'humans'; state.finishReason = 'score'; }
-    }
+    if (other.health === 0) killOpponent();
   });
   for (const bot of state.bots) {
     if (bot.dead || bot.health <= 0) continue;
     consider(bot.x, bot.z, () => {
       bot.health = Math.max(0, bot.health - damage);
-      if (bot.health === 0) {
-        bot.dead = true; bot.respawnAt = now + BOT_RESPAWN_MS;
-        shooter.score++; state.teamScore.humans++;
-        if (state.teamScore.humans >= BOT_SCORE_TARGET) { state.finished = true; state.winnerTeam = 'humans'; state.finishReason = 'score'; }
-      }
+      if (bot.health === 0) killBot(bot);
     });
   }
   if (best) { best.apply(); result.hit = true; }
-  if (shooter.ammo === 0) shooter.reloadAt = now + 1400;
+  if (usesAmmo(w) && shooter.ammo === 0 && isReloadable(w)) shooter.reloadAt = now + 1400;
   return result;
+}
+
+// Apply every grenade whose fuse has run out: falloff damage to each
+// enemy inside the blast, and to the thrower too (a grenade at your own
+// feet hurts — a self-kill scores for nobody, it just respawns you).
+// Returns true when a grenade detonated (state changed).
+export function applyGrenadeBlasts(state: RoomState, now: number) {
+  if (state.finished || state.grenades.length === 0) return false;
+  let changed = false;
+  const due = state.grenades.filter(g => g.detonateAt <= now);
+  if (due.length === 0) return false;
+  state.grenades = state.grenades.filter(g => g.detonateAt > now);
+  for (const g of due) {
+    changed = true;
+    const w = WEAPONS.Grenade, blast = w.blast ?? GRENADE_BLAST_M;
+    const hitTarget = (tx: number, tz: number) => {
+      const dist = Math.hypot(tx - g.x, tz - g.z);
+      return dist <= blast ? grenadeDamageAt(w.dmg, dist, blast) : 0;
+    };
+    const owner = state.players[g.owner];
+    // Enemies: the opponent in PvP, the bots in co-op.
+    if (state.mode !== 'coop') {
+      const other = state.players[1 - g.owner];
+      if (other && other.health > 0) {
+        const dmg = hitTarget(other.x, other.z);
+        if (dmg > 0) {
+          other.health = Math.max(0, other.health - dmg);
+          if (other.health === 0 && owner) {
+            owner.score++; other.respawnAt = now + 2500;
+            if (owner.score >= 10) { state.finished = true; state.winner = g.owner; state.finishReason = 'score'; }
+          }
+        }
+      }
+    } else {
+      for (const bot of state.bots) {
+        if (bot.dead || bot.health <= 0) continue;
+        const dmg = hitTarget(bot.x, bot.z);
+        if (dmg <= 0) continue;
+        bot.health = Math.max(0, bot.health - dmg);
+        if (bot.health === 0 && owner) {
+          bot.dead = true; bot.respawnAt = now + BOT_RESPAWN_MS;
+          owner.score++; state.teamScore.humans++;
+          if (state.teamScore.humans >= BOT_SCORE_TARGET) { state.finished = true; state.winnerTeam = 'humans'; state.finishReason = 'score'; }
+        }
+      }
+    }
+    // Self-damage: the thrower takes the blast too, but a self-kill
+    // scores for nobody.
+    if (owner && owner.health > 0) {
+      const dmg = hitTarget(owner.x, owner.z);
+      if (dmg > 0) {
+        owner.health = Math.max(0, owner.health - dmg);
+        if (owner.health === 0) owner.respawnAt = now + 2500;
+      }
+    }
+    if (state.finished) break;
+  }
+  return changed;
+}
+
+// Detonate every armed claymore an enemy has crossed into: flat damage
+// to each enemy inside the mine's front 60° arc within 6 m. A mine
+// never triggers on its owner. Returns true when a mine detonated.
+export function checkMines(state: RoomState, now: number) {
+  if (state.finished || state.mines.length === 0) return false;
+  let changed = false;
+  const armed = state.mines.filter(m => m.armedAt <= now);
+  if (armed.length === 0) return false;
+  for (const m of armed) {
+    const fx = Math.sin(m.yaw), fz = Math.cos(m.yaw);
+    const inArc = (tx: number, tz: number) => {
+      const dx = tx - m.x, dz = tz - m.z, dist = Math.hypot(dx, dz);
+      if (dist > MINE_RANGE_M || dist <= 0) return false;
+      return (dx * fx + dz * fz) / dist >= 0.866; // inside the front 30° half-angle
+    };
+    const owner = state.players[m.owner];
+    let tripped = false;
+    const victims: { apply: () => void }[] = [];
+    if (state.mode !== 'coop') {
+      const other = state.players[1 - m.owner];
+      if (other && other.health > 0 && inArc(other.x, other.z)) {
+        tripped = true;
+        victims.push({ apply: () => {
+          other.health = Math.max(0, other.health - WEAPONS.Claymore.dmg);
+          if (other.health === 0 && owner) {
+            owner.score++; other.respawnAt = now + 2500;
+            if (owner.score >= 10) { state.finished = true; state.winner = m.owner; state.finishReason = 'score'; }
+          }
+        }});
+      }
+    } else {
+      for (const bot of state.bots) {
+        if (bot.dead || bot.health <= 0 || !inArc(bot.x, bot.z)) continue;
+        tripped = true;
+        victims.push({ apply: () => {
+          bot.health = Math.max(0, bot.health - WEAPONS.Claymore.dmg);
+          if (bot.health === 0 && owner) {
+            bot.dead = true; bot.respawnAt = now + BOT_RESPAWN_MS;
+            owner.score++; state.teamScore.humans++;
+            if (state.teamScore.humans >= BOT_SCORE_TARGET) { state.finished = true; state.winnerTeam = 'humans'; state.finishReason = 'score'; }
+          }
+        }});
+      }
+    }
+    if (!tripped) continue;
+    changed = true;
+    state.mines = state.mines.filter(x => x !== m);
+    for (const v of victims) v.apply();
+    if (state.finished) break;
+  }
+  return changed;
+}
+
+// Place a claymore: the 'place' packet's validation + storage, shared
+// by the DO handler and the tests. The mine goes 1 m in front of the
+// player only when the packet's point is within 3 m of them (and inside
+// the arena), they have a claymore left, and the rate gate is met.
+// Returns true when a mine was placed (state changed).
+export function placeMine(state: RoomState, slot: number, packet: any, now: number) {
+  const p = state.players[slot];
+  if (!p || state.finished || !state.startedAt) return false;
+  if (packet.weapon !== 'Claymore' || !(packet.weapon in WEAPONS)) return false;
+  const w = WEAPONS.Claymore;
+  if (now - p.lastShot < w.rate) return false;
+  const left = p.counts.Claymore ?? w.cap;
+  if (left <= 0) return false;
+  const x = Number(packet.x), z = Number(packet.z), yaw = Number(packet.yaw), bounds = MAPS[state.map].bounds;
+  if (![x, z, yaw].every(Number.isFinite) || Math.hypot(x - p.x, z - p.z) > 3 || Math.abs(x) > bounds.x || Math.abs(z) > bounds.z) return false;
+  p.lastShot = now; p.ammo = left - 1; p.counts.Claymore = p.ammo;
+  state.mines.push({ owner: slot, x, z, yaw, armedAt: now + MINE_ARM_MS });
+  return true;
 }
 
 export default {
@@ -197,7 +425,7 @@ export default {
       if (body.mode !== undefined && body.mode !== 'pvp' && body.mode !== 'coop') return json({error:'Unknown mode.'},400);
       if (body.botCount !== undefined && !isValidBotCount(body.botCount)) return json({error:'Bot count must be an integer from 1 to 4.'},400);
       if (body.difficulty !== undefined && !(typeof body.difficulty === 'string' && (BOT_DIFFICULTIES as readonly string[]).includes(body.difficulty))) return json({error:'Unknown difficulty.'},400);
-      if (body.botWeapon !== undefined && !(typeof body.botWeapon === 'string' && body.botWeapon in WEAPONS)) return json({error:'Unknown bot weapon.'},400);
+      if (body.botWeapon !== undefined && !isBotWeapon(body.botWeapon)) return json({error:'Unknown bot weapon.'},400);
       const mode: RoomMode = body.mode === 'coop' ? 'coop' : 'pvp';
       const botCount = mode === 'coop' ? cleanBotCount(body.botCount) : 0;
       const difficulty = cleanDifficulty(body.difficulty) as Difficulty;
@@ -223,17 +451,17 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 function cleanName(value:unknown){return String(value||'Agent').replace(/[<>\u0000-\u001f]/g,'').trim().slice(0,18)||'Agent';}
-function blankPlayer(token:string,name:string,slot:number,map:MapId,character:string,weapon:WeaponId,loadout:'white'|'black'):Player{const spawn=MAPS[map].spawns[slot];return {token,name,character,loadout,slot,x:spawn.x,z:spawn.z,yaw:spawn.yaw,health:100,score:0,ammo:WEAPONS[weapon].cap,weapon,lastMove:0,lastShot:0,reloadAt:0,disconnectedAt:null,respawnAt:0};}
-function blankState():RoomState{return {map:'courtyard',players:[null,null],startedAt:null,createdAt:Date.now(),finished:false,winner:null,finishReason:null,mode:'pvp',bots:[],difficulty:'normal',teamScore:{humans:0,bots:0},winnerTeam:null,lastBotTick:0};}
+function blankPlayer(token:string,name:string,slot:number,map:MapId,character:string,weapon:WeaponId,loadout:'white'|'black'):Player{const spawn=MAPS[map].spawns[slot];return {token,name,character,loadout,slot,x:spawn.x,z:spawn.z,yaw:spawn.yaw,health:100,score:0,ammo:WEAPONS[weapon].cap,weapon,lastMove:0,lastShot:0,reloadAt:0,disconnectedAt:null,respawnAt:0,counts:{}};}
+function blankState():RoomState{return {map:'courtyard',players:[null,null],startedAt:null,createdAt:Date.now(),finished:false,winner:null,finishReason:null,mode:'pvp',bots:[],difficulty:'normal',teamScore:{humans:0,bots:0},winnerTeam:null,lastBotTick:0,grenades:[],mines:[]};}
 
 export class DeathmatchRoom extends DurableObject<Env> {
   private statePromise:Promise<RoomState>;
   constructor(ctx:DurableObjectState,env:Env){super(ctx,env);this.statePromise=ctx.blockConcurrencyWhile(async()=>{let state=await ctx.storage.get<RoomState>('room');if(!state){state=blankState();await ctx.storage.put('room',state);}return state;});}
   private async load(){await this.statePromise;return (await this.ctx.storage.get<RoomState>('room'))!;}
   private async save(state:RoomState){await this.ctx.storage.put('room',state);}
-  private async scheduleAlarm(state:RoomState){const times:number[]=[state.createdAt+ROOM_TTL_MS];for(const p of state.players){if(!p)continue;if(p.reloadAt>0)times.push(p.reloadAt);if(p.respawnAt>0)times.push(p.respawnAt);if(p.disconnectedAt&&!state.finished)times.push(p.disconnectedAt+30_000);}if(state.mode==='coop'&&state.startedAt&&!state.finished&&state.players.some(p=>p&&!p.disconnectedAt))times.push((state.lastBotTick||Date.now())+BOT_TICK_MS);await this.ctx.storage.setAlarm(Math.min(...times));}
+  private async scheduleAlarm(state:RoomState){const times:number[]=[state.createdAt+ROOM_TTL_MS];for(const p of state.players){if(!p)continue;if(p.reloadAt>0)times.push(p.reloadAt);if(p.respawnAt>0)times.push(p.respawnAt);if(p.disconnectedAt&&!state.finished)times.push(p.disconnectedAt+30_000);}for(const g of state.grenades)times.push(g.detonateAt);for(const m of state.mines)times.push(m.armedAt);if(state.mode==='coop'&&state.startedAt&&!state.finished&&state.players.some(p=>p&&!p.disconnectedAt))times.push((state.lastBotTick||Date.now())+BOT_TICK_MS);await this.ctx.storage.setAlarm(Math.min(...times));}
   private onlineTokens(exclude?:WebSocket){return new Set(this.ctx.getWebSockets().filter(ws=>ws!==exclude).map(ws=>{try{return (ws.deserializeAttachment() as any).token;}catch{return '';}}));}
-  private publicState(state:RoomState){const online=this.onlineTokens();const anyConnected=state.players.some(p=>p&&!p.disconnectedAt);return {type:'state',map:state.map,mode:state.mode,started:state.startedAt!==null&&!state.finished,finished:state.finished,reason:state.finishReason,paused:state.mode==='coop'?!anyConnected:state.players.some(p=>!!p?.disconnectedAt),winner:state.winner,winnerTeam:state.winnerTeam,teamScore:state.teamScore,bots:state.bots.map(b=>({id:b.id,name:b.name,character:b.character,loadout:b.loadout,weapon:b.weapon,x:b.x,z:b.z,yaw:b.yaw,health:b.health,score:b.score,ammo:b.ammo,dead:b.dead,respawnAt:b.respawnAt,lastShotAt:b.lastShotAt||0})),players:state.players.map(p=>p?{slot:p.slot,name:p.name,character:p.character,loadout:p.loadout,x:p.x,z:p.z,yaw:p.yaw,health:p.health,score:p.score,ammo:p.ammo,weapon:p.weapon,respawnAt:p.respawnAt,connected:online.has(p.token)}:null)};}
+  private publicState(state:RoomState){const online=this.onlineTokens();const anyConnected=state.players.some(p=>p&&!p.disconnectedAt);return {type:'state',map:state.map,mode:state.mode,started:state.startedAt!==null&&!state.finished,finished:state.finished,reason:state.finishReason,paused:state.mode==='coop'?!anyConnected:state.players.some(p=>!!p?.disconnectedAt),winner:state.winner,winnerTeam:state.winnerTeam,teamScore:state.teamScore,grenades:state.grenades.map(g=>({x:g.x,z:g.z,detonateAt:g.detonateAt,owner:g.owner})),mines:state.mines.map(m=>({owner:m.owner,x:m.x,z:m.z,yaw:m.yaw,armedAt:m.armedAt})),bots:state.bots.map(b=>({id:b.id,name:b.name,character:b.character,loadout:b.loadout,weapon:b.weapon,x:b.x,z:b.z,yaw:b.yaw,health:b.health,score:b.score,ammo:b.ammo,dead:b.dead,respawnAt:b.respawnAt,lastShotAt:b.lastShotAt||0})),players:state.players.map(p=>p?{slot:p.slot,name:p.name,character:p.character,loadout:p.loadout,x:p.x,z:p.z,yaw:p.yaw,health:p.health,score:p.score,ammo:p.ammo,weapon:p.weapon,counts:p.counts||{},respawnAt:p.respawnAt,connected:online.has(p.token)}:null)};}
   private async broadcast(state:RoomState){const message=JSON.stringify(this.publicState(state));for(const ws of this.ctx.getWebSockets())try{ws.send(message);}catch{}}
   async fetch(request:Request):Promise<Response>{
     const url=new URL(request.url);
@@ -274,7 +502,14 @@ export class DeathmatchRoom extends DurableObject<Env> {
       if(distance>Math.min(8*elapsed+1.5,5))return;
       p.x=nextX;p.z=nextZ;p.yaw=((yaw+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI;p.lastMove=now;
       if(!state.startedAt&&(state.mode==='coop'||state.players.every(Boolean))){state.startedAt=now;state.lastBotTick=now;}
+      checkMines(state,now); // walking into an enemy mine's arc detonates it
       await this.save(state);await this.broadcast(state);return;
+    }
+    if(packet.type==='place'&&!state.finished&&state.startedAt){
+      // Claymore placement: the client sends the point + facing; the
+      // relay validates it (see placeMine) and stores the mine.
+      if(placeMine(state,p.slot,packet,now)){await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);}
+      return;
     }
     if(packet.type==='shoot'&&!state.finished&&state.startedAt){
       // PvP needs a living opponent and no disconnected player, as before.
@@ -290,16 +525,17 @@ export class DeathmatchRoom extends DurableObject<Env> {
     }
     if(packet.type==='weapon'&&!state.finished){
       if(typeof packet.weapon!=='string'||!(packet.weapon in WEAPONS))return;
-      if(p.weapon!==packet.weapon){p.weapon=packet.weapon;p.ammo=WEAPONS[packet.weapon as WeaponId].cap;p.reloadAt=0;await this.save(state);await this.broadcast(state);}
+      if(p.weapon!==packet.weapon){p.weapon=packet.weapon;const w=WEAPONS[packet.weapon as WeaponId];p.ammo=isReloadable(w)?w.cap:(p.counts[packet.weapon]??w.cap);p.reloadAt=0;await this.save(state);await this.broadcast(state);}
       return;
     }
     if(packet.type==='reload'&&!state.finished){p.reloadAt=now+1400;await this.save(state);await this.scheduleAlarm(state);}
   }
   async webSocketClose(ws:WebSocket){const a:any=ws.deserializeAttachment();if(!a||this.onlineTokens(ws).has(a.token))return;const state=await this.load(),p=state.players[a.slot];if(!p||p.token!==a.token)return;p.disconnectedAt=Date.now();await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);}
   async webSocketError(ws:WebSocket){await this.webSocketClose(ws);}
-  async alarm(){const state=await this.load(),now=Date.now();if(now>=state.createdAt+ROOM_TTL_MS){state.finished=true;state.finishReason='expired';await this.save(state);await this.broadcast(state);for(const ws of this.ctx.getWebSockets())try{ws.close(1000,'Room expired');}catch{}await this.ctx.storage.deleteAll();return;}for(const p of state.players){if(!p)continue;if(p.reloadAt&&p.reloadAt<=now){p.ammo=WEAPONS[p.weapon as WeaponId].cap;p.reloadAt=0;}if(p.respawnAt&&p.respawnAt<=now){const spawn=MAPS[state.map].spawns[p.slot];p.x=spawn.x;p.z=spawn.z;p.yaw=spawn.yaw;p.health=100;p.ammo=WEAPONS[p.weapon as WeaponId].cap;p.respawnAt=0;}if(p.disconnectedAt&&now-p.disconnectedAt>=30_000&&!state.finished&&state.mode!=='coop'){state.finished=true;state.winner=1-p.slot;state.finishReason='forfeit';}}
+  async alarm(){const state=await this.load(),now=Date.now();if(now>=state.createdAt+ROOM_TTL_MS){state.finished=true;state.finishReason='expired';await this.save(state);await this.broadcast(state);for(const ws of this.ctx.getWebSockets())try{ws.close(1000,'Room expired');}catch{}await this.ctx.storage.deleteAll();return;}for(const p of state.players){if(!p)continue;if(p.reloadAt&&p.reloadAt<=now){const w=WEAPONS[p.weapon as WeaponId];if(isReloadable(w))p.ammo=w.cap;p.reloadAt=0;}if(p.respawnAt&&p.respawnAt<=now){const spawn=MAPS[state.map].spawns[p.slot];p.x=spawn.x;p.z=spawn.z;p.yaw=spawn.yaw;p.health=100;p.ammo=WEAPONS[p.weapon as WeaponId].cap;p.counts={};p.respawnAt=0;}if(p.disconnectedAt&&now-p.disconnectedAt>=30_000&&!state.finished&&state.mode!=='coop'){state.finished=true;state.winner=1-p.slot;state.finishReason='forfeit';}}
     if(state.mode==='coop'&&!state.finished){const humans=state.players.filter((p):p is Player=>!!p);if(humans.length&&humans.every(p=>p.disconnectedAt)&&now-Math.max(...humans.map(p=>p.disconnectedAt!))>=30_000){state.finished=true;state.winnerTeam='bots';state.finishReason='forfeit';}}
     if(state.mode==='coop'&&!state.finished)tickBots(state,now);
+    if(!state.finished){applyGrenadeBlasts(state,now);checkMines(state,now);}
     await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);
   }
 }

@@ -1,6 +1,6 @@
 import { env, exports } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
-import { createBotsForRoom, tickBots, resolveHumanShot } from '../src/index.ts';
+import { createBotsForRoom, tickBots, resolveHumanShot, applyGrenadeBlasts, checkMines, placeMine, grenadeDamageAt, GRENADE_FUSE_MS } from '../src/index.ts';
 import type { RoomState } from '../src/index.ts';
 
 // A fabricated co-op room for the pure-helper tests (no DO websockets:
@@ -10,7 +10,7 @@ function coopState(overrides: Partial<RoomState> = {}): RoomState {
   const state: RoomState = {
     map: 'courtyard',
     players: [
-      { token: 'human-0', name: 'Host', character: 'Agent_Kyle.fbx', loadout: 'black', slot: 0, x: 0, z: 0, yaw: 0, health: 100, score: 0, ammo: 12, weapon: 'Glock', lastMove: 0, lastShot: 0, reloadAt: 0, disconnectedAt: null, respawnAt: 0 },
+      { token: 'human-0', name: 'Host', character: 'Agent_Kyle.fbx', loadout: 'black', slot: 0, x: 0, z: 0, yaw: 0, health: 100, score: 0, ammo: 12, weapon: 'Glock', lastMove: 0, lastShot: 0, reloadAt: 0, disconnectedAt: null, respawnAt: 0, counts: {} },
       null,
     ],
     startedAt: 1000,
@@ -24,6 +24,8 @@ function coopState(overrides: Partial<RoomState> = {}): RoomState {
     teamScore: { humans: 0, bots: 0 },
     winnerTeam: null,
     lastBotTick: 1000,
+    grenades: [],
+    mines: [],
   };
   return { ...state, ...overrides };
 }
@@ -69,6 +71,163 @@ describe('deathmatch room service', () => {
     expect(badWeapon.status).toBe(400);
     const badLoadout = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Host',loadout:'gold'}) }),env);
     expect(badLoadout.status).toBe(400);
+  });
+
+  it('accepts the five new weapons as a starting weapon', async () => {
+    for (const weapon of ['Knife', 'ThrowingKnife', 'Grenade', 'Claymore', 'SniperRifle']) {
+      const created = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Host',weapon}) }),env);
+      expect(created.status).toBe(200);
+    }
+  });
+});
+
+describe('new weapons', () => {
+  it('knife: hits inside 2.2 m in front, misses beyond range or behind', () => {
+    const state = coopState();
+    const human = state.players[0]!;
+    const bot = state.bots[0];
+    // Human faces +z (yaw 0): a bot 2 m ahead is in range.
+    bot.x = 0; bot.z = 2;
+    const swing = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Knife' }, 5000);
+    expect(swing.fired).toBe(true);
+    expect(swing.hit).toBe(true);
+    expect(bot.health).toBe(100 - 50);
+    // Beyond 2.2 m: a whiff (fired, no hit).
+    bot.x = 0; bot.z = 3; bot.health = 100; human.lastShot = 0;
+    const far = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Knife' }, 6000);
+    expect(far.fired).toBe(true);
+    expect(far.hit).toBe(false);
+    expect(bot.health).toBe(100);
+    // Behind the shooter: also a whiff.
+    bot.x = 0; bot.z = -2; human.lastShot = 0;
+    const behind = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Knife' }, 7000);
+    expect(behind.hit).toBe(false);
+    expect(bot.health).toBe(100);
+  });
+
+  it('throwing knife: a ray that reaches 30 m but not 40 m', () => {
+    const state = coopState();
+    const human = state.players[0]!;
+    const bot = state.bots[0];
+    bot.x = 0; bot.z = -25;
+    const packet = { type: 'shoot', weapon: 'ThrowingKnife', origin: { x: 0, y: 1.5, z: 0 }, dir: { x: 0, y: 0, z: -1 } };
+    const hit = resolveHumanShot(state, 0, packet, 5000);
+    expect(hit.fired).toBe(true);
+    expect(hit.hit).toBe(true);
+    expect(bot.health).toBe(100 - 40);
+    expect(human.ammo).toBe(5); // one of six thrown
+    bot.x = 0; bot.z = -40; bot.health = 100; human.lastShot = 0;
+    const far = resolveHumanShot(state, 0, packet, 6000);
+    expect(far.fired).toBe(true);
+    expect(far.hit).toBe(false);
+    expect(bot.health).toBe(100);
+  });
+
+  it('grenade: the throw stores a pending blast, the fuse applies falloff damage', () => {
+    const state = coopState();
+    const human = state.players[0]!;
+    const bot = state.bots[0];
+    bot.x = 0; bot.z = -10;
+    const packet = { type: 'shoot', weapon: 'Grenade', origin: { x: 0, y: 1.5, z: 0 }, dir: { x: 0, y: 0, z: -1 }, point: { x: 0, z: -10 } };
+    const thrown = resolveHumanShot(state, 0, packet, 5000);
+    expect(thrown.fired).toBe(true);
+    expect(state.grenades.length).toBe(1);
+    expect(state.grenades[0].detonateAt).toBe(5000 + GRENADE_FUSE_MS);
+    expect(human.ammo).toBe(2); // one of three thrown
+    // Before the fuse, nothing has happened.
+    expect(applyGrenadeBlasts(state, 6000)).toBe(false);
+    expect(bot.health).toBe(100);
+    // At the fuse: the bot is at the blast centre, full 90 damage.
+    expect(applyGrenadeBlasts(state, 7000)).toBe(true);
+    expect(state.grenades.length).toBe(0);
+    expect(bot.health).toBe(100 - 90);
+    // Falloff: 4 m from the blast is the 20-damage floor.
+    expect(grenadeDamageAt(90, 0, 5)).toBe(90);
+    expect(grenadeDamageAt(90, 2.5, 5)).toBe(45);
+    expect(grenadeDamageAt(90, 4, 5)).toBe(20);
+    expect(grenadeDamageAt(90, 5, 5)).toBe(20);
+    // A point beyond throw range is rejected, no grenade stored.
+    const state2 = coopState();
+    const far = resolveHumanShot(state2, 0, { type: 'shoot', weapon: 'Grenade', point: { x: 0, z: -30 } }, 5000);
+    expect(far.fired).toBe(false);
+    expect(state2.grenades.length).toBe(0);
+  });
+
+  it('claymore: places, arms, trips on an enemy in the front arc only', () => {
+    const state = coopState();
+    const human = state.players[0]!;
+    const bot = state.bots[0];
+    // Human at (0,0) facing +z; the mine goes 1 m ahead, facing +z.
+    expect(placeMine(state, 0, { type: 'place', weapon: 'Claymore', x: 0, z: 1, yaw: 0 }, 5000)).toBe(true);
+    expect(state.mines.length).toBe(1);
+    expect(human.ammo).toBe(1); // one of two placed
+    // Before it arms, a bot in the arc does not trip it.
+    bot.x = 0; bot.z = 5;
+    expect(checkMines(state, 5500)).toBe(false);
+    expect(bot.health).toBe(100);
+    // After arming (1 s), the bot 4 m ahead in the arc trips it: 100 damage.
+    expect(checkMines(state, 6500)).toBe(true);
+    expect(state.mines.length).toBe(0);
+    expect(bot.health).toBe(0);
+    expect(bot.dead).toBe(true);
+    expect(state.teamScore.humans).toBe(1);
+    // Behind the mine: no trip.
+    const state2 = coopState();
+    placeMine(state2, 0, { type: 'place', weapon: 'Claymore', x: 0, z: 1, yaw: 0 }, 5000);
+    const bot2 = state2.bots[0];
+    bot2.x = 0; bot2.z = -4; // behind the mine's facing
+    expect(checkMines(state2, 6500)).toBe(false);
+    expect(bot2.health).toBe(100);
+    expect(state2.mines.length).toBe(1);
+    // A point beyond 3 m of the placer is rejected.
+    expect(placeMine(state2, 0, { type: 'place', weapon: 'Claymore', x: 0, z: 10, yaw: 0 }, 7000)).toBe(false);
+    expect(state2.mines.length).toBe(1);
+  });
+
+  it('sniper: a ray that reaches 70 m, past the old 60 m cap', () => {
+    const state = coopState();
+    const human = state.players[0]!;
+    const bot = state.bots[0];
+    bot.x = 0; bot.z = -70;
+    const packet = { type: 'shoot', weapon: 'SniperRifle', origin: { x: 0, y: 1.5, z: 0 }, dir: { x: 0, y: 0, z: -1 } };
+    const hit = resolveHumanShot(state, 0, packet, 5000);
+    expect(hit.fired).toBe(true);
+    expect(hit.hit).toBe(true);
+    expect(bot.health).toBe(0); // 100 damage, one-shot kill
+    expect(bot.dead).toBe(true);
+  });
+
+  it('consumables are spent for the life: no reload refills a grenade', () => {
+    const state = coopState();
+    const human = state.players[0]!;
+    const packet = { type: 'shoot', weapon: 'Grenade', point: { x: 0, z: -5 } };
+    // Throw all three.
+    for (let i = 0; i < 3; i++) { human.lastShot = 0; resolveHumanShot(state, 0, packet, 5000 + i * 2000); }
+    expect(human.ammo).toBe(0);
+    expect(human.counts.Grenade).toBe(0);
+    // A fourth throw is refused, and no reload starts.
+    human.lastShot = 0;
+    const spent = resolveHumanShot(state, 0, packet, 12000);
+    expect(spent.fired).toBe(false);
+    expect(human.reloadAt).toBe(0);
+    expect(state.grenades.length).toBe(3);
+  });
+
+  it('bot weapons: a grenade bot is rejected, a sniper bot hits for 100', () => {
+    const bad = createBotsForRoom('courtyard', 1, 'hard', 'Grenade');
+    expect(bad[0].weapon).toBe('Glock'); // the brain falls back, never a grenade bot
+    const snipers = createBotsForRoom('courtyard', 1, 'hard', 'SniperRifle');
+    expect(snipers[0].weapon).toBe('SniperRifle');
+    const state = coopState();
+    state.bots = snipers;
+    const human = state.players[0]!;
+    const bot = state.bots[0];
+    bot.x = 5; bot.z = 0;
+    state.lastBotTick = 1000; tickBots(state, 1500, () => 0);
+    expect(human.health).toBe(100);
+    state.lastBotTick = 1500; tickBots(state, 2000, () => 0);
+    expect(human.health).toBe(0); // sniper damage 100, one-shot
+    expect(state.teamScore.bots).toBe(1);
   });
 });
 

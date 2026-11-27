@@ -82,6 +82,11 @@
 <option value="AKS74U">AKS74U · rifle · 30</option>
 <option value="Shotgun">Shotgun · 5 shells</option>
 <option value="RPG7">RPG7 · rifle · 30</option>
+<option value="Knife">Knife · melee · ∞</option>
+<option value="ThrowingKnife">Throwing knife · thrown · 6</option>
+<option value="Grenade">Grenade · thrown · 3</option>
+<option value="Claymore">Claymore · mine · 2</option>
+<option value="SniperRifle">Sniper rifle · rifle · 5</option>
 </select>
 <fieldset class="maps"><legend>Arena</legend><label><input type="radio" name="map" value="courtyard" checked> Courtyard</label><label><input type="radio" name="map" value="mall"> Mall</label></fieldset>
 <section id="botOptions" class="hidden">
@@ -95,7 +100,7 @@
 </section>
 <div class="choices"><button id="create">Create private room</button><button id="showJoin" class="secondary">Join with code</button><button id="startSolo" class="hidden">Start solo match</button></div>
 <section id="joinPanel" class="hidden"><label for="code">Room code</label><div class="row"><input id="code" maxlength="6" autocomplete="off" placeholder="6-character code"><button id="join">Join</button></div></section>
-<div id="status" role="status" aria-live="polite"></div><p class="rules">Modes: 1v1 Private match — first to 10 takedowns against one other player, via a room code. Solo vs AI — you vs 1–4 bots, first to 10 takedowns (your takedowns vs the bots’ takedowns); needs no relay and no code, and works even before the relay is configured. Co-op vs Bots — you and a friend as a team vs the bots, first team to 10; create a room and share the code, the room plays on the creator’s arena, and the joiner’s arena pick is ignored. Bots are computer opponents, always labeled BOT — never real people. The relay pauses the match during a disconnect and allows 30 seconds to reconnect. Leaving longer forfeits the match. Loadout: pick a black or white finish and a starting weapon above; in the match, Tab cycles weapons and 1–8 select one directly (courtyard). Ballroom and Theater need a gun system before they can host a deathmatch. Deathmatch multiplayer needs the project’s Cloudflare Worker deployed and its URL set in <code>assets/js/deathmatch-config.js</code> — solo vs AI does not.</p></main>
+<div id="status" role="status" aria-live="polite"></div><p class="rules">Modes: 1v1 Private match — first to 10 takedowns against one other player, via a room code. Solo vs AI — you vs 1–4 bots, first to 10 takedowns (your takedowns vs the bots’ takedowns); needs no relay and no code, and works even before the relay is configured. Co-op vs Bots — you and a friend as a team vs the bots, first team to 10; create a room and share the code, the room plays on the creator’s arena, and the joiner’s arena pick is ignored. Bots are computer opponents, always labeled BOT — never real people. The relay pauses the match during a disconnect and allows 30 seconds to reconnect. Leaving longer forfeits the match. Loadout: pick a black or white finish and a starting weapon above — 13 weapons now: the 8 guns plus Knife (melee, silent, never runs out), Throwing knife (6, sticks where it lands), Grenade (3, 2-second fuse, blast hurts anyone close — including you), Claymore (2, place it and it fires when an enemy crosses its front arc), and Sniper rifle (5, one-shot, scope on aim). In the match, Tab cycles weapons and 1–9, 0 select one directly (9 Knife, 0 Sniper rifle; throwing knife, grenade and claymore are Tab-only) on the courtyard. Ballroom and Theater need a gun system before they can host a deathmatch. Deathmatch multiplayer needs the project’s Cloudflare Worker deployed and its URL set in <code>assets/js/deathmatch-config.js</code> — solo vs AI does not.</p></main>
 <script type="module">
 import { DEATHMATCH_RELAY_URL } from './assets/js/deathmatch-config.js';
 import { BOT_MIN_COUNT, BOT_MAX_COUNT, BOT_DEFAULT_COUNT } from './assets/js/dm-bot-brain.js';

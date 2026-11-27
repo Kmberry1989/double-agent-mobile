@@ -63,6 +63,16 @@
   #hud b{font-size:15px}
   #dmHud{display:none;position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:6;background:#080d17dd;border:1px solid #8290a8;border-radius:10px;padding:8px 14px;text-align:center;min-width:220px;text-shadow:0 1px 3px #000;pointer-events:none}
   body.deathmatch #dmHud{display:block}body.deathmatch #detectBar,body.deathmatch #minimap{display:none}
+  /* Sniper scope (deathmatch only, reused from halloween.html): the
+  crosshair PNG is a thin white circle on transparency, so #scopeRing
+  hugs it with a solid black ring and the lens reads as a real scope
+  body. Shown only while aiming with the sniper rifle equipped. */
+  #scopeUI{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:none;z-index:6;pointer-events:none;text-align:center}
+  #scopeWrap{position:relative;width:min(58vmin,400px);height:min(58vmin,400px);margin:0 auto}
+  #scopeWrap img{width:100%;height:100%;display:block;position:relative;z-index:1}
+  #scopeRing{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:78.9%;height:78.9%;box-sizing:content-box;border:clamp(10px,2.5vmin,18px) solid #000;border-radius:50%;pointer-events:none}
+  #zoomLabel{margin-top:10px;font-size:15px;font-weight:700;color:#fff;text-shadow:0 1px 4px #000}
+  #btnZoom{display:none}
   #dmStatus{font-size:12px;color:#ffd27a;margin-top:2px}
   body.deathmatch #moveGrid .tbtn:not(#btnSprint),body.deathmatch #btnMelee,body.deathmatch #btnInteract,body.deathmatch #btnCarry{display:none}
   body.deathmatch #actionGrid{grid-template-columns:60px;grid-template-rows:60px}
@@ -98,6 +108,7 @@
   <div class="bar" id="detectBar"><i id="detectFill" style="width:0%"></i></div>
 </div>
 <div id="dmHud"><strong id="dmScore">Deathmatch · connecting</strong><div id="dmStatus">Waiting for relay</div><div id="dmAmmo">Glock · 12 / 12</div></div>
+<div id="scopeUI"><div id="scopeWrap"><div id="scopeRing"></div><img id="crosshairImg" src="assets/ui/crosshair-sniper.png" alt=""></div><div id="zoomLabel">2x</div></div>
 <div id="touchUI" aria-label="Touch controls">
   <div id="joyBase"><div id="joyKnob"></div></div>
   <div id="moveGrid">
@@ -109,6 +120,7 @@
   <div id="actionGrid">
     <button class="tbtn" id="btnMelee" type="button" aria-label="Melee"><img src="assets/ui/icon-melee.png" alt=""></button>
     <button class="tbtn" id="btnFire" type="button" aria-label="Fire"><img src="assets/ui/icon-fire.png" alt=""></button>
+    <button class="tbtn" id="btnZoom" type="button" aria-label="Zoom">ZOOM</button>
     <button class="tbtn" id="btnInteract" type="button" aria-label="Use"><img src="assets/ui/icon-use.png" alt=""></button>
     <button class="tbtn" id="btnCarry" type="button" aria-label="Carry"><img src="assets/ui/icon-carry.png" alt=""></button>
     <button class="tbtn" id="btnReload" type="button" aria-label="Reload"><img src="assets/ui/icon-reload.png" alt=""></button>
@@ -156,7 +168,7 @@ function dmCharacter(){ return dmAnyMode && DM_CHARACTER_ROSTER.has(dmParams.get
 // is authoritative afterwards.
 const DM_MAP_SPAWNS = { courtyard: [{x:-14,z:20,yaw:-0.61},{x:14,z:-20,yaw:2.53}], ballroom: [{x:-14,z:9,yaw:-0.61},{x:14,z:-9,yaw:2.53}], theater: [{x:-10,z:16,yaw:-0.61},{x:10,z:-16,yaw:2.53}], mall: [{x:-14,z:24,yaw:-0.61},{x:14,z:-24,yaw:2.53}] };
 function dmSpawn(){ const m = DM_MAP_SPAWNS[dmParams.get('map')] || DM_MAP_SPAWNS.courtyard; return m[dmSlot] || m[0]; }
-if(dmAnyMode){document.body.classList.add('deathmatch');document.title=(soloAiMode?'Courtyard Solo vs AI — ':(coopMode?'Courtyard Co-op vs Bots — ':'Courtyard Deathmatch — '))+'Undercover: Double Agent';document.querySelector('#overlay h1').textContent=soloAiMode?'COURTYARD SOLO VS AI':(coopMode?'COURTYARD CO-OP VS BOTS':'COURTYARD DEATHMATCH');document.getElementById('startBtn').textContent=soloAiMode?'Start match':'Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · Tab cycle weapon · 1–8 select weapon · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent=soloAiMode?('You vs '+dmBotCount+' BOT'+(dmBotCount>1?'s':'')+' ('+dmBotDifficulty+') · no guards, cameras or mission objectives'):(coopMode?('Humans vs '+dmBotCount+' BOT'+(dmBotCount>1?'s':'')+' ('+dmBotDifficulty+') · first team to 10 · 30 second reconnect window'):'Two agents · private room · no guards, cameras or mission objectives · 30 second reconnect window');}
+if(dmAnyMode){document.body.classList.add('deathmatch');document.title=(soloAiMode?'Courtyard Solo vs AI — ':(coopMode?'Courtyard Co-op vs Bots — ':'Courtyard Deathmatch — '))+'Undercover: Double Agent';document.querySelector('#overlay h1').textContent=soloAiMode?'COURTYARD SOLO VS AI':(coopMode?'COURTYARD CO-OP VS BOTS':'COURTYARD DEATHMATCH');document.getElementById('startBtn').textContent=soloAiMode?'Start match':'Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · Tab cycle weapon · 1–9, 0 select weapon · F / wheel zoom (sniper) · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent=soloAiMode?('You vs '+dmBotCount+' BOT'+(dmBotCount>1?'s':'')+' ('+dmBotDifficulty+') · no guards, cameras or mission objectives'):(coopMode?('Humans vs '+dmBotCount+' BOT'+(dmBotCount>1?'s':'')+' ('+dmBotDifficulty+') · first team to 10 · 30 second reconnect window'):'Two agents · private room · no guards, cameras or mission objectives · 30 second reconnect window');}
 
 // Human characters stand 5 cm off the floor (feet less likely to clip
 // into / sink below it). Added to every human character's standing Y:
@@ -173,6 +185,11 @@ const ANIM_MAP = {
   crawl:'Low_Crawl.fbx', crawlBack:'Moving_Backward_In_Crawl_Position.fbx', crawlIdle:'Prone_Firing_Rifle.fbx',
   roll:'Run_To_Rolling.fbx',
   cover:'Taking_Cover_Idle.fbx', punch:'Punching.fbx', kick:'Side_Kick.fbx',
+  // Throw (deathmatch grenade / throwing knife, 2026-11-27): a real
+  // Mixamo clip on disk (assets/animations/Run_And_Throw_Grenade.fbx).
+  // It is not in the viewer manifest yet — wired here first, so the
+  // throw reads as a throw rather than a gunshot.
+  throwGrenade:'Run_And_Throw_Grenade.fbx',
   // Melee combo (Kyle, 2026-11-14): Lead Jab -> Hook -> Melee_Hook
   // finisher. All three are repo-scale Mixamo clips (rest Hips ~0.39),
   // so processClip leaves them alone (no unit scaling).
@@ -1843,13 +1860,18 @@ function syncDmBots(botStates){
     ent.group.position.set(s.x, CHAR_LIFT, s.z); ent.group.rotation.y = s.yaw;
     // The relay marks each bot shot with lastShotAt: draw its tracer +
     // flash so a bot shooting reads on screen (the damage itself comes
-    // through the state broadcast, like the 1v1 opponent's shots).
+    // through the state broadcast, like the 1v1 opponent's shots). A
+    // knife bot slashes, so it draws no tracer or flash; a sniper bot's
+    // tracer reaches 80 m, a throwing-knife bot's 30 m.
     if (s.lastShotAt && s.lastShotAt !== ent.lastShotAt){
       ent.lastShotAt = s.lastShotAt;
-      const m = dmBotMuzzle(ent, new THREE.Vector3());
-      const dir = new THREE.Vector3(Math.sin(ent.bot.yaw), 0, Math.cos(ent.bot.yaw));
-      showMuzzleFlash(m, dir);
-      spawnTracer(m, m.clone().addScaledVector(dir, 60));
+      if (ent.bot.weapon !== 'Knife'){
+        const m = dmBotMuzzle(ent, new THREE.Vector3());
+        const dir = new THREE.Vector3(Math.sin(ent.bot.yaw), 0, Math.cos(ent.bot.yaw));
+        const range = ent.bot.weapon === 'SniperRifle' ? 80 : (ent.bot.weapon === 'ThrowingKnife' ? 30 : 60);
+        showMuzzleFlash(m, dir);
+        spawnTracer(m, m.clone().addScaledVector(dir, range));
+      }
     }
   }
   for (let i = dmBots.length - 1; i >= 0; i--){
@@ -1881,7 +1903,7 @@ function updateDmBots(dt){
   if (soloAiMode && dmStarted && !dmFinished && playing){
     // Player respawn after a bot takedown (2.5 s, like the relay).
     if (health <= 0 && now >= dmRespawnAt){
-      health = 100; ammoInMag = weaponStats().max;
+      health = 100; ammoInMag = weaponStats().max; dmWeaponCounts = {}; // fresh loadout
       const sp = dmSpawn(); player.position.set(sp.x, CHAR_LIFT, sp.z); yaw = sp.yaw; modelYaw = yaw;
     }
     for (const ent of dmBots){
@@ -1902,10 +1924,20 @@ function updateDmBots(dt){
         const m = dmBotMuzzle(ent, new THREE.Vector3());
         const chest = new THREE.Vector3(player.position.x, player.position.y + 1.4, player.position.z);
         const dir = chest.clone().sub(m).normalize();
-        showMuzzleFlash(m, dir); spawnMuzzleSmoke(m, dir); spawnTracer(m, chest);
         const dist = Math.hypot(player.position.x - b.x, player.position.z - b.z);
-        playSfx(dist < 8 ? SFX_FILES.enemyShotgun : pickSfx(SFX_FILES.enemyRifle));
-        if (dist > 10) playSfx(SFX_FILES.bulletWhizz);
+        // A knife bot slashes (no muzzle flash, no tracer, stab on a
+        // hit); a sniper bot cracks the sniper shot; a throwing-knife
+        // bot whizzes a blade (the tracer stands in until the effects
+        // build adds the sticking knife). Guns keep the old rendering.
+        if (b.weapon === 'Knife'){
+          if (ev.hit) playSfx(pickSfx(SFX_FILES.stab)); else playSfx(SFX_FILES.stabMiss);
+        } else {
+          showMuzzleFlash(m, dir); spawnMuzzleSmoke(m, dir); spawnTracer(m, chest);
+          if (b.weapon === 'SniperRifle') playSfx(SFX_FILES.sniperShot);
+          else if (b.weapon === 'ThrowingKnife') playSfx(SFX_FILES.bulletWhizz);
+          else playSfx(dist < 8 ? SFX_FILES.enemyShotgun : pickSfx(SFX_FILES.enemyRifle));
+          if (dist > 10) playSfx(SFX_FILES.bulletWhizz);
+        }
         if (ev.hit && health > 0){
           health -= ev.damage; spawnBloodMist(chest.clone()); spawnBloodSpatter(chest.clone()); playPlayerOneShot('hitReaction');
           if (health <= 0){
@@ -1916,6 +1948,7 @@ function updateDmBots(dt){
         }
       }
     }
+    dmCheckSoloMines(now); // a bot that walked into a mine's arc trips it
   }
   // Animate every rendered bot (solo + co-op): mixer + walk/idle.
   for (const ent of dmBots){
@@ -1929,9 +1962,11 @@ function updateDmBots(dt){
 function soloShootResolve(dir){
   // Solo hitscan against the live bots (same pattern as tryShoot's guard
   // branch, minus takedowns): a hit damages the bot, a kill scores, a
-  // miss leaves a bullet hole / sparks on the first surface.
+  // miss leaves a bullet hole / sparks on the first surface. The ray
+  // reaches the weapon's own range (the sniper's 80 m, the throwing
+  // knife's 30 m).
   const w = weaponStats();
-  ray.set(camera.position, dir); ray.far = 60;
+  ray.set(camera.position, dir); ray.far = w.range || 60;
   const targets = dmBots.filter(e => !e.bot.dead).map(e => e.group);
   const hits = ray.intersectObjects(targets, true);
   let endPoint = null;
@@ -1940,18 +1975,8 @@ function soloShootResolve(dir){
     while (node){ ent = dmBots.find(x => x.group === node); if (ent) break; node = node.parent; }
     if (ent){
       endPoint = hits[0].point.clone();
-      const b = ent.bot;
-      b.health -= w.dmg;
-      playSfx(pickSfx(SFX_FILES.hit)); playSfx(pickSfx(SFX_FILES.enemyHitVocal));
+      dmHurtBot(ent, w.dmg, endPoint);
       if (weaponVariant === 'RPG7') playSfx(SFX_FILES.explosion);
-      spawnBloodMist(hits[0].point.clone()); spawnBloodSpatter(hits[0].point.clone());
-      addDecal(new THREE.Vector3(b.x, 0.02, b.z), new THREE.Vector3(0, 1, 0), 'blood');
-      if (b.health <= 0){
-        b.dead = true; b.respawnAt = performance.now() + 2500; dmPlayerScore++;
-        ent.group.rotation.x = -Math.PI / 2; ent.group.position.y = 0.4 + CHAR_LIFT;
-        updateDmScoreHud();
-        if (dmPlayerScore >= BOT_SCORE_TARGET) endDmBotMatch(true);
-      }
       return endPoint;
     }
   }
@@ -2002,9 +2027,18 @@ const weapons = { pistol:{mag:12, max:12, dmg:34, rate:0.28}, rifle:{mag:30, max
 // up close, its rate gated by the pump (PUMP_T below). Resolved at
 // call time, so weaponVariant may change underneath.
 function weaponStats(){
-  if (weaponVariant === 'Revolver') return { mag: 6, max: 6, dmg: 40, rate: 0.35 };
-  if (weaponVariant === 'Shotgun') return { mag: 5, max: 5, dmg: 70, rate: 0.11 };
-  return weapons[weapon];
+  if (weaponVariant === 'Revolver') return { mag: 6, max: 6, dmg: 40, rate: 0.35, range: 60 };
+  if (weaponVariant === 'Shotgun') return { mag: 5, max: 5, dmg: 70, rate: 0.11, range: 60 };
+  // Deathmatch-only weapons (2026-11-27): the knife has no magazine
+  // (mag 0 — it never runs out); the consumables carry their count;
+  // the sniper reaches 80 m, past the old 60 m ray.
+  if (weaponVariant === 'Knife') return { mag: 0, max: 0, dmg: 50, rate: 0.5, range: 2.2 };
+  if (weaponVariant === 'ThrowingKnife') return { mag: 6, max: 6, dmg: 40, rate: 0.7, range: 30 };
+  if (weaponVariant === 'Grenade') return { mag: 3, max: 3, dmg: 90, rate: 1.0, range: 25 };
+  if (weaponVariant === 'Claymore') return { mag: 2, max: 2, dmg: 100, rate: 1.0, range: 6 };
+  if (weaponVariant === 'SniperRifle') return { mag: 5, max: 5, dmg: 100, rate: 1.2, range: 80 };
+  const base = weapons[weapon];
+  return { mag: base.mag, max: base.max, dmg: base.dmg, rate: base.rate, range: 60 };
 }
 let ammoInMag = 12, lastShot = 0, reloadUntil = 0, currentAnim = 'idle', pumpUntil = 0;
 // Reload: ammo requires reloading — when the mag runs dry the reload
@@ -2194,16 +2228,35 @@ const WEAPON_CYCLE = [
   { name: 'MP5K', cls: 'rifle', len: 0.60, mag: 30 },
   { name: 'AKS74U', cls: 'rifle', len: 0.60, mag: 30 },
   { name: 'Shotgun', cls: 'rifle', len: 0.80, mag: 5 },
-  { name: 'RPG7', cls: 'rifle', len: 0.60, mag: 30 }
+  { name: 'RPG7', cls: 'rifle', len: 0.60, mag: 30 },
+  // Deathmatch-only weapons (2026-11-27): the knife is a silent melee
+  // blade (no magazine — it never runs out); the throwing knife, the
+  // grenade and the claymore are consumables (spent for the life, no
+  // reload); the sniper rifle is a slow one-shot long gun.
+  { name: 'Knife', cls: 'melee', len: 0.35, mag: 0 },
+  { name: 'ThrowingKnife', cls: 'thrown', len: 0.25, mag: 6 },
+  { name: 'Grenade', cls: 'thrown', len: 0.12, mag: 3 },
+  { name: 'Claymore', cls: 'mine', len: 0.25, mag: 2 },
+  { name: 'SniperRifle', cls: 'rifle', len: 1.10, mag: 5 }
 ];
 // Guns that can take a suppressor. The RPG7 cannot — it never gets one.
 const SUPPRESSIBLE = new Set(['Glock', 'Walther', 'Makarov', 'MP5K', 'AKS74U']);
+// Consumables (deathmatch, 2026-11-27): spent for the life, never
+// reloaded. dmWeaponCounts tracks what is left of each across weapon
+// switches (mirrored from the relay state in relay modes, the
+// authority in solo mode); it resets on respawn.
+const DM_CONSUMABLES = new Set(['ThrowingKnife', 'Grenade', 'Claymore']);
+let dmWeaponCounts = {};
 let weaponVariant = 'Glock'; // current variant name; `weapon` still holds its class
 function weaponVariantInfo(){ return WEAPON_CYCLE.find(v=>v.name===weaponVariant) || WEAPON_CYCLE[0]; }
 function setWeaponVariant(name){
   const info = WEAPON_CYCLE.find(v=>v.name===name); if (!info) return;
   weaponVariant = info.name; weapon = info.cls;
-  ammoInMag = info.cls === 'pistol' ? Math.min(ammoInMag, info.mag) : info.mag;
+  // Consumables (throwing knife, grenade, claymore) are spent for the
+  // life — switching away and back does not refill them. dmWeaponCounts
+  // is the mirror of the relay's per-weapon counts (relay modes) and
+  // the authority in solo mode; it resets on respawn.
+  ammoInMag = DM_CONSUMABLES.has(info.name) ? (dmWeaponCounts[info.name] ?? info.mag) : (info.cls === 'pistol' ? Math.min(ammoInMag, info.mag) : info.mag);
   updateWeaponVisibility();
   // Deathmatch: tell the relay the new weapon at once, so its damage /
   // rate / magazine follow the pick even before the next shot.
@@ -2214,10 +2267,13 @@ function cycleWeapon(){
   setWeaponVariant(WEAPON_CYCLE[(i + 1) % WEAPON_CYCLE.length].name);
 }
 const PLAYER_LOADOUTS = {
-  white: { Glock: 'white_glock.glb', Walther: 'white_walther.glb', Makarov: 'white_makarov.glb', Revolver: 'white_revolver.glb', MP5K: 'white_mp5k.glb', AKS74U: 'white_aks74u.glb', Shotgun: 'white_shotgun.glb', RPG7: 'white_RPG7.glb' },
-  black: { Glock: 'black_glock_threaded.glb', Walther: 'black_walther.glb', Makarov: 'black_makarov.glb', Revolver: 'black_revolver.glb', MP5K: 'black_mp5k.glb', AKS74U: 'black_aks74u.glb', Shotgun: 'black_shotgun.glb', RPG7: 'black_rpg.glb' }
+  // Throwing knife: no white_ file exists, so the white loadout shares
+  // the black file. Sniper rifle: one file, no finish variants — both
+  // loadouts share it. (Gaps, not placeholders.)
+  white: { Glock: 'white_glock.glb', Walther: 'white_walther.glb', Makarov: 'white_makarov.glb', Revolver: 'white_revolver.glb', MP5K: 'white_mp5k.glb', AKS74U: 'white_aks74u.glb', Shotgun: 'white_shotgun.glb', RPG7: 'white_RPG7.glb', Knife: 'white_knife.glb', ThrowingKnife: 'black_throwing_knife.glb', Grenade: 'white_grenade.glb', Claymore: 'white_claymore.glb', SniperRifle: 'sniper_rifle.glb' },
+  black: { Glock: 'black_glock_threaded.glb', Walther: 'black_walther.glb', Makarov: 'black_makarov.glb', Revolver: 'black_revolver.glb', MP5K: 'black_mp5k.glb', AKS74U: 'black_aks74u.glb', Shotgun: 'black_shotgun.glb', RPG7: 'black_rpg.glb', Knife: 'black_knife.glb', ThrowingKnife: 'black_throwing_knife.glb', Grenade: 'black_grenade.glb', Claymore: 'black_claymore.glb', SniperRifle: 'sniper_rifle.glb' }
 };
-const weaponPivots = { white: { Glock: null, Walther: null, Makarov: null, Revolver: null, MP5K: null, AKS74U: null, Shotgun: null, RPG7: null }, black: { Glock: null, Walther: null, Makarov: null, Revolver: null, MP5K: null, AKS74U: null, Shotgun: null, RPG7: null } };
+const weaponPivots = { white: { Glock: null, Walther: null, Makarov: null, Revolver: null, MP5K: null, AKS74U: null, Shotgun: null, RPG7: null, Knife: null, ThrowingKnife: null, Grenade: null, Claymore: null, SniperRifle: null }, black: { Glock: null, Walther: null, Makarov: null, Revolver: null, MP5K: null, AKS74U: null, Shotgun: null, RPG7: null, Knife: null, ThrowingKnife: null, Grenade: null, Claymore: null, SniperRifle: null } };
 // Suppressor + accessory groups (filled by loaders below; null until loaded).
 const suppressorGroups = { white: null, black: null };
 const accessoryGroups = { white: { glasses: null }, black: { glasses: null }, watch: null };
@@ -3110,19 +3166,22 @@ addEventListener('keydown', e=>{
   if (e.code==='KeyY') cycleWeather();
   if (e.code==='Digit1'){ setWeaponVariant('Glock'); }
   if (e.code==='Digit2'){ setWeaponVariant(dmAnyMode ? 'Walther' : 'MP5K'); }
-  // Deathmatch: 1–8 pick any weapon in WEAPON_CYCLE order, Tab cycles it.
-  // Single-player keeps 1 = Glock, 2 = MP5K.
+  // Deathmatch: 1–9, 0 pick any weapon in WEAPON_CYCLE order (9 Knife,
+  // 0 Sniper rifle; throwing knife, grenade and claymore are Tab-only),
+  // Tab cycles it. Single-player keeps 1 = Glock, 2 = MP5K.
   if (dmAnyMode && e.code==='Digit3'){ setWeaponVariant('Makarov'); }
   if (dmAnyMode && e.code==='Digit4'){ setWeaponVariant('Revolver'); }
   if (dmAnyMode && e.code==='Digit5'){ setWeaponVariant('MP5K'); }
   if (dmAnyMode && e.code==='Digit6'){ setWeaponVariant('AKS74U'); }
   if (dmAnyMode && e.code==='Digit7'){ setWeaponVariant('Shotgun'); }
   if (dmAnyMode && e.code==='Digit8'){ setWeaponVariant('RPG7'); }
+  if (dmAnyMode && e.code==='Digit9'){ setWeaponVariant('Knife'); }
+  if (dmAnyMode && e.code==='Digit0'){ setWeaponVariant('SniperRifle'); }
   if (dmAnyMode && e.code==='Tab'){ e.preventDefault(); cycleWeapon(); }
   if (e.code==='KeyL'){ playerLoadout = playerLoadout==='white' ? 'black' : 'white'; updateWeaponVisibility(); showMsg('Loadout: ' + playerLoadout + ' set', 1400); }
   if (e.code==='KeyR') startReload();
   if (e.code==='KeyG') toggleCarryDrop();
-  if (e.code==='KeyF') tryTakedown();
+  if (e.code==='KeyF'){ if (dmAnyMode && weaponVariant==='SniperRifle') cycleDmZoom(); else tryTakedown(); }
   // ---- Lean / roll / sneak (movement 2026-11-14) + carry/drop (stealth) ----
   // Lean is hold-Q/E while AIMING (read from keys[] in animate(), so no
   // keydown state is needed here). Outside aim, E still interacts (guard
@@ -3151,6 +3210,9 @@ addEventListener('mousedown', e=>{
 });
 addEventListener('mouseup', e=>{ if (e.button===2) aiming=false; });
 addEventListener('contextmenu', e=>e.preventDefault());
+// Sniper zoom (deathmatch, 2026-11-27): the mouse wheel cycles 2x/4x
+// while the sniper rifle is equipped. No wheel binding existed here.
+addEventListener('wheel', e=>{ if (dmAnyMode && weaponVariant==='SniperRifle'){ e.preventDefault(); cycleDmZoom(); } }, { passive: false });
 document.getElementById('startBtn').addEventListener('click', ()=>{
   ensureAudio(); // unlock audio on the same gesture that starts the game
   document.getElementById('overlay').style.display='none';
@@ -3379,6 +3441,7 @@ function kickHit(){
   bindBtn('btnInteract', tryInteract);
   bindBtn('btnCarry', toggleCarryDrop);
   bindBtn('btnReload', startReload); // RELOAD (2026-11-22): reload had no touch button — R / auto-reload only
+  bindBtn('btnZoom', cycleDmZoom); // Sniper zoom (deathmatch, 2026-11-27): the button only shows while scoped
   bindBtn('btnCrouch', ()=>{ cycleStance(); document.getElementById('btnCrouch').classList.toggle('on', crouching); });
   bindBtn('btnSneak', ()=>{ sneaking = !sneaking; noteActivity(); document.getElementById('btnSneak').classList.toggle('on', sneaking); });
   bindBtn('btnSprint', ()=>{ touchSprintToggle = !touchSprintToggle; noteActivity(); document.getElementById('btnSprint').classList.toggle('on', touchSprintToggle); });
@@ -3446,6 +3509,12 @@ const SFX_FILES = {
   hit: ['assets/audio/gunshot-hit.m4a', 'assets/audio/gunshot-hit2.m4a'],
   slashHit: ['assets/audio/slash-hit.m4a', 'assets/audio/slash-hit2.m4a', 'assets/audio/slash-hit3.m4a', 'assets/audio/slash-hit5.m4a', 'assets/audio/slash-hit6.m4a'],
   slashMiss: ['assets/audio/slash-miss.m4a', 'assets/audio/slash-miss3.m4a'],
+  // Deathmatch knife + sniper (2026-11-27): the 6 stab recordings Kyle
+  // sent (2026-11-22) are now the knife's hit sound, stab-miss the
+  // whiff; the sniper shot is his Halloween pick, reused here.
+  stab: ['assets/audio/stab.m4a', 'assets/audio/stab-0.m4a', 'assets/audio/stab-1.m4a', 'assets/audio/stab-4.m4a', 'assets/audio/stab-5.m4a', 'assets/audio/stab-6.m4a'],
+  stabMiss: 'assets/audio/stab-miss.m4a',
+  sniperShot: 'assets/audio/sniper-shot.m4a',
   // New sounds (Kyle, 2026-11-22) — his own recordings, wired where
   // they fit. The 12 hit vocals are a random pool (he likes variants):
   // a guard grunts when hit, alongside the flesh-hit sound. The guard's
@@ -3453,9 +3522,10 @@ const SFX_FILES = {
   // guard shot also whizzes in); a guard firing from close range (< 8 m)
   // plays his shotgun blast instead — a heavier sound up close. The
   // strayshot is retired (file stays on disk). Body drag plays on
-  // pickup, body drop on drop. Banked in assets/audio/ but NOT wired
-  // (no home yet): stab x7 (no knife weapon), typing (no typing
-  // interaction), door-open-electric (no door mechanic). The
+  // pickup, body drop on drop. The stab sounds found their home in the
+  // deathmatch knife (2026-11-27). Still banked in assets/audio/ but NOT
+  // wired (no home yet): typing (no typing interaction),
+  // door-open-electric (no door mechanic). The
   // enemy-hit-vocal-00 file he sent was empty (298 bytes, no audio) —
   // it needs a re-send if he wants it.
   enemyHitVocal: ['assets/audio/enemy-hit-vocal-01.m4a', 'assets/audio/enemy-hit-vocal-02.m4a', 'assets/audio/enemy-hit-vocal-03.m4a', 'assets/audio/enemy-hit-vocal-04.m4a', 'assets/audio/enemy-hit-vocal-05.m4a', 'assets/audio/enemy-hit-vocal-06.m4a', 'assets/audio/enemy-hit-vocal-07.m4a', 'assets/audio/enemy-hit-vocal-08.m4a', 'assets/audio/enemy-hit-vocal-09.m4a', 'assets/audio/enemy-hit-vocal-10.m4a', 'assets/audio/enemy-hit-vocal-11.m4a', 'assets/audio/enemy-hit-vocal-12.m4a'],
@@ -3542,6 +3612,7 @@ function playShotSound(){
     else if (weaponVariant === 'MP5K') playSfx(playerLoadout === 'black' ? SFX_FILES.suppressedRifle : SFX_FILES.mp5k);
     else if (weaponVariant === 'Shotgun') playSfx(SFX_FILES.shotgun);
     else if (weaponVariant === 'RPG7') playSfx(SFX_FILES.rpg);
+    else if (weaponVariant === 'SniperRifle') playSfx(SFX_FILES.sniperShot);
     else playSfx(SFX_FILES.aks74u);
   } else {
     if (weaponVariant === 'Walther') playSfx(SFX_FILES.walther);
@@ -3675,19 +3746,324 @@ function playFootstep(){
 // Footstep distance accumulator (one soft step per ~1.1 m while moving).
 let stepAccum = 0, stepPrevX = null, stepPrevZ = null;
 let dmLastShot = 0;
+// ---------- Deathmatch new weapons (2026-11-27) ----------
+// Sniper scope: shown while aiming with the sniper rifle equipped
+// (the existing `aiming` flag — right-mouse / L2 / touch AIM). FOV is
+// the Halloween scope's (2x = 30, 4x = 15, base 70). Zoom cycles 2x/4x
+// on the mouse wheel, F, or the touch ZOOM button. Gamepad zoom is not
+// wired (L3 is sprint here) — the scope still works at 2x on a pad.
+let dmZoomLevel = 2, dmScoped = false, dmScopeApplied = null;
+function cycleDmZoom(){ dmZoomLevel = dmZoomLevel === 2 ? 4 : 2; refreshDmScope(); }
+function refreshDmScope(){
+  const scoped = dmAnyMode && weaponVariant === 'SniperRifle' && aiming && health > 0 && !dmFinished;
+  const key = scoped ? ('scoped-' + dmZoomLevel) : 'off';
+  if (key === dmScopeApplied) return;
+  dmScopeApplied = key; dmScoped = scoped;
+  camera.fov = scoped ? (dmZoomLevel === 2 ? 30 : 15) : 70;
+  camera.updateProjectionMatrix();
+  const ui = document.getElementById('scopeUI');
+  if (ui) ui.style.display = scoped ? 'block' : 'none';
+  const zl = document.getElementById('zoomLabel');
+  if (zl) zl.textContent = dmZoomLevel + 'x';
+  const zb = document.getElementById('btnZoom');
+  if (zb) zb.style.display = scoped ? 'block' : 'none';
+}
+// Thrown / placed models: the three GLBs are loaded once and cloned
+// per throw / placement, so a throw never waits on a network load.
+// (The knife and sniper rifle already ride the weapon pivots.)
+const dmThrownModels = {};
+function loadDmThrownModel(key, file){
+  if (dmThrownModels[key]) return;
+  gltfLoader.load('assets/weapons/' + file, (gltf)=>{ dmThrownModels[key] = gltf.scene; }, undefined, ()=>{});
+}
+function dmThrownClone(key, fallback){
+  const src = dmThrownModels[key];
+  if (src) return src.clone();
+  return fallback ? fallback() : null;
+}
+function dmKnifeMesh(){
+  return dmThrownClone('throwingKnife', ()=>{ const m = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.3), new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.8 })); return m; });
+}
+function dmGrenadeMesh(){
+  return dmThrownClone('grenade', ()=>{ const m = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshStandardMaterial({ color: 0x2a3324, roughness: 0.6 })); return m; });
+}
+function dmClaymoreMesh(){
+  return dmThrownClone('claymore', ()=>{ const m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.08), new THREE.MeshStandardMaterial({ color: 0x3a4a2a, roughness: 0.7 })); return m; });
+}
+// Explosion visual, for now: the explosion sound, a bright flash and
+// an orange particle burst at the point. A rendered explosion (fireball
+// / smoke / shockwave) is the effects build's job — this reads as a
+// blast until then.
+function dmExplodeAt(x, z){
+  const p = new THREE.Vector3(x, 0.6, z);
+  playSfx(SFX_FILES.explosion);
+  showMuzzleFlash(p, new THREE.Vector3(0, 1, 0));
+  spawnParticles(p, 0xff7722, 22, 4, 0.12, 0.8, 4);
+  spawnParticles(p, 0x555555, 10, 2, 0.2, 1.2, -1);
+}
+// Pending grenades / placed mines, rendered from the relay state in
+// relay modes and from the local lists in solo mode. Keys are
+// owner:x:z so a local mesh and its broadcast entry are the same object.
+const dmRenderedGrenades = new Map(), dmRenderedMines = new Map();
+let dmSoloGrenades = [], dmSoloMines = []; // solo mode's local pending lists
+const dmGrenadeKey = (owner, x, z) => owner + ':' + x.toFixed(1) + ':' + z.toFixed(1);
+const dmMineKey = (owner, x, z) => owner + ':' + x.toFixed(1) + ':' + z.toFixed(1);
+function dmAddGrenadeMesh(key, x, z, detonateAt){
+  if (dmRenderedGrenades.has(key)) return;
+  const mesh = dmGrenadeMesh(); if (!mesh) return;
+  mesh.position.set(x, 0.1, z); scene.add(mesh);
+  dmRenderedGrenades.set(key, { mesh, x, z, detonateAt, confirmed: false });
+}
+function dmRemoveGrenade(key, explode){
+  const g = dmRenderedGrenades.get(key); if (!g) return;
+  scene.remove(g.mesh); dmRenderedGrenades.delete(key);
+  if (explode) dmExplodeAt(g.x, g.z);
+}
+function dmAddMineMesh(key, x, z, yaw){
+  if (dmRenderedMines.has(key)) return;
+  const mesh = dmClaymoreMesh(); if (!mesh) return;
+  mesh.position.set(x, 0.12, z); mesh.rotation.y = yaw; scene.add(mesh);
+  dmRenderedMines.set(key, { mesh, x, z, yaw, confirmed: false });
+}
+function dmRemoveMine(key, explode){
+  const m = dmRenderedMines.get(key); if (!m) return;
+  scene.remove(m.mesh); dmRenderedMines.delete(key);
+  if (explode) dmExplodeAt(m.x, m.z);
+}
+// Reconcile the relay's broadcast grenades / mines (relay modes): the
+// opponent's are rendered from the broadcast; my own are already on
+// the ground from the local throw / placement (registered under the
+// same key), so they are not duplicated. A broadcast entry that
+// disappears has detonated — the explosion plays at its last point.
+// A local mesh the relay never confirmed (a rejected placement) is
+// removed silently, not exploded.
+function syncDmGrenades(list){
+  if (soloAiMode) return;
+  const seen = new Set();
+  for (const g of list || []){
+    const key = dmGrenadeKey(g.owner, g.x, g.z); seen.add(key);
+    if (g.owner === dmSlot){ const mine = dmRenderedGrenades.get(key); if (mine) mine.confirmed = true; continue; } // my own — the local mesh shows it
+    dmAddGrenadeMesh(key, g.x, g.z, g.detonateAt);
+    const added = dmRenderedGrenades.get(key); if (added) added.confirmed = true;
+  }
+  for (const key of [...dmRenderedGrenades.keys()]){ const g = dmRenderedGrenades.get(key); if (!seen.has(key)) dmRemoveGrenade(key, !!g.confirmed); }
+}
+function syncDmMines(list){
+  if (soloAiMode) return;
+  const seen = new Set();
+  for (const m of list || []){
+    const key = dmMineKey(m.owner, m.x, m.z); seen.add(key);
+    if (m.owner === dmSlot){ const mine = dmRenderedMines.get(key); if (mine) mine.confirmed = true; continue; } // my own — the local mesh shows it
+    dmAddMineMesh(key, m.x, m.z, m.yaw);
+    const added = dmRenderedMines.get(key); if (added) added.confirmed = true;
+  }
+  for (const key of [...dmRenderedMines.keys()]){ const m = dmRenderedMines.get(key); if (!seen.has(key)) dmRemoveMine(key, !!m.confirmed); }
+}
+// Flying projectiles: a thrown knife flies straight to the ray's first
+// hit and sticks there; a grenade arcs to its landing point and waits
+// out its fuse. Each entry is {kind, mesh, from, to, t, dur, key}.
+const dmProjectiles = [];
+function updateDmProjectiles(dt){
+  if (!dmAnyMode) return;
+  const now = performance.now();
+  for (let i = dmProjectiles.length - 1; i >= 0; i--){
+    const pr = dmProjectiles[i];
+    pr.t += dt;
+    const k = Math.min(1, pr.t / pr.dur);
+    const pos = pr.from.clone().lerp(pr.to, k);
+    if (pr.kind === 'grenade') pos.y += 4 * 2 * k * (1 - k); // parabolic arc, ~2 m apex
+    else pr.mesh.rotation.z += dt * 12; // the knife spins in flight
+    pr.mesh.position.copy(pos);
+    if (k >= 1){
+      if (pr.kind === 'knife'){ pr.stuckUntil = now + 4000; pr.mesh.position.copy(pr.to); pr.mesh.lookAt(pr.to.clone().add(pr.dir)); dmProjectiles.splice(i, 1); dmStuckKnives.push({ mesh: pr.mesh, until: pr.stuckUntil }); }
+      else { // grenade landed: the flying mesh becomes the landed
+        // grenade (registered under its key, so the broadcast
+        // reconciliation finds it and never duplicates it).
+        dmProjectiles.splice(i, 1);
+        const key = pr.key;
+        if (key && !dmRenderedGrenades.has(key)) dmRenderedGrenades.set(key, { mesh: pr.mesh, x: pr.to.x, z: pr.to.z, detonateAt: pr.detonateAt, confirmed: false });
+        else scene.remove(pr.mesh);
+      }
+    }
+  }
+  for (let i = dmStuckKnives.length - 1; i >= 0; i--){
+    if (now >= dmStuckKnives[i].until){ scene.remove(dmStuckKnives[i].mesh); dmStuckKnives.splice(i, 1); }
+  }
+  // Solo: the local fuse — a grenade whose time has come detonates.
+  if (soloAiMode) for (const key of [...dmRenderedGrenades.keys()]){
+    const g = dmRenderedGrenades.get(key);
+    if (g && g.detonateAt && now >= g.detonateAt) dmDetonateSoloGrenade(key);
+  }
+}
+const dmStuckKnives = [];
+// Shared bot damage (solo mode): blood, grunt, kill / score / respawn.
+// Used by the knife, the grenade blast and the ray path alike.
+function dmHurtBot(ent, dmg, point){
+  const b = ent.bot;
+  b.health -= dmg;
+  if (point){ spawnBloodMist(point.clone()); spawnBloodSpatter(point.clone()); addDecal(new THREE.Vector3(b.x, 0.02, b.z), new THREE.Vector3(0, 1, 0), 'blood'); }
+  playSfx(pickSfx(SFX_FILES.hit)); playSfx(pickSfx(SFX_FILES.enemyHitVocal));
+  if (b.health <= 0){
+    b.dead = true; b.respawnAt = performance.now() + 2500; dmPlayerScore++;
+    ent.group.rotation.x = -Math.PI / 2; ent.group.position.y = 0.4 + CHAR_LIFT;
+    updateDmScoreHud();
+    if (dmPlayerScore >= BOT_SCORE_TARGET) endDmBotMatch(true);
+  }
+}
+// First hit point along the ray (bots + opponent + surfaces), for the
+// throwing-knife visual in relay modes — the relay decides the hit,
+// the client only needs where the knife stops.
+function dmRayEndpoint(dir, maxDist){
+  ray.set(camera.position, dir); ray.far = maxDist;
+  const targets = dmBots.filter(e => !e.bot.dead).map(e => e.group);
+  if (dmRemote.visible) targets.push(dmRemote);
+  const hits = ray.intersectObjects(targets, true);
+  if (hits.length) return hits[0].point.clone();
+  const surf = ray.intersectObjects(losMeshes.concat([ground]), false);
+  if (surf.length) return surf[0].point.clone();
+  return camera.position.clone().addScaledVector(dir, maxDist);
+}
+// Knife (melee, silent): a swing at the nearest living target inside
+// 2.2 m and in front of the player. Solo resolves locally; relay modes
+// send the packet and the relay does the distance + arc check.
+function dmKnifeSwing(now){
+  if (now - dmLastShot < weaponStats().rate * 1000) return;
+  dmLastShot = now; lastShot = now;
+  playPlayerOneShot('meleeHook');
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+  if (!soloAiMode){ dmClient?.send('shoot', { weapon: 'Knife' }); playSfx(SFX_FILES.stabMiss); return; }
+  let best = null, bestDist = Infinity;
+  for (const ent of dmBots){
+    if (ent.bot.dead) continue;
+    const dx = ent.bot.x - player.position.x, dz = ent.bot.z - player.position.z, dist = Math.hypot(dx, dz);
+    if (dist > 2.2 || dist <= 0) continue;
+    if ((dx * dir.x + dz * dir.z) / dist < 0.707) continue; // not in front (45 degrees, same as the relay)
+    if (dist < bestDist){ best = ent; bestDist = dist; }
+  }
+  if (best){
+    playSfx(pickSfx(SFX_FILES.stab));
+    const point = new THREE.Vector3(best.bot.x, player.position.y + 1.4, best.bot.z);
+    dmHurtBot(best, weaponStats().dmg, point);
+  } else playSfx(SFX_FILES.stabMiss);
+}
+// Claymore: FIRE places it 1 m in front of the player, facing the
+// player's yaw. Solo stores it locally; relay modes send a 'place'
+// packet and the relay stores it (the mesh renders from the broadcast
+// for the opponent, from the local placement for me).
+function dmPlaceClaymore(now){
+  const w = weaponStats();
+  if (now - dmLastShot < w.rate * 1000) return;
+  if (ammoInMag <= 0){ showMsg('Out of claymores — switch weapons', 1400); return; }
+  dmLastShot = now; lastShot = now; ammoInMag--; dmWeaponCounts.Claymore = ammoInMag;
+  const x = Math.max(-39, Math.min(39, player.position.x + Math.sin(yaw) * 1)), z = Math.max(-39, Math.min(39, player.position.z + Math.cos(yaw) * 1));
+  playSfx(pickSfx(SFX_FILES.mechClick)); // the arming click
+  const key = dmMineKey(soloAiMode ? -1 : dmSlot, x, z);
+  if (soloAiMode){
+    dmSoloMines.push({ x, z, yaw, armedAt: now + 1000, key });
+    dmAddMineMesh(key, x, z, yaw);
+  } else {
+    dmClient?.send('place', { weapon: 'Claymore', x, z, yaw });
+    dmAddMineMesh(key, x, z, yaw); // local mesh until the broadcast confirms it
+  }
+}
+// Throwing knife: a visible blade flies to the ray's first hit and
+// sticks there. Solo resolves the hit locally (the ray); relay modes
+// send the packet and the relay resolves it.
+function dmThrowKnife(now, dir){
+  playPlayerOneShot('throwGrenade');
+  playSfx(SFX_FILES.bulletWhizz);
+  const muzzle = getPlayerMuzzle(_muzzleV);
+  const end = soloAiMode ? soloShootResolve(dir) : dmRayEndpoint(dir, weaponStats().range);
+  const mesh = dmKnifeMesh(); if (!mesh) return;
+  mesh.position.copy(muzzle); scene.add(mesh);
+  dmProjectiles.push({ kind: 'knife', mesh, from: muzzle.clone(), to: end.clone(), dir: dir.clone(), t: 0, dur: Math.max(0.08, muzzle.distanceTo(end) / 30) });
+  if (!soloAiMode) dmClient?.send('shoot', { weapon: 'ThrowingKnife', dir: { x: dir.x, y: dir.y, z: dir.z }, origin: { x: camera.position.x, y: camera.position.y, z: camera.position.z } });
+}
+// Grenade: thrown in an arc to the landing point (the aim ray's first
+// surface, or 25 m out), 2 s fuse. Solo resolves the blast locally;
+// relay modes send the landing point and the relay applies the blast
+// on the fuse (the explosion renders when the broadcast drops it).
+function dmThrowGrenade(now, dir){
+  playPlayerOneShot('throwGrenade');
+  playSfx(SFX_FILES.bulletWhizz);
+  const muzzle = getPlayerMuzzle(_muzzleV);
+  ray.set(camera.position, dir); ray.far = 25;
+  const surf = ray.intersectObjects(losMeshes.concat([ground]), false);
+  const land = surf.length ? surf[0].point.clone() : camera.position.clone().addScaledVector(dir, 25);
+  land.x = Math.max(-39, Math.min(39, land.x)); land.z = Math.max(-39, Math.min(39, land.z));
+  const detonateAt = now + 2000;
+  const mesh = dmGrenadeMesh(); if (!mesh) return;
+  mesh.position.copy(muzzle); scene.add(mesh);
+  const key = dmGrenadeKey(soloAiMode ? -1 : dmSlot, land.x, land.z);
+  dmProjectiles.push({ kind: 'grenade', mesh, from: muzzle.clone(), to: new THREE.Vector3(land.x, 0.1, land.z), t: 0, dur: 0.8, key, detonateAt });
+  if (soloAiMode) dmSoloGrenades.push({ x: land.x, z: land.z, detonateAt, key });
+  else dmClient?.send('shoot', { weapon: 'Grenade', dir: { x: dir.x, y: dir.y, z: dir.z }, origin: { x: camera.position.x, y: camera.position.y, z: camera.position.z }, point: { x: land.x, z: land.z } });
+}
+// Solo grenade detonation: falloff damage to every bot inside 5 m, and
+// to the player too (a grenade at your own feet hurts — a self-kill
+// scores for nobody, you just respawn).
+function dmDetonateSoloGrenade(key){
+  const g = dmRenderedGrenades.get(key); if (!g) return;
+  dmRemoveGrenade(key, true);
+  dmSoloGrenades = dmSoloGrenades.filter(s => s.key !== key);
+  for (const ent of dmBots){
+    if (ent.bot.dead) continue;
+    const dist = Math.hypot(ent.bot.x - g.x, ent.bot.z - g.z);
+    if (dist > 5) continue;
+    const dmg = Math.max(20, Math.round(90 * (1 - dist / 5)));
+    dmHurtBot(ent, dmg, new THREE.Vector3(ent.bot.x, player.position.y + 1.4, ent.bot.z));
+  }
+  const selfDist = Math.hypot(player.position.x - g.x, player.position.z - g.z);
+  if (selfDist <= 5 && health > 0){
+    health -= Math.max(20, Math.round(90 * (1 - selfDist / 5)));
+    if (health <= 0){ health = 0; dmRespawnAt = performance.now() + 2500; playPlayerOneShot(pickRandomDeath(), { hold: true }); }
+  }
+}
+// Solo mine check: a living bot that walks into an armed mine's front
+// arc (60°, 6 m) trips it. Called from updateDmBots after the bots move.
+function dmCheckSoloMines(now){
+  if (!soloAiMode || dmSoloMines.length === 0) return;
+  for (let i = dmSoloMines.length - 1; i >= 0; i--){
+    const m = dmSoloMines[i];
+    if (now < m.armedAt) continue;
+    const fx = Math.sin(m.yaw), fz = Math.cos(m.yaw);
+    let tripped = false;
+    for (const ent of dmBots){
+      if (ent.bot.dead) continue;
+      const dx = ent.bot.x - m.x, dz = ent.bot.z - m.z, dist = Math.hypot(dx, dz);
+      if (dist > 6 || dist <= 0) continue;
+      if ((dx * fx + dz * fz) / dist < 0.866) continue;
+      tripped = true;
+      dmHurtBot(ent, 100, new THREE.Vector3(ent.bot.x, player.position.y + 1.4, ent.bot.z));
+    }
+    if (tripped){ dmRemoveMine(m.key, true); dmSoloMines.splice(i, 1); }
+  }
+}
 function deathmatchShoot(){
-  noteActivity();const now=performance.now();if(now-dmLastShot<weaponStats().rate*1000||health<=0||!dmStarted||dmPaused||dmFinished)return;
+  noteActivity();const now=performance.now();if(health<=0||!dmStarted||dmPaused||dmFinished)return;
+  // Knife: melee — no ammo, no reload, rate-gated only.
+  if(weaponVariant==='Knife'){dmKnifeSwing(now);return;}
+  // Claymore: FIRE places it.
+  if(weaponVariant==='Claymore'){dmPlaceClaymore(now);return;}
+  if(now-dmLastShot<weaponStats().rate*1000)return;
   if(weaponVariant==='Shotgun'&&now<pumpUntil)return; // the pump must finish before the next shot
-  if(ammoInMag<=0){startReload();return;}
-  dmLastShot=now;lastShot=now;ammoInMag--;const dir=new THREE.Vector3();camera.getWorldDirection(dir);
+  // Consumables are spent for the life — no reload when they run out.
+  if(ammoInMag<=0){if(DM_CONSUMABLES.has(weaponVariant)){showMsg('Out of '+(weaponVariant==='ThrowingKnife'?'throwing knives':weaponVariant.toLowerCase()+'s')+' — switch weapons (Tab)',1400);return;}startReload();return;}
+  dmLastShot=now;lastShot=now;ammoInMag--;if(DM_CONSUMABLES.has(weaponVariant))dmWeaponCounts[weaponVariant]=ammoInMag;
+  const dir=new THREE.Vector3();camera.getWorldDirection(dir);
+  if(weaponVariant==='Grenade'){dmThrowGrenade(now,dir);return;}
+  if(weaponVariant==='ThrowingKnife'){dmThrowKnife(now,dir);return;}
+  // Sniper: an unscoped shot spreads; a scoped shot is exact.
+  let shotDir=dir;
+  if(weaponVariant==='SniperRifle'&&!dmScoped){shotDir=dir.clone();const s=0.026;shotDir.x+=(Math.random()-0.5)*2*s;shotDir.y+=(Math.random()-0.5)*2*s;shotDir.normalize();}
   // Solo: no relay — the shot resolves locally against the bots
   // (soloShootResolve); relay modes send the packet and the relay
   // decides the hit, so the tracer just flies to max range there.
-  if(!soloAiMode)dmClient?.send('shoot',{weapon:weaponVariant,dir:{x:dir.x,y:dir.y,z:dir.z},origin:{x:camera.position.x,y:camera.position.y,z:camera.position.z}});
+  if(!soloAiMode)dmClient?.send('shoot',{weapon:weaponVariant,dir:{x:shotDir.x,y:shotDir.y,z:shotDir.z},origin:{x:camera.position.x,y:camera.position.y,z:camera.position.z}});
   playShotSound();playPlayerOneShot(weapon==='rifle'?'fireRifle':'firePistol');
   if(weaponVariant==='Shotgun'){pumpUntil=now+PUMP_T;playSfx(SFX_FILES.shotgunPump);}
-  const muzzle=getPlayerMuzzle(_muzzleV),end=soloAiMode?soloShootResolve(dir):muzzle.clone().addScaledVector(dir,60);showMuzzleFlash(muzzle,dir);spawnTracer(muzzle,end);
-  if(ammoInMag<=0)startReload();
+  const muzzle=getPlayerMuzzle(_muzzleV),end=soloAiMode?soloShootResolve(shotDir):muzzle.clone().addScaledVector(shotDir,weaponStats().range);showMuzzleFlash(muzzle,shotDir);spawnTracer(muzzle,end);
+  if(ammoInMag<=0&&!DM_CONSUMABLES.has(weaponVariant))startReload();
 }
 function tryShoot(){
   if(dmAnyMode){deathmatchShoot();return;}
@@ -4582,7 +4958,7 @@ function animate(){
   // Advance real FBX playback (player + experimental guards are updated
   // in their own mixers; player mixer runs even on the menu so idle plays).
   if (playerMixer && fbxPlaying){ try { playerMixer.update(dt); } catch (e) {} }
-  if (dmAnyMode){ updateDmRemoteAnim(dt); updateDmBots(dt); }
+  if (dmAnyMode){ updateDmRemoteAnim(dt); updateDmBots(dt); updateDmProjectiles(dt); refreshDmScope(); }
   // Heavy kick impact: the damage lands when the leg reaches full
   // extension (clip time KICK_HIT_T), not on the press — the leg has
   // to arrive first. Tied to the one-shot's own time, so slow-mo and
@@ -4647,7 +5023,7 @@ function animate(){
   const _st=document.getElementById('stateText'); if(_st) _st.textContent = anyAlert?'ALERT':(detection>=30?'CAUTION':(detection>0?'SUSPICIOUS':'UNDETECTED'));
   const _wt=document.getElementById('weaponText'); if(_wt) _wt.textContent = weaponVariant + ' (' + weapon + ') · ' + playerLoadout + ' set';
   const _at=document.getElementById('ammoText'); if(_at) _at.textContent = 'Ammo: '+ammoInMag+' / '+weapons[weapon].max + (now<reloadUntil?' (reloading)':'');
-  if(dmAnyMode){const _dmAmmo=document.getElementById('dmAmmo');if(_dmAmmo)_dmAmmo.textContent=weaponVariant+' · '+ammoInMag+' / '+weaponStats().max+(now<reloadUntil?' · reloading':'');}
+  if(dmAnyMode){const _dmAmmo=document.getElementById('dmAmmo');if(_dmAmmo)_dmAmmo.textContent=weaponVariant==='Knife'?'Knife · melee':weaponVariant+' · '+ammoInMag+' / '+weaponStats().max+(now<reloadUntil?' · reloading':'');}
   const _dispAnim = playerHeldPose || playerOneShotName || currentAnim;
   const _ant=document.getElementById('animText'); if(_ant) _ant.textContent = 'Anim: '+_dispAnim+' ('+(fbxPlaying ? 'Agent_Kyle.fbx, FBX' : 'procedural capsule')+') — FBX: '+(ANIM_MAP[_dispAnim]||ANIM_MAP[currentAnim]||'—');
   const _pt=document.getElementById('posText'); if(_pt) _pt.textContent = 'Intel: '+intel+'/3  •  X '+player.position.x.toFixed(0)+' Z '+player.position.z.toFixed(0);
@@ -4661,8 +5037,9 @@ function applyDeathmatchState(message){
   dmPlayers=message.players||[null,null];dmStarted=!!message.started;dmPaused=!!message.paused;dmFinished=!!message.finished;
   if(message.teamScore)dmTeamScore=message.teamScore;
   syncDmBots(message.bots);
+  syncDmGrenades(message.grenades); syncDmMines(message.mines);
   const me=dmPlayers[dmSlot],op=dmPlayers[1-dmSlot];
-  if(me){player.position.set(me.x,CHAR_LIFT,me.z);yaw=me.yaw;modelYaw=me.yaw;health=me.health;ammoInMag=me.ammo;}
+  if(me){player.position.set(me.x,CHAR_LIFT,me.z);yaw=me.yaw;modelYaw=me.yaw;health=me.health;ammoInMag=me.ammo;if(me.counts)dmWeaponCounts=me.counts;}
   if(op){dmRemote.visible=true;dmRemote.position.set(op.x,CHAR_LIFT,op.z);dmRemote.rotation.y=op.yaw;loadDmRemoteCharacter(op.character);}
   else dmRemote.visible=false;
   const score=document.getElementById('dmScore'),status=document.getElementById('dmStatus');
@@ -4680,6 +5057,9 @@ if(deathmatchMode){
   }else{document.getElementById('dmStatus').textContent='Multiplayer relay is not configured';document.getElementById('overlay').style.display='flex';document.querySelector('#overlay .box').insertAdjacentHTML('beforeend','<p>The relay URL is missing. Configure assets/js/deathmatch-config.js after deploying the Worker.</p><a href="deathmatch.html">Return to lobby</a>');}
 }
 if(soloAiMode)spawnDmBots();
+// Deathmatch: preload the thrown / placed models once, so a throw or
+// a placement never waits on a network load (see dmThrownModels).
+if (dmAnyMode){ loadDmThrownModel('throwingKnife', 'black_throwing_knife.glb'); loadDmThrownModel('grenade', (playerLoadout === 'white' ? 'white_grenade.glb' : 'black_grenade.glb')); loadDmThrownModel('claymore', (playerLoadout === 'white' ? 'white_claymore.glb' : 'black_claymore.glb')); }
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 animate();
 </script>

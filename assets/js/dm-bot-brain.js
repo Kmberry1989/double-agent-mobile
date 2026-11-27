@@ -27,15 +27,26 @@ export const BOT_DEFAULT_CHARACTERS = ['enemy-terror1.fbx', 'enemy-terror2.fbx',
 // bot's fire cadence is max(weapon rate, difficulty shot interval):
 // the weapon sets the fastest it can fire, the difficulty sets how
 // often it chooses to. Reload is 1400 ms for every weapon, as for humans.
+// kind / range: 'hitscan' is the ray the relay already resolves;
+// 'thrown' is a thrown blade (ray, 30 m); 'melee' is the knife (no
+// ammo, 2.2 m); 'blast' (grenade) and 'mine' (claymore) are NOT bot
+// weapons — a bot has no throw or place behaviour, so cleanBotWeapon
+// rejects them (the relay answers 400). The sniper is a long ray
+// (80 m) but the brain's 22 m shooting gate still caps it.
 export const BOT_WEAPONS = {
-  Glock: { dmg: 34, rate: 270, cap: 12 },
-  Walther: { dmg: 34, rate: 270, cap: 12 },
-  Makarov: { dmg: 34, rate: 270, cap: 12 },
-  Revolver: { dmg: 40, rate: 340, cap: 6 },
-  MP5K: { dmg: 50, rate: 105, cap: 30 },
-  AKS74U: { dmg: 50, rate: 105, cap: 30 },
-  Shotgun: { dmg: 70, rate: 600, cap: 5 },
-  RPG7: { dmg: 50, rate: 105, cap: 30 },
+  Glock: { dmg: 34, rate: 270, cap: 12, kind: 'hitscan', range: 60 },
+  Walther: { dmg: 34, rate: 270, cap: 12, kind: 'hitscan', range: 60 },
+  Makarov: { dmg: 34, rate: 270, cap: 12, kind: 'hitscan', range: 60 },
+  Revolver: { dmg: 40, rate: 340, cap: 6, kind: 'hitscan', range: 60 },
+  MP5K: { dmg: 50, rate: 105, cap: 30, kind: 'hitscan', range: 60 },
+  AKS74U: { dmg: 50, rate: 105, cap: 30, kind: 'hitscan', range: 60 },
+  Shotgun: { dmg: 70, rate: 600, cap: 5, kind: 'hitscan', range: 60 },
+  RPG7: { dmg: 50, rate: 105, cap: 30, kind: 'hitscan', range: 60 },
+  Knife: { dmg: 50, rate: 490, cap: 0, kind: 'melee', range: 2.2 },
+  ThrowingKnife: { dmg: 40, rate: 690, cap: 6, kind: 'thrown', range: 30 },
+  Grenade: { dmg: 90, rate: 990, cap: 3, kind: 'blast', range: 25, blast: 5 },
+  Claymore: { dmg: 100, rate: 990, cap: 2, kind: 'mine', range: 6, blast: 6 },
+  SniperRifle: { dmg: 100, rate: 1190, cap: 5, kind: 'hitscan', range: 80 },
 };
 export const BOT_RELOAD_MS = 1400;
 export const BOT_RESPAWN_MS = 2500;
@@ -62,7 +73,17 @@ export function cleanDifficulty(v) {
   return typeof v === 'string' && v in BOT_DIFFICULTY ? v : 'normal';
 }
 export function cleanBotWeapon(v) {
-  return typeof v === 'string' && v in BOT_WEAPONS ? v : 'Glock';
+  // Only weapons a bot can actually shoot: hitscan, a thrown blade
+  // (ray) or the knife (melee, range-gated below). A grenade needs a
+  // throw + fuse and a claymore needs placing — the brain has neither
+  // behaviour, so those fall back to the Glock.
+  return isBotWeapon(v) ? v : 'Glock';
+}
+// True when the value names a weapon a bot can shoot (see above).
+// The relay uses this for its botWeapon validation (400, not a clamp).
+export function isBotWeapon(v) {
+  return typeof v === 'string' && v in BOT_WEAPONS &&
+    (BOT_WEAPONS[v].kind === 'hitscan' || BOT_WEAPONS[v].kind === 'thrown' || BOT_WEAPONS[v].kind === 'melee');
 }
 // A bot character is a plain .fbx/.glb filename, same rule as the relay's
 // cleanCharacter. Returns null when the filename is not acceptable.
@@ -195,11 +216,14 @@ export function updateBot(bot, env, dt) {
   // Shoot: in range, line of sight, reacted, cadence met, ammo to spend.
   // The hit is a difficulty roll — the caller applies damage on a hit
   // and renders the tracer either way, so a miss still reads as a shot.
-  if (seesTarget && targetDist <= 22 && now - bot.seenAt >= diff.reactionMs &&
+  // Range is the weapon's own (a knife only slashes inside 2.2 m, a
+  // sniper's 80 m is still capped by the brain's 22 m shooting gate).
+  // A weapon with no magazine (the knife, cap 0) never reloads.
+  const shootRange = Math.min(22, w.range ?? 22), usesAmmo = w.cap > 0;
+  if (seesTarget && targetDist <= shootRange && now - bot.seenAt >= diff.reactionMs &&
       !bot.reloadUntil && now - bot.lastShot >= Math.max(w.rate, diff.shotIntervalMs)) {
     bot.lastShot = now;
-    bot.ammo--;
-    if (bot.ammo <= 0) bot.reloadUntil = now + BOT_RELOAD_MS;
+    if (usesAmmo) { bot.ammo--; if (bot.ammo <= 0) bot.reloadUntil = now + BOT_RELOAD_MS; }
     events.push({ type: 'shoot', botId: bot.id, targetId: target.id, hit: rand() < diff.hitChance, damage: w.dmg, weapon: bot.weapon });
   }
   return events;
