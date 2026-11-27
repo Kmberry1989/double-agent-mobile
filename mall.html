@@ -38,13 +38,13 @@
 </head>
 <body>
 <nav class="levels"><a href="menu.html">Main Menu</a><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html">Halloween</a><a href="mall.html" class="cur" aria-current="page">Mall</a><a href="deathmatch.html">Deathmatch</a><a href="stage-editor.html">Stage Editor</a></nav>
-<div id="mission"><b>Bombs defused:</b> <span id="bombCount">0 / 4</span> &nbsp; <b>Time:</b> <span id="timerText">5:00</span><div id="bombStatus"></div></div>
+<div id="mission"><b>Bombs defused:</b> <span id="bombCount">0 / 4</span><div id="bombStatus"></div></div>
 <div id="dmHud"><strong id="dmScore">Deathmatch · connecting</strong><div id="dmStatus">Waiting for relay</div><div id="dmAmmo">Pistol · 12 / 12</div></div>
 <button id="fireBtn">FIRE</button>
 <button id="defuseBtn">DEFUSE</button>
 <div id="joy"><div id="joyKnob"></div></div>
 <div id="defuseUI">Hold to defuse<div id="defuseBar"><div id="defuseFill"></div></div></div>
-<div id="overlay"><h1>The Mall</h1><p>On the roof at sunset. Climb down the south wall and slip in.<br>Four bombs. Five minutes. Rochelle is on the radio.</p><button id="startBtn">Enter the mall</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / R2 Shoot · Square hold Defuse</p><p class="padControls">Mouse — look · Click Shoot · E hold Defuse · F Shoot · Touch — joystick · FIRE / DEFUSE</p></div>
+<div id="overlay"><h1>The Mall</h1><p>On the roof at sunset. Climb down the south wall and slip in.<br>Four bombs. Rochelle is on the radio.</p><button id="startBtn">Enter the mall</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / R2 Shoot · Square hold Defuse</p><p class="padControls">Mouse — look · Click Shoot · E hold Defuse · F Shoot · Touch — joystick · FIRE / DEFUSE</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="fail"><h1>Mission failed</h1><p id="failText"></p><button onclick="location.reload()">Try again</button></div>
 <script>
@@ -60,14 +60,14 @@ import { DeathmatchClient } from './assets/js/deathmatch-client.js';
 import { DEATHMATCH_RELAY_URL } from './assets/js/deathmatch-config.js';
 import { createBot, updateBot, respawnBot, cleanBotCount, cleanDifficulty, BOT_DEFAULT_CHARACTERS, BOT_SCORE_TARGET, BOT_WEAPONS } from './assets/js/dm-bot-brain.js';
 // Deathmatch mode (?mode=deathmatch): 1v1 over the relay. The mission
-// (bombs, terrorists, shoppers, timer, roof-climb intro) is hidden and
+// (bombs, terrorists, shoppers, roof-climb intro) is hidden and
 // the arena is the mall ground floor. Single-player is untouched.
 const dmParams = new URLSearchParams(location.search);
 const deathmatchMode = dmParams.get('mode') === 'deathmatch';
 // Deathmatch bots: solo vs AI runs entirely in the page (no relay, no
 // room code); co-op vs bots is the relay 1v1 with relay-driven bots
 // added (coop=1). dmAnyMode = any deathmatch flavour — the mission
-// (bombs, terrorists, shoppers, timer, roof-climb intro) is hidden or
+// (bombs, terrorists, shoppers, roof-climb intro) is hidden or
 // skipped for all of them.
 const soloAiMode = dmParams.get('mode') === 'solo-ai';
 const coopMode = deathmatchMode && dmParams.get('coop') === '1';
@@ -135,7 +135,6 @@ const SPAWN = { x: 0, z: 26 };
 const ROOF_Y = 12.05; // roof walk surface (just above the 12 m ceiling)
 const BOMB_COUNT = 4;
 const TERRORIST_COUNT = 5;
-const TIME_LIMIT = 300; // 5 minutes, from entering the atrium (not the roof)
 const DEFUSE_RANGE = 2.5;
 const DEFUSE_TIME = 3; // hold USE for 3 s to defuse
 const SHOOT_RANGE = 120;
@@ -143,7 +142,7 @@ const SHOOT_RANGE = 120;
 // ---- Mall audio (plain Audio elements; the mall has no Web Audio
 // sound module). Kyle's picks (2026-11-22): C4 beep (procedural) ticks
 // once per second during a defuse hold; explosion (video extract)
-// plays when the timer runs out and a bomb goes off.
+// plays on a grenade blast or a claymore trip.
 const mallBeep = new Audio('assets/audio/c4-beep.m4a');
 const mallExplosion = new Audio('assets/audio/explosion.m4a');
 function playMallBeep(){ try { mallBeep.currentTime = 0; mallBeep.play().catch(()=>{}); } catch(e){} }
@@ -209,24 +208,29 @@ const colliders = [];
 // Warm tile floor, red carpet runner down the centre of the atrium with
 // gold edge strips. Offsets keep added planes off the surfaces below
 // (floor y=0, carpet y=0.02, strips y=0.03).
-flatPlane(0, 0, 0, 40, 60, 0x9a8a72);
-flatPlane(0, 0.02, 0, 6, 56, 0x7a1a1a);
-flatPlane(-3.1, 0.03, 0, 0.2, 56, 0xc9a227);
-flatPlane(3.1, 0.03, 0, 0.2, 56, 0xc9a227);
+// dmSurfaces: the structural surfaces a deathmatch shot can hit — the
+// raycast list for bullet holes, wall blood and thrown-knife endpoints.
+// (Props and shelving are not in it; a shot through them hits the wall
+// or floor behind.)
+const dmSurfaces = [];
+dmSurfaces.push(flatPlane(0, 0, 0, 40, 60, 0x9a8a72));
+dmSurfaces.push(flatPlane(0, 0.02, 0, 6, 56, 0x7a1a1a));
+dmSurfaces.push(flatPlane(-3.1, 0.03, 0, 0.2, 56, 0xc9a227));
+dmSurfaces.push(flatPlane(3.1, 0.03, 0, 0.2, 56, 0xc9a227));
 // Ceiling at y=12 (faces down) with two bright skylight strips 0.02 below it.
-flatPlane(0, 12, 0, 40, 60, 0x2a2018, null, 0, 0, Math.PI / 2);
+dmSurfaces.push(flatPlane(0, 12, 0, 40, 60, 0x2a2018, null, 0, 0, Math.PI / 2));
 [[-6], [6]].forEach(([x]) => {
   const sky = new THREE.Mesh(new THREE.PlaneGeometry(6, 20), new THREE.MeshBasicMaterial({ color: 0xfff6dd }));
   sky.rotation.x = Math.PI / 2; sky.position.set(x, 11.98, 0); scene.add(sky);
 });
 // Perimeter walls, 12 m tall. North wall solid; south wall has the entrance
 // (x -2..2, y 0..3.5) the player walks in through.
-box(0, 6, -30, 40, 12, 0.4, 0x7a6a58); // north
-box(-11, 6, 30, 18, 12, 0.4, 0x7a6a58); // south, west of entrance
-box(11, 6, 30, 18, 12, 0.4, 0x7a6a58); // south, east of entrance
-box(0, 7.75, 30, 4, 8.5, 0.4, 0x7a6a58); // lintel above the entrance, y 3.5..12
-box(20, 6, 0, 0.4, 12, 60, 0x7a6a58); // east outer wall
-box(-20, 6, 0, 0.4, 12, 60, 0x7a6a58); // west outer wall
+dmSurfaces.push(box(0, 6, -30, 40, 12, 0.4, 0x7a6a58)); // north
+dmSurfaces.push(box(-11, 6, 30, 18, 12, 0.4, 0x7a6a58)); // south, west of entrance
+dmSurfaces.push(box(11, 6, 30, 18, 12, 0.4, 0x7a6a58)); // south, east of entrance
+dmSurfaces.push(box(0, 7.75, 30, 4, 8.5, 0.4, 0x7a6a58)); // lintel above the entrance, y 3.5..12
+dmSurfaces.push(box(20, 6, 0, 0.4, 12, 60, 0x7a6a58)); // east outer wall
+dmSurfaces.push(box(-20, 6, 0, 0.4, 12, 60, 0x7a6a58)); // west outer wall
 // Entrance mat just inside the doors.
 flatPlane(0, 0.04, 28, 4, 2, 0x4a1a1a);
 // A wreath laid flat on the floor beside the entrance mat (the wreath
@@ -247,7 +251,7 @@ const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(260, 32, 20),
 skyMesh.renderOrder = -1; scene.add(skyMesh);
 // Exterior ground: the street / city ground at y=-0.05 (just under the
 // interior floor, so no z-fight inside; the apron outside is the street).
-flatPlane(0, -0.05, 0, 400, 400, 0x15151c);
+dmSurfaces.push(flatPlane(0, -0.05, 0, 400, 400, 0x15151c));
 // Night-city windows: a canvas texture, dark facade with a grid of windows,
 // some lit warm. Three variants, cycled so no two neighbours match.
 function makeWindowTexture(litFrac) {
@@ -525,10 +529,10 @@ GROUND_FLOOR_ITEMS.forEach(([file, x, z, tw, th, td, ry, r]) => {
 // the tree. The escalators land on the south end strip (z 12..30) —
 // they rise through the opening, so no hole is cut for them.
 const UPPER_FLOOR_COLOR = 0x8a7a62;
-box(-14, 4.35, 0, 12, 0.3, 60, UPPER_FLOOR_COLOR); // west walkway
-box(14, 4.35, 0, 12, 0.3, 60, UPPER_FLOOR_COLOR); // east walkway
-box(0, 4.35, 21, 16, 0.3, 18, UPPER_FLOOR_COLOR); // south end strip
-box(0, 4.35, -21, 16, 0.3, 18, UPPER_FLOOR_COLOR); // north end strip
+dmSurfaces.push(box(-14, 4.35, 0, 12, 0.3, 60, UPPER_FLOOR_COLOR)); // west walkway
+dmSurfaces.push(box(14, 4.35, 0, 12, 0.3, 60, UPPER_FLOOR_COLOR)); // east walkway
+dmSurfaces.push(box(0, 4.35, 21, 16, 0.3, 18, UPPER_FLOOR_COLOR)); // south end strip
+dmSurfaces.push(box(0, 4.35, -21, 16, 0.3, 18, UPPER_FLOOR_COLOR)); // north end strip
 // Gold edge strips along the balcony inner edge (0.01 above the slab top).
 box(-8, 4.52, 0, 0.2, 0.02, 24, 0xc9a227);
 box(8, 4.52, 0, 0.2, 0.02, 24, 0xc9a227);
@@ -1160,22 +1164,14 @@ function updateNpcs(dt) {
   }
 }
 
-// ---- Bombs, timer, win / fail ----
+// ---- Bombs, win / fail ----
 let defused = 0, won = false, failed = false, started = false, winShown = false, failShown = false;
-let timeLeft = TIME_LIMIT;
 let yaw = 0, pitch = -0.05;
 let statusTimer = null;
 let defuseProgress = 0, defuseBeeps = 0, blinkT = 0;
 function updateBombCount() {
   const el = document.getElementById('bombCount');
   if (el) el.textContent = defused + ' / ' + BOMB_COUNT;
-}
-function updateTimer() {
-  const el = document.getElementById('timerText');
-  if (el) {
-    const t = Math.max(0, Math.ceil(timeLeft));
-    el.textContent = Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
-  }
 }
 function setStatus(text) {
   const el = document.getElementById('bombStatus');
@@ -1220,12 +1216,10 @@ function showWin() {
   document.getElementById('win').style.display = 'flex';
   if (document.pointerLockElement) document.exitPointerLock();
 }
-function failMission(reason) {
+function failMission() {
   if (failShown) return;
   failShown = true; failed = true;
-  if (reason === 'timer') playMallExplosion(); // a bomb goes off when the timer runs out
-  document.getElementById('failText').textContent =
-    reason === 'timer' ? 'The timer ran out.' : 'You shot a shopper.';
+  document.getElementById('failText').textContent = 'You shot a shopper.';
   document.getElementById('fail').style.display = 'flex';
   if (document.pointerLockElement) document.exitPointerLock();
 }
@@ -1298,6 +1292,177 @@ function updateTracers(rawDt) {
       t.cyl.geometry.dispose(); t.mat.dispose(); t.glowMat.dispose();
       tracers.splice(i, 1);
     }
+  }
+}
+// ---------- Deathmatch effects (bullet holes, blood, explosions, stuck knives) ----------
+// The courtyard's effect systems, ported to the mall — the mall had
+// none (no blood, no bullet holes, no rendered explosion). All of it
+// is deathmatch-only: single-player never calls these helpers.
+// Textures: the same real WebP effect textures the courtyard uses;
+// the procedural canvas textures are the fallback if a file is missing.
+function dmMakeDecalTexture(kind){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  if (kind === 'blood'){
+    g.fillStyle = 'rgba(0,0,0,0)'; g.clearRect(0,0,64,64);
+    for (let i=0;i<9;i++){
+      const x = 18 + Math.random()*28, y = 18 + Math.random()*28, r = 4 + Math.random()*9;
+      g.fillStyle = i % 2 ? 'rgba(122,10,10,0.9)' : 'rgba(90,5,5,0.9)';
+      g.beginPath(); g.arc(x,y,r,0,7); g.fill();
+    }
+  } else {
+    const grad = g.createRadialGradient(32,32,2,32,32,30);
+    grad.addColorStop(0,'rgba(5,5,5,1)'); grad.addColorStop(0.7,'rgba(20,20,20,0.95)'); grad.addColorStop(1,'rgba(120,120,120,0.35)');
+    g.fillStyle = grad; g.beginPath(); g.arc(32,32,30,0,7); g.fill();
+  }
+  const t = new THREE.CanvasTexture(c); return t;
+}
+const dmHoleTex = dmMakeDecalTexture('hole'), dmBloodTex = dmMakeDecalTexture('blood');
+const dmBloodSpatterTexs = [
+  'assets/textures/effects/blood_spatter.webp',
+  'assets/textures/effects/blood_spatter_2.webp',
+  'assets/textures/effects/blood_spatter_3.webp',
+].map((u) => { const t = texLoader.load(u); t.colorSpace = THREE.SRGBColorSpace; return t; });
+const dmBulletHoleTexs = [
+  'assets/textures/effects/bullet_hole.webp',
+  'assets/textures/effects/bullet_hole_2.webp',
+  'assets/textures/effects/bullet_hole_3.webp',
+].map((u) => { const t = texLoader.load(u); t.colorSpace = THREE.SRGBColorSpace; return t; });
+function dmPickTex(list) { return list[Math.floor(Math.random() * list.length)]; }
+const dmDecals = []; const DM_MAX_DECALS = 200;
+function dmAddDecal(point, normal, kind){
+  const size = kind === 'blood' ? 0.35 : 0.11;
+  const m = new THREE.Mesh(new THREE.CircleGeometry(size, 12),
+    new THREE.MeshBasicMaterial({ map: kind === 'blood' ? dmBloodTex : dmHoleTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  m.position.copy(point).addScaledVector(normal, 0.02);
+  m.lookAt(point.x + normal.x, point.y + normal.y, point.z + normal.z);
+  m.rotateZ(Math.random() * Math.PI * 2);
+  if (kind === 'blood') m.scale.set(0.8 + Math.random() * 0.7, 0.7 + Math.random() * 0.6, 1);
+  scene.add(m); dmDecals.push(m);
+  while (dmDecals.length > DM_MAX_DECALS){ const old = dmDecals.shift(); scene.remove(old); old.geometry.dispose(); old.material.dispose(); }
+  return m;
+}
+// Cheap particles: tiny boxes with velocity + gravity + fade. One style
+// serves chips, sparks and the red hit spray.
+const dmParticles = [];
+function dmSpawnParticles(point, color, count, speed, size, life, grav){
+  for (let i = 0; i < count; i++){
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size),
+      new THREE.MeshBasicMaterial({ color: color, transparent: true }));
+    mesh.position.copy(point);
+    const vel = new THREE.Vector3((Math.random() - 0.5) * 2, Math.random(), (Math.random() - 0.5) * 2).normalize().multiplyScalar(speed * (0.5 + Math.random() * 0.7));
+    vel.y = Math.abs(vel.y) + speed * 0.3;
+    scene.add(mesh);
+    dmParticles.push({ mesh: mesh, vel: vel, life: life, maxLife: life, grav: grav === undefined ? 9.8 : grav });
+  }
+  while (dmParticles.length > 120){ const old = dmParticles.shift(); scene.remove(old.mesh); }
+}
+function dmSpawnBloodMist(point){
+  dmSpawnParticles(point, 0x5a0a0a, 14, 2.0, 0.06, 0.5, 2.0);
+  dmSpawnParticles(point, 0x8a1010, 6, 1.2, 0.05, 0.5, 2.0);
+}
+const dmSpatters = [];
+function dmSpawnBloodSpatter(point){
+  const mat = new THREE.SpriteMaterial({ map: dmPickTex(dmBloodSpatterTexs), transparent: true, depthWrite: false, opacity: 0.95 });
+  mat.rotation = Math.random() * Math.PI * 2;
+  const s = new THREE.Sprite(mat);
+  s.position.copy(point);
+  s.scale.set(0.55, 0.55, 1);
+  scene.add(s);
+  dmSpatters.push({ sprite: s, t: 0 });
+  while (dmSpatters.length > 24){ const old = dmSpatters.shift(); scene.remove(old.sprite); old.sprite.material.dispose(); }
+}
+function dmSpawnSparks(point){
+  dmSpawnParticles(point, 0xfff6cc, 10, 5, 0.03, 0.3, 6);
+  dmSpawnParticles(point, 0xffffff, 2, 0, 0.2, 0.08, 0);
+}
+const dmHoleDecals = []; const DM_MAX_HOLE_DECALS = 40;
+function dmSpawnBulletHole(point, normal){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.15),
+    new THREE.MeshBasicMaterial({ map: dmPickTex(dmBulletHoleTexs), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  m.position.copy(point).addScaledVector(normal, 0.01);
+  m.lookAt(point.x + normal.x, point.y + normal.y, point.z + normal.z);
+  m.rotateZ(Math.random() * Math.PI * 2);
+  scene.add(m); dmHoleDecals.push(m);
+  while (dmHoleDecals.length > DM_MAX_HOLE_DECALS){ const old = dmHoleDecals.shift(); scene.remove(old); old.geometry.dispose(); old.material.dispose(); }
+}
+// Bullet-hole decal ON a character model (see the courtyard's
+// spawnModelBulletHole): attached to the character's group so it rides
+// the model. Capped at 8 per character, cleared on respawn / change.
+const dmModelHoles = new Map(); const DM_MAX_MODEL_HOLES = 8;
+function dmSpawnModelBulletHole(group, point, normal){
+  if (!group || !point || !normal) return;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.15),
+    new THREE.MeshBasicMaterial({ map: dmPickTex(dmBulletHoleTexs), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  m.position.copy(point).addScaledVector(normal, 0.01);
+  m.lookAt(point.x + normal.x, point.y + normal.y, point.z + normal.z);
+  m.rotateZ(Math.random() * Math.PI * 2);
+  scene.add(m); group.attach(m);
+  let list = dmModelHoles.get(group); if (!list){ list = []; dmModelHoles.set(group, list); }
+  list.push(m);
+  while (list.length > DM_MAX_MODEL_HOLES){ const old = list.shift(); old.removeFromParent(); old.geometry.dispose(); old.material.dispose(); }
+}
+function dmClearModelHoles(group){
+  const list = dmModelHoles.get(group); if (!list) return;
+  for (const m of list){ m.removeFromParent(); m.geometry.dispose(); m.material.dispose(); }
+  dmModelHoles.delete(group);
+}
+// Blood on the wall behind a hit: the spatter flies past the victim
+// along the shot direction and lands on the first surface within 4 m.
+const dmBloodRay = new THREE.Raycaster();
+function dmSpawnBloodOnWall(point, dir){
+  if (!point || !dir) return;
+  dmBloodRay.set(point, dir); dmBloodRay.far = 4;
+  const surf = dmBloodRay.intersectObjects(dmSurfaces, false);
+  if (!surf.length) return;
+  const sh = surf[0];
+  const n = sh.face ? sh.face.normal.clone().transformDirection(sh.object.matrixWorld) : new THREE.Vector3(0, 1, 0);
+  dmAddDecal(sh.point, n, 'blood');
+}
+// Rendered explosion (fireball + smoke + debris + shockwave ring):
+// the deathmatch blast for grenades, claymores and RPG7 impacts. The
+// single-player C4 keeps its own sound-only explosion (playMallExplosion).
+const dmExplosions = [];
+function dmExplodeAt(x, z){
+  const p = new THREE.Vector3(x, 0.6, z);
+  playMallExplosion();
+  dmSpawnParticles(p, 0xff7722, 22, 4, 0.12, 0.8, 4);
+  dmSpawnParticles(p, 0xffcc66, 10, 3, 0.09, 0.5, 3);
+  dmSpawnParticles(p, 0x555555, 12, 2, 0.2, 1.4, -1.5); // smoke rises
+  dmSpawnParticles(p, 0x222222, 8, 5, 0.1, 0.9, 9.8); // debris
+  const fireMat = new THREE.MeshBasicMaterial({ color: 0xff8822, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+  const fire = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), fireMat);
+  fire.position.copy(p); scene.add(fire);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffcc88, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.55, 24), ringMat);
+  ring.rotation.x = -Math.PI / 2; ring.position.set(x, 0.06, z); scene.add(ring);
+  dmExplosions.push({ fire, fireMat, ring, ringMat, t: 0 });
+  while (dmExplosions.length > 6){ const old = dmExplosions.shift(); scene.remove(old.fire); scene.remove(old.ring); old.fire.geometry.dispose(); old.fireMat.dispose(); old.ring.geometry.dispose(); old.ringMat.dispose(); }
+}
+function updateDmEffects(dt){
+  for (let i = dmParticles.length - 1; i >= 0; i--){
+    const p = dmParticles[i];
+    p.vel.y -= p.grav * dt;
+    p.mesh.position.addScaledVector(p.vel, dt);
+    if (p.mesh.position.y < 0.03){ p.mesh.position.y = 0.03; p.vel.set(0, 0, 0); }
+    p.life -= dt;
+    p.mesh.material.opacity = Math.max(0, p.life / p.maxLife);
+    if (p.life <= 0){ scene.remove(p.mesh); dmParticles.splice(i, 1); }
+  }
+  for (let i = dmSpatters.length - 1; i >= 0; i--){
+    const sp = dmSpatters[i]; sp.t += dt;
+    const k = Math.min(sp.t / 0.25, 1);
+    sp.sprite.scale.set(0.55, 0.55 + 0.35 * k, 1);
+    if (sp.t > 0.25) sp.sprite.material.opacity = Math.max(0, 0.95 * (1 - (sp.t - 0.25) / 0.35));
+    if (sp.t >= 0.6){ scene.remove(sp.sprite); sp.sprite.material.dispose(); dmSpatters.splice(i, 1); }
+  }
+  for (let i = dmExplosions.length - 1; i >= 0; i--){
+    const ex = dmExplosions[i]; ex.t += dt;
+    const fk = Math.min(ex.t / 0.35, 1), fo = Math.max(0, 1 - ex.t / 0.7);
+    ex.fire.scale.setScalar(1 + fk * 3.8); ex.fireMat.opacity = 0.95 * fo;
+    const rk = Math.min(ex.t / 0.5, 1);
+    ex.ring.scale.setScalar(1 + rk * 8); ex.ringMat.opacity = 0.7 * Math.max(0, 1 - rk);
+    if (ex.t >= 0.7){ scene.remove(ex.fire); scene.remove(ex.ring); ex.fire.geometry.dispose(); ex.fireMat.dispose(); ex.ring.geometry.dispose(); ex.ringMat.dispose(); dmExplosions.splice(i, 1); }
   }
 }
 // ---------- Deathmatch (1v1 over the relay) ----------
@@ -1466,7 +1631,7 @@ function endDmBotMatch(won){
   dmFinished = true; dmClient?.close();
   if (document.pointerLockElement) document.exitPointerLock();
   if (won){ showWin(); document.getElementById('winText').textContent = 'You reached 10 takedowns.'; }
-  else { failMission('bots'); document.getElementById('failText').textContent = 'The BOTs reached 10 takedowns.'; }
+  else { failMission(); document.getElementById('failText').textContent = 'The BOTs reached 10 takedowns.'; }
 }
 function updateDmBots(dt){
   if (!dmAnyMode) return;
@@ -1749,7 +1914,7 @@ function doShoot(ndcX, ndcY) {
     const end = hit ? hit.point.clone() : new THREE.Vector3(target.outer.position.x, target.outer.position.y + 1.2, target.outer.position.z);
     spawnTracer(muzzlePos(), end);
     if (target.kind === 'terrorist') stopTerrorist(target);
-    else failMission('shopper');
+    else failMission();
   } else {
     // Miss: tracer far down the ray.
     shootRay.setFromCamera(new THREE.Vector2(nx, ny), camera);
@@ -1767,11 +1932,9 @@ if (isTouch) document.body.classList.add('touch');
 // parapet, hangs, shimmies to the descent line, slips (close call — the
 // camera looks down at the night city below), drops to a ledge, climbs
 // down, wall-jumps through the glass canopy over the entrance, lands,
-// and walks in. The 5:00 timer starts only when the player enters the
-// atrium (z < 29.5), not during the climb. Any movement key / FIRE
+// and walks in. Any movement key / FIRE
 // during the intro skips to the end (player on the ground outside).
 let introActive = false;
-let enteredAtrium = false;
 let descentIdx = 0;
 let descentT = 0;
 let descentShaken = false;
@@ -1797,7 +1960,7 @@ const DESCENT = [
   { clip: 'land', from: [0, CHAR_LIFT, 32.5], to: [0, CHAR_LIFT, 32.5], dur: 1.5, yaw: 0 },
 ];
 function startIntro() {
-  introActive = true; enteredAtrium = false; glassShattered = false;
+  introActive = true; glassShattered = false;
   descentIdx = 0; descentT = 0; descentShaken = false;
   player.position.set(0, ROOF_Y + CHAR_LIFT, 22);
   yaw = Math.PI; player.rotation.y = yaw;
@@ -2050,18 +2213,6 @@ function animate() {
   }
   }
   if (started && !won && !failed) {
-    // Timer runs on real time — bullet time does not extend it. It starts
-    // only when the player enters the atrium (ground floor, z < 29.5) —
-    // not during the roof-climb intro. No mission timer in deathmatch.
-    if (!dmAnyMode) {
-    if (!enteredAtrium && player.position.y < 1 && player.position.z < 29.5) enteredAtrium = true;
-    if (enteredAtrium) {
-      timeLeft -= rawDt;
-      if (timeLeft <= 0) {
-        timeLeft = 0; updateTimer(); failMission('timer');
-      } else updateTimer();
-    } else updateTimer();
-    }
     // Roof-climb intro: the descent drives the player. Any movement input
     // skips to the end (player on the ground outside the entrance).
     if (introActive) {
@@ -2195,19 +2346,17 @@ function animate() {
   renderer.render(scene, camera);
 }
 updateBombCount();
-updateTimer();
 if (new URLSearchParams(location.search).has('test')) {
   window.__mall = {
     player, npcs, bombs, camera, escalators, UPPER_Y,
     get playerFloor() { return playerFloor; },
     get riding() { return riding; },
     get defused() { return defused; }, get won() { return won; }, get failed() { return failed; },
-    get started() { return started; }, get timeLeft() { return timeLeft; },
-    get introActive() { return introActive; }, get enteredAtrium() { return enteredAtrium; },
+    get started() { return started; },
+    get introActive() { return introActive; },
     startIntro, endIntro,
-    set timeLeft(v) { timeLeft = v; },
     get defuseProgress() { return defuseProgress; }, get bulletTimeT() { return bulletTimeT; }, tracers,
-    doShoot, defuseBomb, showWin, failMission, nearestLiveBomb, nearestInFront, updateBombCount, updateTimer,
+    doShoot, defuseBomb, showWin, failMission, nearestLiveBomb, nearestInFront, updateBombCount,
   };
 }
 animate();
