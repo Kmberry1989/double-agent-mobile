@@ -37,7 +37,7 @@
 <button id="defuseBtn">DEFUSE</button>
 <div id="joy"><div id="joyKnob"></div></div>
 <div id="defuseUI">Hold to defuse<div id="defuseBar"><div id="defuseFill"></div></div></div>
-<div id="overlay"><h1>The Mall</h1><p>Christmas shopping. Four bombs. Five minutes.<br>Rochelle is on the radio.</p><button id="startBtn">Enter the mall</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / R2 Shoot · Square hold Defuse</p><p class="padControls">Mouse — look · Click Shoot · E hold Defuse · F Shoot · Touch — joystick · FIRE / DEFUSE</p></div>
+<div id="overlay"><h1>The Mall</h1><p>On the roof at sunset. Climb down the south wall and slip in.<br>Four bombs. Five minutes. Rochelle is on the radio.</p><button id="startBtn">Enter the mall</button><p class="padControls">PS4 controller — Left stick move · Right stick look · X / R2 Shoot · Square hold Defuse</p><p class="padControls">Mouse — look · Click Shoot · E hold Defuse · F Shoot · Touch — joystick · FIRE / DEFUSE</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="fail"><h1>Mission failed</h1><p id="failText"></p><button onclick="location.reload()">Try again</button></div>
 <script type="module">
@@ -70,11 +70,13 @@ const texLoader = new THREE.TextureLoader();
 const CHAR_LIFT = 0.05;
 const UPPER_Y = 4.5; // second-story floor height
 const VOID = { x: 8, z: 12 }; // central atrium opening, half-extents
-const MALL = { xMin: -19, xMax: 19, zMin: -29, zMax: 29 };
+const MALL = { xMin: -19, xMax: 19, zMin: -29, zMax: 34 }; // zMax 34 so the
+// player can stand on the exterior apron outside the south wall (z 29..34)
 const SPAWN = { x: 0, z: 26 };
+const ROOF_Y = 12.05; // roof walk surface (just above the 12 m ceiling)
 const BOMB_COUNT = 4;
 const TERRORIST_COUNT = 5;
-const TIME_LIMIT = 300; // 5 minutes, from mission start
+const TIME_LIMIT = 300; // 5 minutes, from entering the atrium (not the roof)
 const DEFUSE_RANGE = 2.5;
 const DEFUSE_TIME = 3; // hold USE for 3 s to defuse
 const SHOOT_RANGE = 120;
@@ -171,6 +173,81 @@ flatPlane(0, 0.04, 28, 4, 2, 0x4a1a1a);
 // A wreath laid flat on the floor beside the entrance mat (the wreath
 // model is built flat — it lies on the ground, it does not hang).
 loadProp('assets/props/mall/wreath_christmas.glb', -2.5, 0.06, 26.5, 0.9, 0.12, 0.9, 0);
+// ---- Exterior: sunset skybox, night city below, roof + south-wall descent ----
+// The mall opens on the roof at sunset. The sky is a generated 360-degree
+// panorama (assets/textures/mall-sunset-skybox.jpg, 2240x1120 equirect) on
+// a large sphere; the night city is 3D buildings with lit windows on the
+// ground below, so the descent looks down on real city lights. The roof
+// slab + parapet + ledges + glass canopy are the Tomb Raider descent set.
+// Skybox (sphere, BackSide, renders first behind everything).
+const skyTex = new THREE.TextureLoader().load('assets/textures/mall-sunset-skybox.jpg');
+skyTex.mapping = THREE.EquirectangularReflectionMapping;
+skyTex.colorSpace = THREE.SRGBColorSpace;
+const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(260, 32, 20),
+  new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, depthWrite: false }));
+skyMesh.renderOrder = -1; scene.add(skyMesh);
+// Exterior ground: the street / city ground at y=-0.05 (just under the
+// interior floor, so no z-fight inside; the apron outside is the street).
+flatPlane(0, -0.05, 0, 400, 400, 0x15151c);
+// Night-city windows: a canvas texture, dark facade with a grid of windows,
+// some lit warm. Three variants, cycled so no two neighbours match.
+function makeWindowTexture(litFrac) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0b0b10'; g.fillRect(0, 0, 128, 256);
+  for (let r = 0; r < 10; r++) for (let col = 0; col < 4; col++) {
+    if (Math.random() < litFrac) {
+      g.fillStyle = Math.random() < 0.15 ? '#9fc8ff' : (Math.random() < 0.7 ? '#ffca6a' : '#ffd9a0');
+    } else g.fillStyle = '#111118';
+    g.fillRect(6 + col * 30, 8 + r * 25, 20, 13);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 6); return t;
+}
+const windowTexes = [makeWindowTexture(0.45), makeWindowTexture(0.35), makeWindowTexture(0.55)];
+// Distant buildings (x, z, width, height, depth) — a ring around the mall,
+// tallest to the south, which is the view from the roof edge.
+[[0, 80, 18, 42, 18], [-35, 95, 14, 28, 14], [35, 100, 16, 36, 16],
+ [-60, 70, 12, 22, 12], [60, 75, 12, 26, 12], [0, 130, 24, 55, 24],
+ [-80, 110, 14, 30, 14], [80, 115, 14, 34, 14],
+ [70, 20, 14, 30, 14], [90, -20, 16, 40, 16], [65, -50, 12, 24, 12], [100, 40, 14, 28, 14],
+ [-70, 10, 14, 32, 14], [-90, -30, 16, 38, 16], [-65, -60, 12, 26, 12], [-100, 30, 14, 30, 14],
+ [0, -80, 18, 38, 18], [-40, -95, 14, 30, 14], [40, -90, 14, 28, 14],
+ [-70, -70, 12, 24, 12], [70, -75, 12, 26, 12]].forEach(([bx, bz, bw, bh, bd], i) => {
+  const tex = windowTexes[i % windowTexes.length];
+  const mat = new THREE.MeshStandardMaterial({ map: tex, emissive: 0xffffff,
+    emissiveMap: tex, emissiveIntensity: 0.9, roughness: 0.9 });
+  const b = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), mat);
+  b.position.set(bx, bh / 2 - 0.05, bz); scene.add(b);
+});
+// Street lamps along the south street (emissive globes, no extra lights).
+[[-15, 38], [-5, 38], [5, 38], [15, 38]].forEach(([lx, lz]) => {
+  box(lx, 2, lz, 0.12, 4, 0.12, 0x2a2a2a);
+  const globe = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8),
+    new THREE.MeshStandardMaterial({ color: 0xffe0b0, emissive: 0xffca6a, emissiveIntensity: 2 }));
+  globe.position.set(lx, 4.1, lz); scene.add(globe);
+});
+// Roof slab (walkable, y=ROOF_Y) + parapet around the edge (top y=12.95).
+flatPlane(0, ROOF_Y, 0, 40, 60, 0x3a352e);
+box(0, 12.5, 30, 40, 0.9, 0.4, 0x6a5a48); // south parapet (the hang rail)
+box(0, 12.5, -30, 40, 0.9, 0.4, 0x6a5a48); // north
+box(20, 12.5, 0, 0.4, 0.9, 60, 0x6a5a48); // east
+box(-20, 12.5, 0, 0.4, 0.9, 60, 0x6a5a48); // west
+// Two solid ledges on the south exterior wall (descent footholds), tops at
+// y=9 and y=6, protruding 0.5 m from the wall face.
+box(0, 8.91, 30.35, 4, 0.18, 0.7, 0x5a4a38); // ledge 1, top y=9
+box(0, 5.91, 30.35, 4, 0.18, 0.7, 0x5a4a38); // ledge 2, top y=6
+// Glass canopy over the south entrance (y=4, x -2.5..2.5, z 30..33.5) —
+// the player wall-jumps through it. Kept as glassCanopy so the shatter
+// can hide it; the frame stays.
+const glassCanopy = new THREE.Mesh(new THREE.PlaneGeometry(5, 3.5),
+  new THREE.MeshStandardMaterial({ color: 0x9fc8e8, transparent: true, opacity: 0.35,
+    roughness: 0.08, metalness: 0.2, side: THREE.DoubleSide }));
+glassCanopy.rotation.x = -Math.PI / 2; glassCanopy.position.set(0, 4, 31.75); scene.add(glassCanopy);
+box(0, 4, 33.5, 5, 0.1, 0.1, 0x2a2a2a); // canopy frame, outer edge
+box(-2.5, 4, 31.75, 0.1, 0.1, 3.5, 0x2a2a2a); box(2.5, 4, 31.75, 0.1, 0.1, 3.5, 0x2a2a2a);
+box(0, 4, 30, 5, 0.1, 0.1, 0x2a2a2a); // canopy frame, against the wall
 // OPEN PLAN (Kyle, 2026-11-22): the storefront walls are gone — no piers,
 // no lintels, no fascia bands, and no pier colliders (they were the
 // invisible walls). The four stores are defined by their merchandise and
@@ -768,7 +845,12 @@ const mxClips = {};
  ['crouchM', 'Male_Crouch_Pose.fbx'],
  ['aimPistol', 'Aim_Pistol.fbx'], ['aimGun', 'Aiming_Gun.fbx'],
  ['fireRifle', 'Firing_Rifle.fbx'], ['gunHold', 'Gunplay_Stand_Hold.fbx'],
- ['pistolWalk', 'Pistol_Walk.fbx']].forEach(([key, file]) => {
+ ['pistolWalk', 'Pistol_Walk.fbx'],
+ // Roof-climb intro (Tomb Raider-style descent down the south exterior wall).
+ ['climbDown', 'Climbing_Down_Wall.fbx'], ['hang', 'Idle_To_Braced_Hang.fbx'],
+ ['shimmy', 'Moving_While_Hanging.fbx'], ['dropHang', 'Braced_Hang_Drop.fbx'],
+ ['wallJump', 'Jump_From_Wall.fbx'], ['dropFree', 'Drop_To_Freehang.fbx'],
+ ['climbTop', 'Climbing_To_Top.fbx'], ['land', 'Landing.fbx']].forEach(([key, file]) => {
   fbxLoader.load('assets/animations/' + file, (obj) => {
     const raw = (obj.animations && obj.animations[0]) ? obj.animations[0] : null;
     if (raw) mxClips[key] = stripRootTravel(raw);
@@ -1148,6 +1230,7 @@ function updateTracers(rawDt) {
 }
 function doShoot(ndcX, ndcY) {
   if (!started || won || failed) return;
+  if (introActive) { endIntro(); return; } // FIRE during the intro skips it
   const nx = ndcX === undefined ? 0 : ndcX;
   const ny = ndcY === undefined ? 0 : ndcY;
   bulletTimeT = 1.0; // slow-mo on every shot
@@ -1170,9 +1253,135 @@ function doShoot(ndcX, ndcY) {
 const keys = {};
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 if (isTouch) document.body.classList.add('touch');
+// ---------- Roof-climb intro (Tomb Raider-style descent) ----------
+// The mission opens on the roof at sunset. The player walks to the south
+// parapet, hangs, shimmies to the descent line, slips (close call — the
+// camera looks down at the night city below), drops to a ledge, climbs
+// down, wall-jumps through the glass canopy over the entrance, lands,
+// and walks in. The 5:00 timer starts only when the player enters the
+// atrium (z < 29.5), not during the climb. Any movement key / FIRE
+// during the intro skips to the end (player on the ground outside).
+let introActive = false;
+let enteredAtrium = false;
+let descentIdx = 0;
+let descentT = 0;
+let descentShaken = false;
+let glassShattered = false;
+let camShakeT = 0;
+const glassShards = [];
+// Stages: clip key, from/to group position, duration, facing yaw.
+// arc = extra vertical rise at the midpoint (over the parapet / jump arc).
+// slip = fast drop + camera shake. lookDown = camera looks down at the
+// night city below (suspense hold). glass = shatter the canopy on the
+// way down (triggered when the player drops through y=4).
+const DESCENT = [
+  { clip: 'walk', from: [0, ROOF_Y + CHAR_LIFT, 22], to: [-2, ROOF_Y + CHAR_LIFT, 28.8], dur: 2.5, yaw: Math.PI },
+  { clip: 'idle', from: [-2, ROOF_Y + CHAR_LIFT, 28.8], to: [-2, ROOF_Y + CHAR_LIFT, 28.8], dur: 2.0, yaw: Math.PI },
+  { clip: 'hang', from: [-2, ROOF_Y + CHAR_LIFT, 28.8], to: [-2, 11.40, 30.6], dur: 2.0, yaw: 0, arc: 0.6 },
+  { clip: 'shimmy', from: [-2, 11.40, 30.6], to: [0, 11.40, 30.6], dur: 2.5, yaw: 0 },
+  { clip: 'hang', from: [0, 11.40, 30.6], to: [0, 10.80, 30.6], dur: 0.6, yaw: 0, slip: true },
+  { clip: 'hang', from: [0, 10.80, 30.6], to: [0, 10.80, 30.6], dur: 2.5, yaw: 0, lookDown: true },
+  { clip: 'hang', from: [0, 10.80, 30.6], to: [0, 11.40, 30.6], dur: 1.0, yaw: 0 },
+  { clip: 'dropHang', from: [0, 11.40, 30.6], to: [0, 9.05, 30.6], dur: 1.2, yaw: 0 },
+  { clip: 'climbDown', from: [0, 9.05, 30.6], to: [0, 6.05, 30.6], dur: 3.5, yaw: 0 },
+  { clip: 'wallJump', from: [0, 6.05, 30.6], to: [0, CHAR_LIFT, 32.5], dur: 1.8, yaw: 0, arc: 0.5, glass: true },
+  { clip: 'land', from: [0, CHAR_LIFT, 32.5], to: [0, CHAR_LIFT, 32.5], dur: 1.5, yaw: 0 },
+];
+function startIntro() {
+  introActive = true; enteredAtrium = false; glassShattered = false;
+  descentIdx = 0; descentT = 0; descentShaken = false;
+  player.position.set(0, ROOF_Y + CHAR_LIFT, 22);
+  yaw = Math.PI; player.rotation.y = yaw;
+  if (mixer) playPlayerClip('idle');
+}
+function endIntro() {
+  if (!introActive) return;
+  introActive = false;
+  player.position.set(0, CHAR_LIFT, 32.5); // on the ground outside the entrance
+  yaw = 0; player.rotation.y = 0;
+  if (mixer) playPlayerClip('idle');
+}
+function updateDescent(dt) {
+  if (!introActive) return;
+  const st = DESCENT[descentIdx];
+  if (!st) { endIntro(); return; }
+  descentT += dt;
+  const t = Math.min(1, descentT / st.dur);
+  // Ease in-out, except the slip (a fast fall — linear).
+  const e = st.slip ? t : (t * t * (3 - 2 * t));
+  player.position.x = st.from[0] + (st.to[0] - st.from[0]) * e;
+  player.position.y = st.from[1] + (st.to[1] - st.from[1]) * e + (st.arc ? Math.sin(e * Math.PI) * st.arc : 0);
+  player.position.z = st.from[2] + (st.to[2] - st.from[2]) * e;
+  yaw = st.yaw; player.rotation.y = yaw;
+  if (mixer) { mixer.update(dt); playPlayerClip(st.clip); }
+  if (st.slip && !descentShaken) { descentShaken = true; camShakeT = 0.5; }
+  if (st.glass && !glassShattered && player.position.y < 4) shatterGlass();
+  if (descentT >= st.dur) {
+    descentIdx++; descentT = 0; descentShaken = false;
+    if (descentIdx >= DESCENT.length) endIntro();
+  }
+}
+// Glass shatter: hide the canopy, spawn ~45 shards, play a WebAudio shatter.
+function shatterGlass() {
+  if (glassShattered) return; glassShattered = true;
+  glassCanopy.visible = false;
+  for (let i = 0; i < 45; i++) {
+    const mat = new THREE.MeshStandardMaterial({ color: 0xbfe0f8, transparent: true,
+      opacity: 0.75, roughness: 0.1, metalness: 0.3, side: THREE.DoubleSide });
+    const s = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.02, 0.14), mat);
+    s.position.set((Math.random() - 0.5) * 4.6, 4, 31.75 + (Math.random() - 0.5) * 3.1);
+    s.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    scene.add(s);
+    glassShards.push({ mesh: s,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 3, -Math.random() * 1.5, 1 + Math.random() * 2),
+      angVel: new THREE.Vector3((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8),
+      life: 0 });
+  }
+  playGlassShatter();
+}
+function updateGlassShards(dt) {
+  for (let i = glassShards.length - 1; i >= 0; i--) {
+    const sh = glassShards[i]; sh.life += dt;
+    sh.vel.y -= 14 * dt; // gravity
+    sh.mesh.position.addScaledVector(sh.vel, dt);
+    sh.mesh.rotation.x += sh.angVel.x * dt; sh.mesh.rotation.y += sh.angVel.y * dt; sh.mesh.rotation.z += sh.angVel.z * dt;
+    if (sh.life > 1.1) sh.mesh.material.opacity = Math.max(0, 0.75 * (1 - (sh.life - 1.1) / 0.7));
+    if (sh.life > 1.8 || sh.mesh.position.y < -0.5) { scene.remove(sh.mesh); sh.mesh.material.dispose(); glassShards.splice(i, 1); }
+  }
+}
+// Glass shatter sound: a small WebAudio synth (the mall has no sound
+// module; this is a one-off effect). Noise burst through a highpass
+// filter (the crash) + a few short high "tinkles".
+let glassAudioCtx = null;
+function playGlassShatter() {
+  try {
+    if (!glassAudioCtx) glassAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (glassAudioCtx.state === 'suspended') glassAudioCtx.resume();
+    const ctx = glassAudioCtx, t0 = ctx.currentTime;
+    const dur = 0.5, buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.5, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    src.connect(hp); hp.connect(g); g.connect(ctx.destination); src.start(t0);
+    for (let i = 0; i < 6; i++) {
+      const o = ctx.createOscillator(); o.type = 'sine';
+      o.frequency.value = 2000 + Math.random() * 3000;
+      const og = ctx.createGain();
+      const start = t0 + 0.05 + Math.random() * 0.35;
+      og.gain.setValueAtTime(0, start);
+      og.gain.linearRampToValueAtTime(0.18, start + 0.005);
+      og.gain.exponentialRampToValueAtTime(0.001, start + 0.18);
+      o.connect(og); og.connect(ctx.destination); o.start(start); o.stop(start + 0.2);
+    }
+  } catch (e) {}
+}
 const clock = new THREE.Clock();
 document.getElementById('startBtn').onclick = () => {
   document.getElementById('overlay').style.display = 'none'; started = true;
+  startIntro(); // the mission opens on the roof at sunset
   if (!isTouch) renderer.domElement.requestPointerLock();
 };
 addEventListener('keydown', (e) => {
@@ -1311,6 +1520,7 @@ function animate() {
   pollGamepad(rawDt); // PS4 controller: look stays responsive in slow-mo
   updateNpcs(dt);
   updateTracers(rawDt); // tracers fade in real time, even in slow-mo
+  updateGlassShards(rawDt); // glass canopy shards fall + fade
   updateEscalatorSteps(dt); // escalator steps cycle along the incline
   // Bomb blink lights (live bombs only; defused ones stay green).
   blinkT += rawDt;
@@ -1321,11 +1531,26 @@ function animate() {
     if (b.blinkLight) b.blinkLight.intensity = blinkOn ? 2 : 0.3;
   }
   if (started && !won && !failed) {
-    // Timer runs on real time — bullet time does not extend it.
-    timeLeft -= rawDt;
-    if (timeLeft <= 0) {
-      timeLeft = 0; updateTimer(); failMission('timer');
+    // Timer runs on real time — bullet time does not extend it. It starts
+    // only when the player enters the atrium (ground floor, z < 29.5) —
+    // not during the roof-climb intro.
+    if (!enteredAtrium && player.position.y < 1 && player.position.z < 29.5) enteredAtrium = true;
+    if (enteredAtrium) {
+      timeLeft -= rawDt;
+      if (timeLeft <= 0) {
+        timeLeft = 0; updateTimer(); failMission('timer');
+      } else updateTimer();
     } else updateTimer();
+    // Roof-climb intro: the descent drives the player. Any movement input
+    // skips to the end (player on the ground outside the entrance).
+    if (introActive) {
+      updateDescent(rawDt);
+      const skip = keys['w'] || keys['a'] || keys['s'] || keys['d'] ||
+        keys['arrowup'] || keys['arrowdown'] || keys['arrowleft'] || keys['arrowright'] ||
+        (gp.connected && (Math.abs(gp.lx) > 0.3 || Math.abs(gp.ly) > 0.3)) ||
+        Math.abs(joyX) > 0.3 || Math.abs(joyY) > 0.3;
+      if (skip) endIntro();
+    }
     // Movement: WASD + gamepad left stick + touch joystick.
     let fx = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
     let fz = (keys['w'] ? 1 : 0) - (keys['s'] ? 1 : 0);
@@ -1351,7 +1576,9 @@ function animate() {
         else player.position.z = (pz < 0 ? -1 : 1) * VOID.z;
       }
     }
-    if (!riding) player.position.y = playerFloor === 1 ? UPPER_Y + CHAR_LIFT : CHAR_LIFT;
+    // The Y-reset would teleport the player off the roof — skipped while
+    // the intro descent owns the player's height.
+    if (!riding && !introActive) player.position.y = playerFloor === 1 ? UPPER_Y + CHAR_LIFT : CHAR_LIFT;
     // Escalator sides: the balustrades block walking through from the
     // side on the ground floor (boarding is only at the ends).
     if (!riding && playerFloor === 0) {
@@ -1372,13 +1599,16 @@ function animate() {
       }
     }
     player.rotation.y = yaw;
-    if (mixer) {
+    // During the intro the descent owns the mixer/clip (updateDescent
+    // already advanced it); the normal walk/idle switch stays out.
+    if (mixer && !introActive) {
       mixer.update(dt);
       playPlayerClip(ml > 0.1 ? 'walk' : 'idle');
     }
     // Defuse: hold USE (E / DEFUSE button / Square) near a live bomb
-    // for 3 s. Releasing or walking away resets progress.
-    const bomb = nearestLiveBomb();
+    // for 3 s. Releasing or walking away resets progress. No defusing
+    // during the intro (the player is outside, on the wall).
+    const bomb = introActive ? null : nearestLiveBomb();
     const defuseUI = document.getElementById('defuseUI');
     if (bomb) {
       if (defuseUI) defuseUI.style.display = 'block';
@@ -1401,7 +1631,13 @@ function animate() {
     mixer.update(dt);
   }
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
-  if (idleOrbitActive(dt, started && !won && !failed)) {
+  // The look-down beat: the camera swings to the side and looks down at
+  // the night city far below (suspense hold while the player hangs).
+  const lookDownStage = introActive && DESCENT[descentIdx] && DESCENT[descentIdx].lookDown;
+  if (lookDownStage) {
+    camera.position.set(player.position.x + 5, player.position.y + 2.5, player.position.z + 1.5);
+    camera.lookAt(player.position.x - 0.5, 0.5, player.position.z + 3);
+  } else if (idleOrbitActive(dt, started && !introActive && !won && !failed)) {
     const op = orbitCamPos(new THREE.Vector3());
     camera.position.lerp(op, Math.min(1, dt * 3));
     camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
@@ -1412,6 +1648,14 @@ function animate() {
     player.visible = true;
     camera.position.set(player.position.x + back.x * 3.4, player.position.y + 2.6, player.position.z + back.z * 3.4);
     camera.lookAt(camera.position.x + fwdX * 10, camera.position.y + fwdY * 10, camera.position.z + fwdZ * 10);
+  }
+  // Camera shake (the slip) — a decaying random offset.
+  if (camShakeT > 0) {
+    camShakeT -= rawDt;
+    const s = camShakeT * 0.4;
+    camera.position.x += (Math.random() - 0.5) * s;
+    camera.position.y += (Math.random() - 0.5) * s;
+    camera.position.z += (Math.random() - 0.5) * s;
   }
   renderer.render(scene, camera);
 }
@@ -1424,6 +1668,8 @@ if (new URLSearchParams(location.search).has('test')) {
     get riding() { return riding; },
     get defused() { return defused; }, get won() { return won; }, get failed() { return failed; },
     get started() { return started; }, get timeLeft() { return timeLeft; },
+    get introActive() { return introActive; }, get enteredAtrium() { return enteredAtrium; },
+    startIntro, endIntro,
     set timeLeft(v) { timeLeft = v; },
     get defuseProgress() { return defuseProgress; }, get bulletTimeT() { return bulletTimeT; }, tracers,
     doShoot, defuseBomb, showWin, failMission, nearestLiveBomb, nearestInFront, updateBombCount, updateTimer,

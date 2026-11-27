@@ -502,7 +502,13 @@ function findModel(name) { for (const g of MODELS) for (const it of g.items) if 
 // he never sank and the bug went unnoticed). stripRootTravel re-bases
 // the clip's Hips Y to this value, so each character keeps their own
 // height and only the clip's relative vertical motion (crouch, bounce)
-// survives.
+// survives — anchored to the fixed Mixamo standing Hips height (0.538),
+// not the clip's first frame, so clips that START lowered (kneel, crouch,
+// sit, prone loops) do not float: anchoring to their lowered first frame
+// held the Hips at standing height while the legs bent (~0.29 m of float
+// for Kneeling_Idle). Clips that start standing are unaffected — both
+// anchors agree there.
+const MIXAMO_STAND_HIPS_Y = 0.538;
 let bindHipsY = null;
 function stripRootTravel(c) {
   const tracks = c.tracks.map(t => {
@@ -512,12 +518,11 @@ function stripRootTravel(c) {
       for (let i = 0; i + 2 < nt.values.length; i += 3) { nt.values[i] = x0; nt.values[i + 2] = z0; }
       // Re-base Y to the model's own bind-pose Hips height: the clip's
       // Hips Y is absolute (authored for a 0.538 rig), so without this
-      // a long-legged character sinks by (bindHipsY - clipY0). The
+      // a long-legged character sinks by (bindHipsY - 0.538). The
       // relative motion is preserved (each frame keeps its offset from
-      // the clip's first frame), only the anchor changes.
+      // the standard standing height), only the anchor changes.
       if (bindHipsY !== null) {
-        const y0 = nt.values[1];
-        for (let i = 1; i < nt.values.length; i += 3) nt.values[i] = nt.values[i] - y0 + bindHipsY;
+        for (let i = 1; i < nt.values.length; i += 3) nt.values[i] = nt.values[i] - MIXAMO_STAND_HIPS_Y + bindHipsY;
       }
     } return nt;
   });
