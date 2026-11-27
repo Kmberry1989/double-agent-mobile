@@ -1746,6 +1746,7 @@ function loadDmRemoteCharacter(file){
   const f = DM_CHARACTER_ROSTER.has(file||'') ? file : 'Agent_Kyle.fbx';
   if (f === dmRemoteCharFile) return;
   dmRemoteCharFile = f;
+  clearModelHoles(dmRemote); // a new character starts without the old one's holes
   if (dmRemoteModel) { dmRemote.remove(dmRemoteModel); dmRemoteModel = null; }
   if (dmRemoteMixer) { dmRemoteMixer.stopAllAction(); dmRemoteMixer = null; }
   dmRemoteCurClip = null; dmRemoteClips.idle = null; dmRemoteClips.walk = null;
@@ -1862,13 +1863,19 @@ function syncDmBots(botStates){
     // flash so a bot shooting reads on screen (the damage itself comes
     // through the state broadcast, like the 1v1 opponent's shots). A
     // knife bot slashes, so it draws no tracer or flash; a sniper bot's
-    // tracer reaches 80 m, a throwing-knife bot's 30 m.
+    // tracer reaches 80 m, a throwing-knife bot's 30 m. A throwing-
+    // knife bot flies a real blade that sticks where it lands.
     if (s.lastShotAt && s.lastShotAt !== ent.lastShotAt){
       ent.lastShotAt = s.lastShotAt;
-      if (ent.bot.weapon !== 'Knife'){
+      if (ent.bot.weapon === 'ThrowingKnife'){
         const m = dmBotMuzzle(ent, new THREE.Vector3());
         const dir = new THREE.Vector3(Math.sin(ent.bot.yaw), 0, Math.cos(ent.bot.yaw));
-        const range = ent.bot.weapon === 'SniperRifle' ? 80 : (ent.bot.weapon === 'ThrowingKnife' ? 30 : 60);
+        playSfx(SFX_FILES.bulletWhizz);
+        dmFlyStuckKnife(m, dir, 30);
+      } else if (ent.bot.weapon !== 'Knife'){
+        const m = dmBotMuzzle(ent, new THREE.Vector3());
+        const dir = new THREE.Vector3(Math.sin(ent.bot.yaw), 0, Math.cos(ent.bot.yaw));
+        const range = ent.bot.weapon === 'SniperRifle' ? 80 : 60;
         showMuzzleFlash(m, dir);
         spawnTracer(m, m.clone().addScaledVector(dir, range));
       }
@@ -1909,7 +1916,7 @@ function updateDmBots(dt){
     for (const ent of dmBots){
       const b = ent.bot;
       if (b.dead){
-        if (now >= b.respawnAt){ const sp = dmBotSpawn(dmBots.indexOf(ent)); respawnBot(b, sp); ent.group.rotation.x = 0; ent.group.position.y = CHAR_LIFT; ent.group.visible = true; }
+        if (now >= b.respawnAt){ const sp = dmBotSpawn(dmBots.indexOf(ent)); respawnBot(b, sp); ent.group.rotation.x = 0; ent.group.position.y = CHAR_LIFT; ent.group.visible = true; clearModelHoles(ent.group); }
         continue;
       }
       const events = updateBot(b, {
@@ -1927,14 +1934,29 @@ function updateDmBots(dt){
         const dist = Math.hypot(player.position.x - b.x, player.position.z - b.z);
         // A knife bot slashes (no muzzle flash, no tracer, stab on a
         // hit); a sniper bot cracks the sniper shot; a throwing-knife
-        // bot whizzes a blade (the tracer stands in until the effects
-        // build adds the sticking knife). Guns keep the old rendering.
+        // bot whizzes a real blade (it flies to the player and sticks
+        // in them on a hit, or in the wall behind them on a miss).
+        // Guns keep the old rendering.
         if (b.weapon === 'Knife'){
           if (ev.hit) playSfx(pickSfx(SFX_FILES.stab)); else playSfx(SFX_FILES.stabMiss);
+        } else if (b.weapon === 'ThrowingKnife'){
+          playSfx(SFX_FILES.bulletWhizz);
+          const km = dmKnifeMesh();
+          if (km){
+            km.position.copy(m); scene.add(km);
+            let kto, kgroup = null, kstick = true;
+            if (ev.hit){ kto = chest.clone(); kgroup = player; }
+            else {
+              ray.set(m, dir); ray.far = 30;
+              const ksurf = ray.intersectObjects(losMeshes.concat([ground]), false);
+              if (ksurf.length) kto = ksurf[0].point.clone();
+              else { kto = m.clone().addScaledVector(dir, 30); kstick = false; }
+            }
+            dmProjectiles.push({ kind: 'knife', mesh: km, from: m.clone(), to: kto, dir: dir.clone(), t: 0, dur: Math.max(0.08, m.distanceTo(kto) / 30), group: kgroup, stick: kstick });
+          }
         } else {
           showMuzzleFlash(m, dir); spawnMuzzleSmoke(m, dir); spawnTracer(m, chest);
           if (b.weapon === 'SniperRifle') playSfx(SFX_FILES.sniperShot);
-          else if (b.weapon === 'ThrowingKnife') playSfx(SFX_FILES.bulletWhizz);
           else playSfx(dist < 8 ? SFX_FILES.enemyShotgun : pickSfx(SFX_FILES.enemyRifle));
           if (dist > 10) playSfx(SFX_FILES.bulletWhizz);
         }
@@ -1964,20 +1986,22 @@ function soloShootResolve(dir){
   // branch, minus takedowns): a hit damages the bot, a kill scores, a
   // miss leaves a bullet hole / sparks on the first surface. The ray
   // reaches the weapon's own range (the sniper's 80 m, the throwing
-  // knife's 30 m).
+  // knife's 30 m). Returns {point, group, hit}: group is the bot group
+  // hit (null for a surface), hit is false when the ray met nothing and
+  // the point is just max range — so a thrown knife knows whether to
+  // stick (see dmThrowKnife).
   const w = weaponStats();
   ray.set(camera.position, dir); ray.far = w.range || 60;
   const targets = dmBots.filter(e => !e.bot.dead).map(e => e.group);
   const hits = ray.intersectObjects(targets, true);
-  let endPoint = null;
   if (hits.length){
     let node = hits[0].object, ent = null;
     while (node){ ent = dmBots.find(x => x.group === node); if (ent) break; node = node.parent; }
     if (ent){
-      endPoint = hits[0].point.clone();
-      dmHurtBot(ent, w.dmg, endPoint);
-      if (weaponVariant === 'RPG7') playSfx(SFX_FILES.explosion);
-      return endPoint;
+      const endPoint = hits[0].point.clone();
+      dmHurtBot(ent, w.dmg, endPoint, dir, weaponVariant !== 'ThrowingKnife' && weaponVariant !== 'RPG7');
+      if (weaponVariant === 'RPG7'){ playSfx(SFX_FILES.explosion); dmExplodeAt(endPoint.x, endPoint.z); }
+      return { point: endPoint, group: ent.group, hit: true };
     }
   }
   const surf = ray.intersectObjects(losMeshes.concat([ground]), false);
@@ -1987,11 +2011,10 @@ function soloShootResolve(dir){
     const o = obstacles.find(x => x.mesh === sh.object);
     if (o && o.destructible) damageDestructible(o, w.dmg, sh.point, n);
     else { spawnBulletHole(sh.point, n); spawnSparks(sh.point); if (!(o && o.material === 'metal')) spawnParticles(sh.point, o && o.material === 'wood' ? 0x8a6a3a : 0x888888, 5, 1.5, 0.05, 0.5, 9.8); }
-    endPoint = sh.point.clone();
-    if (weaponVariant === 'RPG7') playSfx(SFX_FILES.explosion);
+    if (weaponVariant === 'RPG7'){ playSfx(SFX_FILES.explosion); dmExplodeAt(sh.point.x, sh.point.z); }
+    return { point: sh.point.clone(), group: null, hit: true };
   }
-  if (!endPoint) endPoint = camera.position.clone().addScaledVector(dir, 60);
-  return endPoint;
+  return { point: camera.position.clone().addScaledVector(dir, 60), group: null, hit: false };
 }
 let yaw = -Math.PI/4, pitch = 0.12, vy = 0, grounded = true, crouching = false, aiming = false;
 // ---------- Movement stream (2026-11-14): lean / crawl / roll / sneak ----------
@@ -2657,6 +2680,41 @@ function spawnBulletHole(point, normal){
   scene.add(m); holeDecals.push(m);
   while (holeDecals.length > MAX_HOLE_DECALS){ const old = holeDecals.shift(); scene.remove(old); old.geometry.dispose(); old.material.dispose(); }
 }
+// Bullet-hole decal ON a character model: a small hole plane attached
+// to the character's group at the hit point, so it rides the model
+// (walk, tip-over on death) instead of floating where the shot landed.
+// group.attach() keeps the world transform while reparenting, so the
+// hole lands exactly on the model. Capped at 8 per character, cleared
+// on respawn / character change (clearModelHoles).
+const modelHoles = new Map(); const MAX_MODEL_HOLES = 8;
+function spawnModelBulletHole(group, point, normal){
+  if (!group || !point || !normal) return;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.15),
+    new THREE.MeshBasicMaterial({ map: pickTex(bulletHoleTexs), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+  m.position.copy(point).addScaledVector(normal, 0.01);
+  m.lookAt(point.x + normal.x, point.y + normal.y, point.z + normal.z);
+  m.rotateZ(Math.random() * Math.PI * 2);
+  scene.add(m); group.attach(m);
+  let list = modelHoles.get(group); if (!list){ list = []; modelHoles.set(group, list); }
+  list.push(m);
+  while (list.length > MAX_MODEL_HOLES){ const old = list.shift(); old.removeFromParent(); old.geometry.dispose(); old.material.dispose(); }
+}
+function clearModelHoles(group){
+  const list = modelHoles.get(group); if (!list) return;
+  for (const m of list){ m.removeFromParent(); m.geometry.dispose(); m.material.dispose(); }
+  modelHoles.delete(group);
+}
+// Blood on the wall behind a hit: the spatter flies past the victim
+// along the shot direction and lands on the first surface within 4 m.
+function spawnBloodOnWall(point, dir){
+  if (!point || !dir) return;
+  ray.set(point, dir); ray.far = 4;
+  const surf = ray.intersectObjects(losMeshes.concat([ground]), false);
+  if (!surf.length) return;
+  const sh = surf[0];
+  const n = sh.object === ground ? new THREE.Vector3(0, 1, 0) : (sh.face ? sh.face.normal.clone().transformDirection(sh.object.matrixWorld) : new THREE.Vector3(0, 1, 0));
+  addDecal(sh.point, n, 'blood');
+}
 // Shell casings: small brass boxes, eject right + up, bounce once, rest
 // ~4 s, then fade. Capped at 30 so phones stay smooth.
 const casings = []; const MAX_CASINGS = 30;
@@ -2840,6 +2898,16 @@ function updateEffects(dt){
     sp.sprite.scale.set(0.55, 0.55 + 0.35 * k, 1);
     if (sp.t > 0.25) sp.sprite.material.opacity = Math.max(0, 0.95 * (1 - (sp.t - 0.25) / 0.35));
     if (sp.t >= 0.6){ scene.remove(sp.sprite); sp.sprite.material.dispose(); spatters.splice(i, 1); }
+  }
+  // Rendered explosions: the fireball swells then fades (~0.7 s), the
+  // shockwave ring spreads to the 5 m blast radius (~0.5 s).
+  for (let i = explosions.length - 1; i >= 0; i--){
+    const ex = explosions[i]; ex.t += dt;
+    const fk = Math.min(ex.t / 0.35, 1), fo = Math.max(0, 1 - ex.t / 0.7);
+    ex.fire.scale.setScalar(1 + fk * 3.8); ex.fireMat.opacity = 0.95 * fo;
+    const rk = Math.min(ex.t / 0.5, 1);
+    ex.ring.scale.setScalar(1 + rk * 8); ex.ringMat.opacity = 0.7 * Math.max(0, 1 - rk);
+    if (ex.t >= 0.7){ scene.remove(ex.fire); scene.remove(ex.ring); ex.fire.geometry.dispose(); ex.fireMat.dispose(); ex.ring.geometry.dispose(); ex.ringMat.dispose(); explosions.splice(i, 1); }
   }
   updateTracers(dt);
 }
@@ -3790,16 +3858,31 @@ function dmGrenadeMesh(){
 function dmClaymoreMesh(){
   return dmThrownClone('claymore', ()=>{ const m = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.08), new THREE.MeshStandardMaterial({ color: 0x3a4a2a, roughness: 0.7 })); return m; });
 }
-// Explosion visual, for now: the explosion sound, a bright flash and
-// an orange particle burst at the point. A rendered explosion (fireball
-// / smoke / shockwave) is the effects build's job — this reads as a
-// blast until then.
+// Rendered explosion (fireball + smoke + debris + shockwave ring):
+// a short-lived expanding fireball (additive), a ground ring that
+// spreads to the 5 m blast radius and fades, and the particle bursts.
+// Grenades, claymores and RPG7 impacts all render through here — the
+// mall has its own copy (dmExplodeAt in mall.html).
+const explosions = [];
 function dmExplodeAt(x, z){
   const p = new THREE.Vector3(x, 0.6, z);
   playSfx(SFX_FILES.explosion);
   showMuzzleFlash(p, new THREE.Vector3(0, 1, 0));
   spawnParticles(p, 0xff7722, 22, 4, 0.12, 0.8, 4);
-  spawnParticles(p, 0x555555, 10, 2, 0.2, 1.2, -1);
+  spawnParticles(p, 0xffcc66, 10, 3, 0.09, 0.5, 3);
+  spawnParticles(p, 0x555555, 12, 2, 0.2, 1.4, -1.5); // smoke rises
+  spawnParticles(p, 0x222222, 8, 5, 0.1, 0.9, 9.8); // debris
+  // Fireball: additive orange sphere, grows 0.5 -> 2.4 m over ~0.35 s,
+  // gone by ~0.7 s.
+  const fireMat = new THREE.MeshBasicMaterial({ color: 0xff8822, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+  const fire = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), fireMat);
+  fire.position.copy(p); scene.add(fire);
+  // Shockwave ring: flat on the ground, spreads to the 5 m blast radius.
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffcc88, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.55, 24), ringMat);
+  ring.rotation.x = -Math.PI / 2; ring.position.set(x, 0.06, z); scene.add(ring);
+  explosions.push({ fire, fireMat, ring, ringMat, t: 0 });
+  while (explosions.length > 6){ const old = explosions.shift(); scene.remove(old.fire); scene.remove(old.ring); old.fire.geometry.dispose(); old.fireMat.dispose(); old.ring.geometry.dispose(); old.ringMat.dispose(); }
 }
 // Pending grenades / placed mines, rendered from the relay state in
 // relay modes and from the local lists in solo mode. Keys are
@@ -3875,7 +3958,20 @@ function updateDmProjectiles(dt){
     else pr.mesh.rotation.z += dt * 12; // the knife spins in flight
     pr.mesh.position.copy(pos);
     if (k >= 1){
-      if (pr.kind === 'knife'){ pr.stuckUntil = now + 4000; pr.mesh.position.copy(pr.to); pr.mesh.lookAt(pr.to.clone().add(pr.dir)); dmProjectiles.splice(i, 1); dmStuckKnives.push({ mesh: pr.mesh, until: pr.stuckUntil }); }
+      if (pr.kind === 'knife'){
+        pr.stuckUntil = now + 4000;
+        pr.mesh.position.copy(pr.to);
+        pr.mesh.lookAt(pr.to.clone().add(pr.dir));
+        dmProjectiles.splice(i, 1);
+        // A blade in a character stays in the character: attach it to
+        // the victim's group so it rides them (walk, tip-over) instead
+        // of floating where the throw landed. A blade that met nothing
+        // (max range, no surface) is not stuck — it just falls away.
+        if (pr.stick){
+          if (pr.group) pr.group.attach(pr.mesh);
+          dmStuckKnives.push({ mesh: pr.mesh, until: pr.stuckUntil });
+        } else scene.remove(pr.mesh);
+      }
       else { // grenade landed: the flying mesh becomes the landed
         // grenade (registered under its key, so the broadcast
         // reconciliation finds it and never duplicates it).
@@ -3887,7 +3983,7 @@ function updateDmProjectiles(dt){
     }
   }
   for (let i = dmStuckKnives.length - 1; i >= 0; i--){
-    if (now >= dmStuckKnives[i].until){ scene.remove(dmStuckKnives[i].mesh); dmStuckKnives.splice(i, 1); }
+    if (now >= dmStuckKnives[i].until){ dmStuckKnives[i].mesh.removeFromParent(); dmStuckKnives.splice(i, 1); }
   }
   // Solo: the local fuse — a grenade whose time has come detonates.
   if (soloAiMode) for (const key of [...dmRenderedGrenades.keys()]){
@@ -3898,10 +3994,18 @@ function updateDmProjectiles(dt){
 const dmStuckKnives = [];
 // Shared bot damage (solo mode): blood, grunt, kill / score / respawn.
 // Used by the knife, the grenade blast and the ray path alike.
-function dmHurtBot(ent, dmg, point){
+// point = the hit point on the bot; dir = the shot's direction (when
+// known) so the spatter lands on the wall behind the victim; bullet =
+// true only for a hitscan gun / sniper — a blade or a blast leaves
+// blood but no bullet hole on the model.
+function dmHurtBot(ent, dmg, point, dir, bullet){
   const b = ent.bot;
   b.health -= dmg;
-  if (point){ spawnBloodMist(point.clone()); spawnBloodSpatter(point.clone()); addDecal(new THREE.Vector3(b.x, 0.02, b.z), new THREE.Vector3(0, 1, 0), 'blood'); }
+  if (point){
+    spawnBloodMist(point.clone()); spawnBloodSpatter(point.clone());
+    addDecal(new THREE.Vector3(b.x, 0.02, b.z), new THREE.Vector3(0, 1, 0), 'blood');
+    if (dir){ spawnBloodOnWall(point, dir); if (bullet) spawnModelBulletHole(ent.group, point, dir.clone().negate()); }
+  }
   playSfx(pickSfx(SFX_FILES.hit)); playSfx(pickSfx(SFX_FILES.enemyHitVocal));
   if (b.health <= 0){
     b.dead = true; b.respawnAt = performance.now() + 2500; dmPlayerScore++;
@@ -3912,16 +4016,47 @@ function dmHurtBot(ent, dmg, point){
 }
 // First hit point along the ray (bots + opponent + surfaces), for the
 // throwing-knife visual in relay modes — the relay decides the hit,
-// the client only needs where the knife stops.
-function dmRayEndpoint(dir, maxDist){
-  ray.set(camera.position, dir); ray.far = maxDist;
+// the client only needs where the knife stops. Returns {point, group,
+// hit}: group is the character group the blade sticks to (null for a
+// surface, where it sticks in the wall instead), hit is false when the
+// ray met nothing and the point is just max range (then the blade is
+// not stuck — it would hang in mid-air). dmRayEndpointFrom takes the
+// ray's origin so an opponent's or a bot's throw can be raycast the
+// same way; includePlayer adds my own group as a target (an opponent
+// throwing at me).
+function dmRayEndpointFrom(origin, dir, maxDist, includePlayer){
+  ray.set(origin, dir); ray.far = maxDist;
   const targets = dmBots.filter(e => !e.bot.dead).map(e => e.group);
   if (dmRemote.visible) targets.push(dmRemote);
+  if (includePlayer) targets.push(player);
   const hits = ray.intersectObjects(targets, true);
-  if (hits.length) return hits[0].point.clone();
+  if (hits.length){
+    let node = hits[0].object, group = null;
+    while (node){
+      if (node === dmRemote){ group = dmRemote; break; }
+      if (node === player){ group = player; break; }
+      const ent = dmBots.find(x => x.group === node); if (ent){ group = ent.group; break; }
+      node = node.parent;
+    }
+    return { point: hits[0].point.clone(), group, hit: true };
+  }
   const surf = ray.intersectObjects(losMeshes.concat([ground]), false);
-  if (surf.length) return surf[0].point.clone();
-  return camera.position.clone().addScaledVector(dir, maxDist);
+  if (surf.length) return { point: surf[0].point.clone(), group: null, hit: true };
+  return { point: origin.clone().addScaledVector(dir, maxDist), group: null, hit: false };
+}
+function dmRayEndpoint(dir, maxDist){
+  return dmRayEndpointFrom(camera.position, dir, maxDist, false);
+}
+// Fly a thrown knife from `from` along `dir` to the first thing it
+// meets (a character or a surface) and stick it there for 4 s. The
+// blade rides the victim's group when it hits one, so it stays stuck
+// in them while they move. Used for the opponent's and the bots'
+// throwing knives (my own throws go through dmThrowKnife).
+function dmFlyStuckKnife(from, dir, maxDist){
+  const tgt = dmRayEndpointFrom(from, dir, maxDist, true);
+  const mesh = dmKnifeMesh(); if (!mesh) return;
+  mesh.position.copy(from); scene.add(mesh);
+  dmProjectiles.push({ kind: 'knife', mesh, from: from.clone(), to: tgt.point.clone(), dir: dir.clone(), t: 0, dur: Math.max(0.08, from.distanceTo(tgt.point) / 30), group: tgt.group, stick: tgt.hit });
 }
 // Knife (melee, silent): a swing at the nearest living target inside
 // 2.2 m and in front of the player. Solo resolves locally; relay modes
@@ -3943,7 +4078,7 @@ function dmKnifeSwing(now){
   if (best){
     playSfx(pickSfx(SFX_FILES.stab));
     const point = new THREE.Vector3(best.bot.x, player.position.y + 1.4, best.bot.z);
-    dmHurtBot(best, weaponStats().dmg, point);
+    dmHurtBot(best, weaponStats().dmg, point, dir, false); // a blade leaves blood, never a bullet hole
   } else playSfx(SFX_FILES.stabMiss);
 }
 // Claymore: FIRE places it 1 m in front of the player, facing the
@@ -3973,10 +4108,15 @@ function dmThrowKnife(now, dir){
   playPlayerOneShot('throwGrenade');
   playSfx(SFX_FILES.bulletWhizz);
   const muzzle = getPlayerMuzzle(_muzzleV);
-  const end = soloAiMode ? soloShootResolve(dir) : dmRayEndpoint(dir, weaponStats().range);
+  // Solo resolves the hit as well (the ray is the damage); relay only
+  // finds where the blade stops (the relay decides the hit). Either
+  // way the blade sticks to a character it hits, or in the wall.
+  let end, group = null, stick = true;
+  if (soloAiMode){ const tgt = soloShootResolve(dir); end = tgt.point; group = tgt.group; stick = tgt.hit; }
+  else { const tgt = dmRayEndpoint(dir, weaponStats().range); end = tgt.point; group = tgt.group; stick = tgt.hit; }
   const mesh = dmKnifeMesh(); if (!mesh) return;
   mesh.position.copy(muzzle); scene.add(mesh);
-  dmProjectiles.push({ kind: 'knife', mesh, from: muzzle.clone(), to: end.clone(), dir: dir.clone(), t: 0, dur: Math.max(0.08, muzzle.distanceTo(end) / 30) });
+  dmProjectiles.push({ kind: 'knife', mesh, from: muzzle.clone(), to: end.clone(), dir: dir.clone(), t: 0, dur: Math.max(0.08, muzzle.distanceTo(end) / 30), group, stick });
   if (!soloAiMode) dmClient?.send('shoot', { weapon: 'ThrowingKnife', dir: { x: dir.x, y: dir.y, z: dir.z }, origin: { x: camera.position.x, y: camera.position.y, z: camera.position.z } });
 }
 // Grenade: thrown in an arc to the landing point (the aim ray's first
@@ -4016,6 +4156,9 @@ function dmDetonateSoloGrenade(key){
   const selfDist = Math.hypot(player.position.x - g.x, player.position.z - g.z);
   if (selfDist <= 5 && health > 0){
     health -= Math.max(20, Math.round(90 * (1 - selfDist / 5)));
+    const chest = new THREE.Vector3(player.position.x, player.position.y + 1.4, player.position.z);
+    spawnBloodMist(chest); spawnBloodSpatter(chest);
+    addDecal(new THREE.Vector3(player.position.x, 0.02, player.position.z), new THREE.Vector3(0, 1, 0), 'blood');
     if (health <= 0){ health = 0; dmRespawnAt = performance.now() + 2500; playPlayerOneShot(pickRandomDeath(), { hold: true }); }
   }
 }
@@ -4062,7 +4205,7 @@ function deathmatchShoot(){
   if(!soloAiMode)dmClient?.send('shoot',{weapon:weaponVariant,dir:{x:shotDir.x,y:shotDir.y,z:shotDir.z},origin:{x:camera.position.x,y:camera.position.y,z:camera.position.z}});
   playShotSound();playPlayerOneShot(weapon==='rifle'?'fireRifle':'firePistol');
   if(weaponVariant==='Shotgun'){pumpUntil=now+PUMP_T;playSfx(SFX_FILES.shotgunPump);}
-  const muzzle=getPlayerMuzzle(_muzzleV),end=soloAiMode?soloShootResolve(shotDir):muzzle.clone().addScaledVector(shotDir,weaponStats().range);showMuzzleFlash(muzzle,shotDir);spawnTracer(muzzle,end);
+  const muzzle=getPlayerMuzzle(_muzzleV),end=soloAiMode?soloShootResolve(shotDir).point:muzzle.clone().addScaledVector(shotDir,weaponStats().range);showMuzzleFlash(muzzle,shotDir);spawnTracer(muzzle,end);
   if(ammoInMag<=0&&!DM_CONSUMABLES.has(weaponVariant))startReload();
 }
 function tryShoot(){
@@ -5031,6 +5174,81 @@ function animate(){
   updateSky(rawDt); // weather runs on real time, never slowed by the battle slow-mo
   renderer.render(scene,camera);
 }
+// Relay shot events (see the worker's ShotEvent): the effects for
+// shots the relay resolved. A shot event carries the ray and the hit
+// point, so every client renders the same blood, model bullet hole and
+// tracer. Damage with no shot event (a bot's shot on me in co-op, a
+// grenade / claymore blast) is caught by the health-delta pass in
+// applyDeathmatchState, deduped by `bled` so one hit never bleeds
+// twice. A kill leaves a bigger pool under the victim.
+let dmPrevHealthMe = 100, dmPrevHealthOp = 100;
+const dmPrevBotHealth = new Map();
+function renderDmShotEvent(ev, bled){
+  if (!ev || ev.type !== 'shot') return;
+  const origin = new THREE.Vector3(ev.origin.x, ev.origin.y, ev.origin.z);
+  const dir = new THREE.Vector3(ev.dir.x, ev.dir.y, ev.dir.z);
+  const isMine = ev.slot === dmSlot;
+  const range = ev.weapon === 'SniperRifle' ? 80 : (ev.weapon === 'ThrowingKnife' ? 30 : 60);
+  const isBullet = ev.weapon !== 'Knife' && ev.weapon !== 'ThrowingKnife' && ev.weapon !== 'RPG7';
+  // Surface endpoint for a miss: the first wall/floor along the ray,
+  // or max range when it meets nothing.
+  ray.set(origin, dir); ray.far = range;
+  const surf = ray.intersectObjects(losMeshes.concat([ground]), false);
+  const surfPoint = surf.length ? surf[0].point.clone() : null;
+  const surfNormal = surf.length ? (surf[0].object === ground ? new THREE.Vector3(0, 1, 0) : (surf[0].face ? surf[0].face.normal.clone().transformDirection(surf[0].object.matrixWorld) : new THREE.Vector3(0, 1, 0))) : null;
+  const end = (ev.hit && ev.point) ? new THREE.Vector3(ev.point.x, ev.point.y, ev.point.z) : (surfPoint || origin.clone().addScaledVector(dir, range));
+  // The opponent's shot: their tracer + muzzle flash (my own tracer
+  // is already in the air from deathmatchShoot).
+  if (!isMine){
+    const mop = dmRemote.visible ? new THREE.Vector3(dmRemote.position.x + Math.sin(dmRemote.rotation.y) * 0.5, dmRemote.position.y + 1.45, dmRemote.position.z + Math.cos(dmRemote.rotation.y) * 0.5) : origin.clone();
+    showMuzzleFlash(mop, dir);
+    if (ev.weapon !== 'Knife') spawnTracer(mop, end);
+  }
+  if (ev.hit && ev.point){
+    const point = new THREE.Vector3(ev.point.x, ev.point.y, ev.point.z);
+    // The victim is the character nearest the hit point (the relay's
+    // point sits on the victim's chest).
+    let vkey = null, vgroup = null, vpos = null, vhealth = null;
+    const cands = [];
+    if (dmRemote.visible) cands.push({ key: 'op', group: dmRemote, pos: dmRemote.position, health: dmPlayers[1 - dmSlot] ? dmPlayers[1 - dmSlot].health : 100 });
+    cands.push({ key: 'me', group: player, pos: player.position, health });
+    for (const ent of dmBots) if (!ent.bot.dead) cands.push({ key: 'bot:' + ent.bot.id, group: ent.group, pos: ent.group.position, health: ent.bot.health });
+    let best = null, bestD = Infinity;
+    for (const c of cands){ const d = Math.hypot(c.pos.x - point.x, c.pos.z - point.z); if (d < bestD){ bestD = d; best = c; } }
+    if (best && bestD < 2){ vkey = best.key; vgroup = best.group; vpos = best.pos; vhealth = best.health; }
+    spawnBloodMist(point.clone()); spawnBloodSpatter(point.clone());
+    if (vpos) addDecal(new THREE.Vector3(vpos.x, 0.02, vpos.z), new THREE.Vector3(0, 1, 0), 'blood');
+    spawnBloodOnWall(point, dir);
+    if (vgroup && isBullet) spawnModelBulletHole(vgroup, point, dir.clone().negate());
+    if (ev.weapon === 'RPG7') dmExplodeAt(point.x, point.z);
+    // The opponent's thrown knife flies to the victim and sticks in
+    // them (my own throw already flew one in dmThrowKnife).
+    if (ev.weapon === 'ThrowingKnife' && !isMine && vgroup){
+      const km = dmKnifeMesh();
+      if (km){
+        km.position.copy(origin); scene.add(km);
+        dmProjectiles.push({ kind: 'knife', mesh: km, from: origin.clone(), to: point.clone(), dir: dir.clone(), t: 0, dur: Math.max(0.08, origin.distanceTo(point) / 30), group: vgroup, stick: true });
+      }
+    }
+    if (vkey) bled.add(vkey);
+    if (vhealth !== null && vhealth <= 0 && vpos) addDecal(new THREE.Vector3(vpos.x, 0.02, vpos.z), new THREE.Vector3(0, 1, 0), 'blood');
+  } else if (!ev.hit){
+    if (ev.weapon === 'RPG7'){ if (surfPoint) dmExplodeAt(surfPoint.x, surfPoint.z); else dmExplodeAt(end.x, end.z); }
+    else if (ev.weapon === 'ThrowingKnife'){
+      // The opponent's missed blade sticks in the wall (my own throw
+      // already flew one in dmThrowKnife).
+      if (!isMine && surfPoint){
+        const km = dmKnifeMesh();
+        if (km){
+          km.position.copy(origin); scene.add(km);
+          dmProjectiles.push({ kind: 'knife', mesh: km, from: origin.clone(), to: surfPoint.clone(), dir: dir.clone(), t: 0, dur: Math.max(0.08, origin.distanceTo(surfPoint) / 30), group: null, stick: true });
+        }
+      }
+    } else if (ev.weapon !== 'Knife' && surfPoint){
+      spawnBulletHole(surfPoint, surfNormal); spawnSparks(surfPoint);
+    }
+  }
+}
 function applyDeathmatchState(message){
   if(message.type==='welcome'){dmSlot=message.slot;const sp=dmSpawn();player.position.set(sp.x,CHAR_LIFT,sp.z);yaw=sp.yaw;modelYaw=yaw;const code=dmParams.get('code')||'------';document.getElementById('dmScore').textContent='ROOM '+code+' · first to 10';return;}
   if(message.type!=='state')return;
@@ -5042,6 +5260,40 @@ function applyDeathmatchState(message){
   if(me){player.position.set(me.x,CHAR_LIFT,me.z);yaw=me.yaw;modelYaw=me.yaw;health=me.health;ammoInMag=me.ammo;if(me.counts)dmWeaponCounts=me.counts;}
   if(op){dmRemote.visible=true;dmRemote.position.set(op.x,CHAR_LIFT,op.z);dmRemote.rotation.y=op.yaw;loadDmRemoteCharacter(op.character);}
   else dmRemote.visible=false;
+  // Shot events + health deltas: the effects for shots the relay
+  // resolved (see renderDmShotEvent), and for damage with no shot
+  // event (a bot's shot on me, a grenade / claymore blast). bled
+  // collects the victims bloodied by an event this broadcast, so the
+  // delta pass never double-renders the same hit.
+  const bled = new Set();
+  for (const ev of message.events || []) renderDmShotEvent(ev, bled);
+  if (me && me.health < dmPrevHealthMe && !bled.has('me')){
+    const chest = new THREE.Vector3(player.position.x, player.position.y + 1.4, player.position.z);
+    spawnBloodMist(chest); spawnBloodSpatter(chest);
+    addDecal(new THREE.Vector3(player.position.x, 0.02, player.position.z), new THREE.Vector3(0, 1, 0), 'blood');
+    bled.add('me');
+  }
+  if (op && op.health < dmPrevHealthOp && !bled.has('op')){
+    const chest = new THREE.Vector3(dmRemote.position.x, dmRemote.position.y + 1.4, dmRemote.position.z);
+    spawnBloodMist(chest); spawnBloodSpatter(chest);
+    addDecal(new THREE.Vector3(dmRemote.position.x, 0.02, dmRemote.position.z), new THREE.Vector3(0, 1, 0), 'blood');
+    bled.add('op');
+  }
+  for (const ent of dmBots){
+    const prev = dmPrevBotHealth.get(ent.bot.id);
+    if (prev !== undefined && ent.bot.health < prev && !bled.has('bot:' + ent.bot.id)){
+      const chest = new THREE.Vector3(ent.group.position.x, ent.group.position.y + 1.4, ent.group.position.z);
+      spawnBloodMist(chest); spawnBloodSpatter(chest);
+      addDecal(new THREE.Vector3(ent.group.position.x, 0.02, ent.group.position.z), new THREE.Vector3(0, 1, 0), 'blood');
+      bled.add('bot:' + ent.bot.id);
+    }
+    if (prev === 0 && ent.bot.health === 100) clearModelHoles(ent.group); // respawned: the old holes go with the old life
+    dmPrevBotHealth.set(ent.bot.id, ent.bot.health);
+  }
+  if (me && dmPrevHealthMe === 0 && me.health === 100) clearModelHoles(player);
+  if (op && dmPrevHealthOp === 0 && op.health === 100) clearModelHoles(dmRemote);
+  if (me) dmPrevHealthMe = me.health;
+  if (op) dmPrevHealthOp = op.health;
   const score=document.getElementById('dmScore'),status=document.getElementById('dmStatus');
   if(coopMode)updateDmScoreHud();
   else if(me&&op)score.textContent=`${me.name} ${me.score}  —  ${op.score} ${op.name}`;

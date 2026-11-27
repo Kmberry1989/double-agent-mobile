@@ -26,6 +26,7 @@ function coopState(overrides: Partial<RoomState> = {}): RoomState {
     lastBotTick: 1000,
     grenades: [],
     mines: [],
+    events: [],
   };
   return { ...state, ...overrides };
 }
@@ -306,5 +307,74 @@ describe('co-op vs bots', () => {
     expect(state.finished).toBe(true);
     expect(state.winnerTeam).toBe('humans');
     expect(state.finishReason).toBe('score');
+  });
+});
+
+describe('shot events', () => {
+  it('a ray hit appends a shot event with the hit point on the victim', () => {
+    const state = coopState();
+    const human = state.players[0]!;
+    const bot = state.bots[0];
+    bot.x = 0; bot.z = -10;
+    const packet = { type: 'shoot', weapon: 'Glock', origin: { x: 0, y: 1.5, z: 0 }, dir: { x: 0, y: 0, z: -1 } };
+    const hit = resolveHumanShot(state, 0, packet, 5000);
+    expect(hit.fired).toBe(true);
+    expect(hit.hit).toBe(true);
+    expect(state.events.length).toBe(1);
+    const ev = state.events[0];
+    expect(ev.type).toBe('shot');
+    expect(ev.slot).toBe(0);
+    expect(ev.weapon).toBe('Glock');
+    expect(ev.hit).toBe(true);
+    expect(ev.origin).toEqual({ x: 0, y: 1.5, z: 0 });
+    expect(ev.dir).toEqual({ x: 0, y: 0, z: -1 });
+    // The hit point is on the ray at the bot's chest (z ≈ -10, y ≈ 1.5).
+    expect(ev.point).toBeDefined();
+    expect(Math.abs(ev.point!.z + 10)).toBeLessThan(0.5);
+    expect(Math.abs(ev.point!.y - 1.5)).toBeLessThan(0.5);
+  });
+
+  it('a ray miss appends a shot event with no hit point', () => {
+    const state = coopState();
+    const bot = state.bots[0];
+    bot.x = 5; bot.z = -10; // off-axis: the ray passes more than 0.78 m wide
+    const packet = { type: 'shoot', weapon: 'Glock', origin: { x: 0, y: 1.5, z: 0 }, dir: { x: 0, y: 0, z: -1 } };
+    const miss = resolveHumanShot(state, 0, packet, 5000);
+    expect(miss.fired).toBe(true);
+    expect(miss.hit).toBe(false);
+    expect(state.events.length).toBe(1);
+    expect(state.events[0].hit).toBe(false);
+    expect(state.events[0].point).toBeUndefined();
+  });
+
+  it('a knife swing appends a shot event with the victim chest point on a hit', () => {
+    const state = coopState();
+    const human = state.players[0]!;
+    const bot = state.bots[0];
+    bot.x = 0; bot.z = 2; // 2 m ahead, inside 2.2 m, human faces +z
+    const swing = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Knife' }, 5000);
+    expect(swing.fired).toBe(true);
+    expect(swing.hit).toBe(true);
+    expect(state.events.length).toBe(1);
+    const ev = state.events[0];
+    expect(ev.weapon).toBe('Knife');
+    expect(ev.hit).toBe(true);
+    expect(ev.point).toEqual({ x: 0, y: 1.4, z: 2 });
+    // A whiff still appends an event (the clients render the swing's miss).
+    bot.x = 0; bot.z = 3; bot.health = 100; human.lastShot = 0;
+    const whiff = resolveHumanShot(state, 0, { type: 'shoot', weapon: 'Knife' }, 6000);
+    expect(whiff.hit).toBe(false);
+    expect(state.events.length).toBe(2);
+    expect(state.events[1].hit).toBe(false);
+    expect(state.events[1].point).toBeUndefined();
+  });
+
+  it('a grenade throw appends no shot event (the pending blast is the signal)', () => {
+    const state = coopState();
+    const packet = { type: 'shoot', weapon: 'Grenade', origin: { x: 0, y: 1.5, z: 0 }, dir: { x: 0, y: 0, z: -1 }, point: { x: 0, z: -10 } };
+    const thrown = resolveHumanShot(state, 0, packet, 5000);
+    expect(thrown.fired).toBe(true);
+    expect(state.grenades.length).toBe(1);
+    expect(state.events.length).toBe(0);
   });
 });

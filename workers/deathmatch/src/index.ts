@@ -16,7 +16,22 @@ export type Mine = { owner: number; x: number; z: number; yaw: number; armedAt: 
 export type Bot = { id: string; name: string; character: string; weapon: string; loadout: 'white'|'black'; difficulty: string; x: number; z: number; yaw: number; health: number; score: number; ammo: number; dead: boolean; respawnAt: number; lastShot: number; lastShotAt: number; reloadUntil: number; [key: string]: any };
 export type RoomMode = 'pvp'|'coop';
 export type Difficulty = 'easy'|'normal'|'hard';
-export type RoomState = { map: MapId; players: (Player|null)[]; startedAt: number|null; createdAt: number; finished: boolean; winner: number|null; finishReason: 'score'|'forfeit'|'expired'|null; mode: RoomMode; bots: Bot[]; difficulty: Difficulty; teamScore: { humans: number; bots: number }; winnerTeam: 'humans'|'bots'|null; lastBotTick: number; grenades: Grenade[]; mines: Mine[] };
+// A shot event: the relay's hit resolution, broadcast so every client
+// can render the same effects (blood + a bullet hole on the victim's
+// model on a hit, a surface bullet hole + sparks on a miss, the
+// opponent's tracer, a thrown knife that sticks, an RPG7 explosion).
+// origin/dir are the validated shoot packet's ray (for a melee swing
+// they are the shooter's chest + facing). point is the hit point on
+// the victim (ray origin + dir * along) when hit, absent on a miss —
+// the client raycasts the miss against its own surfaces. The event is
+// transient: the broadcast carries it once and clears it (see
+// broadcast), so a later state never re-renders it. Grenades and
+// claymores need no event — their pending entries already broadcast,
+// and an entry disappearing is the detonation (both arenas render the
+// explosion from that).
+export type ShotEvent = { type: 'shot'; slot: number; weapon: string; origin: { x: number; y: number; z: number }; dir: { x: number; y: number; z: number }; hit: boolean; point?: { x: number; y: number; z: number } };
+export type DmEvent = ShotEvent;
+export type RoomState = { map: MapId; players: (Player|null)[]; startedAt: number|null; createdAt: number; finished: boolean; winner: number|null; finishReason: 'score'|'forfeit'|'expired'|null; mode: RoomMode; bots: Bot[]; difficulty: Difficulty; teamScore: { humans: number; bots: number }; winnerTeam: 'humans'|'bots'|null; lastBotTick: number; grenades: Grenade[]; mines: Mine[]; events: DmEvent[] };
 // Per-map arena bounds (x/z half-extents) and diagonal-opposite spawns,
 // mirroring the courtyard's pattern. The lobby only offers the maps whose
 // pages wire deathmatch mode (courtyard, mall); ballroom and theater are
@@ -156,6 +171,13 @@ export function tickBots(state: RoomState, now: number, random?: () => number) {
   return events;
 }
 
+// Append a shot event to the room's transient event list (created on
+// demand, so fabricated test states without one still work).
+function pushShotEvent(state: RoomState, slot: number, weapon: string, origin: { x: number; y: number; z: number }, dir: { x: number; y: number; z: number }, hit: boolean, point?: { x: number; y: number; z: number }) {
+  if (!state.events) state.events = [];
+  state.events.push(point ? { type: 'shot', slot, weapon, origin, dir, hit, point } : { type: 'shot', slot, weapon, origin, dir, hit });
+}
+
 // The shoot packet's hit resolution, shared by the DO handler and the
 // tests. The ray weapons (hitscan + the thrown knife) use the same ray
 // math as the PvP path (target point at 1.25 m height, 0.78 m hit
@@ -221,12 +243,12 @@ export function resolveHumanShot(state: RoomState, shooterSlot: number, packet: 
   if (w.kind === 'melee') {
     shooter.lastShot = now; result.fired = true; result.changed = true;
     const fx = Math.sin(shooter.yaw), fz = Math.cos(shooter.yaw);
-    let best: { dist: number; apply: () => void } | null = null;
+    let best: { dist: number; tx: number; tz: number; apply: () => void } | null = null;
     const considerMelee = (tx: number, tz: number, apply: () => void) => {
       const dx = tx - shooter.x, dz = tz - shooter.z, dist = Math.hypot(dx, dz);
       if (dist > w.range || dist <= 0) return;
       if ((dx * fx + dz * fz) / dist < 0.707) return; // outside the front 45°
-      if (!best || dist < best.dist) best = { dist, apply };
+      if (!best || dist < best.dist) best = { dist, tx, tz, apply };
     };
     if (state.mode !== 'coop' && other && other.health > 0) considerMelee(other.x, other.z, () => {
       other.health = Math.max(0, other.health - damage);
@@ -239,7 +261,10 @@ export function resolveHumanShot(state: RoomState, shooterSlot: number, packet: 
         if (bot.health === 0) killBot(bot);
       });
     }
-    if (best) { best.apply(); result.hit = true; }
+    // The swing has no ray in the packet: the event carries the
+    // shooter's chest + facing, and the victim's chest on a hit.
+    if (best) { best.apply(); result.hit = true; pushShotEvent(state, shooterSlot, packet.weapon, { x: shooter.x, y: 1.4, z: shooter.z }, { x: fx, y: 0, z: fz }, true, { x: best.tx, y: 1.4, z: best.tz }); }
+    else pushShotEvent(state, shooterSlot, packet.weapon, { x: shooter.x, y: 1.4, z: shooter.z }, { x: fx, y: 0, z: fz }, false);
     return result;
   }
   // Ray weapons (hitscan + thrown knife): the ray must be a unit
@@ -270,6 +295,12 @@ export function resolveHumanShot(state: RoomState, shooterSlot: number, packet: 
     });
   }
   if (best) { best.apply(); result.hit = true; }
+  // The shot event carries the ray and, on a hit, the hit point on the
+  // victim (ray origin + dir * along) — the clients render blood, the
+  // model bullet hole and the opponent's tracer from it; on a miss they
+  // raycast the same ray against their own surfaces for the wall hole.
+  const hitPoint = result.hit && best ? { x: ox + (dx / len) * best.along, y: oy + (dy / len) * best.along, z: oz + (dz / len) * best.along } : undefined;
+  pushShotEvent(state, shooterSlot, packet.weapon, { x: ox, y: oy, z: oz }, { x: dx / len, y: dy / len, z: dz / len }, result.hit, hitPoint);
   if (usesAmmo(w) && shooter.ammo === 0 && isReloadable(w)) shooter.reloadAt = now + 1400;
   return result;
 }
@@ -452,7 +483,7 @@ export default {
 
 function cleanName(value:unknown){return String(value||'Agent').replace(/[<>\u0000-\u001f]/g,'').trim().slice(0,18)||'Agent';}
 function blankPlayer(token:string,name:string,slot:number,map:MapId,character:string,weapon:WeaponId,loadout:'white'|'black'):Player{const spawn=MAPS[map].spawns[slot];return {token,name,character,loadout,slot,x:spawn.x,z:spawn.z,yaw:spawn.yaw,health:100,score:0,ammo:WEAPONS[weapon].cap,weapon,lastMove:0,lastShot:0,reloadAt:0,disconnectedAt:null,respawnAt:0,counts:{}};}
-function blankState():RoomState{return {map:'courtyard',players:[null,null],startedAt:null,createdAt:Date.now(),finished:false,winner:null,finishReason:null,mode:'pvp',bots:[],difficulty:'normal',teamScore:{humans:0,bots:0},winnerTeam:null,lastBotTick:0,grenades:[],mines:[]};}
+function blankState():RoomState{return {map:'courtyard',players:[null,null],startedAt:null,createdAt:Date.now(),finished:false,winner:null,finishReason:null,mode:'pvp',bots:[],difficulty:'normal',teamScore:{humans:0,bots:0},winnerTeam:null,lastBotTick:0,grenades:[],mines:[],events:[]};}
 
 export class DeathmatchRoom extends DurableObject<Env> {
   private statePromise:Promise<RoomState>;
@@ -461,8 +492,8 @@ export class DeathmatchRoom extends DurableObject<Env> {
   private async save(state:RoomState){await this.ctx.storage.put('room',state);}
   private async scheduleAlarm(state:RoomState){const times:number[]=[state.createdAt+ROOM_TTL_MS];for(const p of state.players){if(!p)continue;if(p.reloadAt>0)times.push(p.reloadAt);if(p.respawnAt>0)times.push(p.respawnAt);if(p.disconnectedAt&&!state.finished)times.push(p.disconnectedAt+30_000);}for(const g of state.grenades)times.push(g.detonateAt);for(const m of state.mines)times.push(m.armedAt);if(state.mode==='coop'&&state.startedAt&&!state.finished&&state.players.some(p=>p&&!p.disconnectedAt))times.push((state.lastBotTick||Date.now())+BOT_TICK_MS);await this.ctx.storage.setAlarm(Math.min(...times));}
   private onlineTokens(exclude?:WebSocket){return new Set(this.ctx.getWebSockets().filter(ws=>ws!==exclude).map(ws=>{try{return (ws.deserializeAttachment() as any).token;}catch{return '';}}));}
-  private publicState(state:RoomState){const online=this.onlineTokens();const anyConnected=state.players.some(p=>p&&!p.disconnectedAt);return {type:'state',map:state.map,mode:state.mode,started:state.startedAt!==null&&!state.finished,finished:state.finished,reason:state.finishReason,paused:state.mode==='coop'?!anyConnected:state.players.some(p=>!!p?.disconnectedAt),winner:state.winner,winnerTeam:state.winnerTeam,teamScore:state.teamScore,grenades:state.grenades.map(g=>({x:g.x,z:g.z,detonateAt:g.detonateAt,owner:g.owner})),mines:state.mines.map(m=>({owner:m.owner,x:m.x,z:m.z,yaw:m.yaw,armedAt:m.armedAt})),bots:state.bots.map(b=>({id:b.id,name:b.name,character:b.character,loadout:b.loadout,weapon:b.weapon,x:b.x,z:b.z,yaw:b.yaw,health:b.health,score:b.score,ammo:b.ammo,dead:b.dead,respawnAt:b.respawnAt,lastShotAt:b.lastShotAt||0})),players:state.players.map(p=>p?{slot:p.slot,name:p.name,character:p.character,loadout:p.loadout,x:p.x,z:p.z,yaw:p.yaw,health:p.health,score:p.score,ammo:p.ammo,weapon:p.weapon,counts:p.counts||{},respawnAt:p.respawnAt,connected:online.has(p.token)}:null)};}
-  private async broadcast(state:RoomState){const message=JSON.stringify(this.publicState(state));for(const ws of this.ctx.getWebSockets())try{ws.send(message);}catch{}}
+  private publicState(state:RoomState){const online=this.onlineTokens();const anyConnected=state.players.some(p=>p&&!p.disconnectedAt);return {type:'state',map:state.map,mode:state.mode,started:state.startedAt!==null&&!state.finished,finished:state.finished,reason:state.finishReason,paused:state.mode==='coop'?!anyConnected:state.players.some(p=>!!p?.disconnectedAt),winner:state.winner,winnerTeam:state.winnerTeam,teamScore:state.teamScore,events:state.events||[],grenades:state.grenades.map(g=>({x:g.x,z:g.z,detonateAt:g.detonateAt,owner:g.owner})),mines:state.mines.map(m=>({owner:m.owner,x:m.x,z:m.z,yaw:m.yaw,armedAt:m.armedAt})),bots:state.bots.map(b=>({id:b.id,name:b.name,character:b.character,loadout:b.loadout,weapon:b.weapon,x:b.x,z:b.z,yaw:b.yaw,health:b.health,score:b.score,ammo:b.ammo,dead:b.dead,respawnAt:b.respawnAt,lastShotAt:b.lastShotAt||0})),players:state.players.map(p=>p?{slot:p.slot,name:p.name,character:p.character,loadout:p.loadout,x:p.x,z:p.z,yaw:p.yaw,health:p.health,score:p.score,ammo:p.ammo,weapon:p.weapon,counts:p.counts||{},respawnAt:p.respawnAt,connected:online.has(p.token)}:null)};}
+  private async broadcast(state:RoomState){const message=JSON.stringify(this.publicState(state));const hadEvents=(state.events||[]).length>0;if(hadEvents){state.events=[];await this.save(state);}for(const ws of this.ctx.getWebSockets())try{ws.send(message);}catch{}}
   async fetch(request:Request):Promise<Response>{
     const url=new URL(request.url);
     if(url.pathname==='/reserve'&&request.method==='POST'){
