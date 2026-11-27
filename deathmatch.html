@@ -4,8 +4,9 @@
 <meta charset="utf-8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2712%27 fill=%27%230b1321%27/%3E%3Cpath d=%27M16 15h32v8H24v7h19v8H24v11h-8z%27 fill=%27%23ffd27a%27/%3E%3C/svg%3E"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#080d17"><title>Deathmatch — Undercover: Double Agent</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#23314a,#080d17 60%);color:#edf2fa;font:16px/1.5 system-ui,sans-serif;display:grid;place-items:center;padding:20px}.card{width:min(100%,560px);padding:clamp(22px,5vw,40px);background:#0b1321ed;border:1px solid #52627b;border-radius:18px;box-shadow:0 20px 80px #0008}h1{margin:0 0 8px;font-size:clamp(28px,6vw,42px)}p{color:#bfcbda}.choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}button,input{font:inherit;border-radius:9px;padding:12px 14px}button{cursor:pointer;color:#09101b;background:#ffd27a;border:0;font-weight:700}button.secondary{background:#1d2a3e;color:#e8eef8;border:1px solid #56677e}input{width:100%;background:#080d16;color:#fff;border:1px solid #52627b}select{width:100%;background:#080d16;color:#fff;border:1px solid #52627b;font:inherit;border-radius:9px;padding:12px 14px;margin:8px 0 16px}label{display:block;margin-top:12px}.maps{border:1px solid #52627b;border-radius:9px;padding:12px 14px;margin:8px 0 16px}.maps legend{color:#bfcbda;padding:0 6px}.maps label{display:inline-block;margin:0 18px 0 0;color:#edf2fa}.maps input{width:auto;margin-right:6px}.row{display:grid;grid-template-columns:1fr auto;gap:8px;margin:8px 0 16px}.hidden{display:none!important}#status{min-height:26px;color:#ffd27a}a{color:#ffd27a}.rules{border-top:1px solid #334156;padding-top:14px;margin-top:18px;color:#b6c3d5;font-size:14px}.hint{font-size:14px;color:#b6c3d5;margin:-8px 0 16px}@media(max-width:430px){.choices{grid-template-columns:1fr}}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0,#23314a,#080d17 60%);color:#edf2fa;font:16px/1.5 system-ui,sans-serif;display:grid;place-items:center;padding:20px}.card{width:min(100%,560px);padding:clamp(22px,5vw,40px);background:#0b1321ed;border:1px solid #52627b;border-radius:18px;box-shadow:0 20px 80px #0008}h1{margin:0 0 8px;font-size:clamp(28px,6vw,42px)}p{color:#bfcbda}.choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}button,input{font:inherit;border-radius:9px;padding:12px 14px}button{cursor:pointer;color:#09101b;background:#ffd27a;border:0;font-weight:700}button.secondary{background:#1d2a3e;color:#e8eef8;border:1px solid #56677e}input{width:100%;background:#080d16;color:#fff;border:1px solid #52627b}select{width:100%;background:#080d16;color:#fff;border:1px solid #52627b;font:inherit;border-radius:9px;padding:12px 14px;margin:8px 0 16px}label{display:block;margin-top:12px}.maps{border:1px solid #52627b;border-radius:9px;padding:12px 14px;margin:8px 0 16px}.maps legend{color:#bfcbda;padding:0 6px}.maps label{display:inline-block;margin:0 18px 0 0;color:#edf2fa}.maps input{width:auto;margin-right:6px}.row{display:grid;grid-template-columns:1fr auto;gap:8px;margin:8px 0 16px}.hidden{display:none!important}#status{min-height:26px;color:#ffd27a}a{color:#ffd27a}.rules{border-top:1px solid #334156;padding-top:14px;margin-top:18px;color:#b6c3d5;font-size:14px}.hint{font-size:14px;color:#b6c3d5;margin:-8px 0 16px}#preview{position:relative;width:100%;height:min(320px,70vw);margin:8px 0 16px;border:1px solid #52627b;border-radius:12px;overflow:hidden;background:#0a101d}#previewCanvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}#previewCanvas.dragging{cursor:grabbing}#previewStatus{position:absolute;inset:0;display:grid;place-items:center;color:#bfcbda;pointer-events:none;font-size:14px}@media(max-width:430px){.choices{grid-template-columns:1fr}}
 </style>
 </head>
 <body><main class="card"><a href="menu.html">← Main menu</a><h1>Deathmatch</h1><p>Private 1v1, solo vs AI, or co-op vs bots — first to 10 takedowns. Pick your character, loadout, and arena — any of the 8 weapons, in black or white — and the game’s desktop, controller, or touch controls.</p>
@@ -72,6 +73,7 @@
 <option value="shopper7.fbx">Shopper 7</option>
 </optgroup>
 </select>
+<div id="preview"><canvas id="previewCanvas"></canvas><div id="previewStatus" class="hidden"></div></div>
 <fieldset class="maps" id="loadoutBox"><legend>Loadout</legend><label><input type="radio" name="loadout" value="black" checked> Black</label><label><input type="radio" name="loadout" value="white"> White</label></fieldset>
 <label for="weapon" id="weaponLabel">Starting weapon</label><select id="weapon">
 <option value="Glock" selected>Glock · pistol · 12</option>
@@ -104,6 +106,10 @@
 <script type="module">
 import { DEATHMATCH_RELAY_URL } from './assets/js/deathmatch-config.js';
 import { BOT_MIN_COUNT, BOT_MAX_COUNT, BOT_DEFAULT_COUNT } from './assets/js/dm-bot-brain.js';
+import * as THREE from 'three';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 const $ = id => document.getElementById(id), status = $('status');
 function setupNeeded(){status.innerHTML='Multiplayer relay is not configured yet. Deploy <code>workers/deathmatch</code>, then set its URL in <code>assets/js/deathmatch-config.js</code>.';}
 const MAP_PAGES={courtyard:'index.html',mall:'mall.html',theater:'theater.html'};
@@ -111,6 +117,343 @@ function currentMode(){return document.querySelector('input[name="mode"]:checked
 function botCount(){const n=parseInt($('botCount').value,10);return Number.isFinite(n)?Math.max(BOT_MIN_COUNT,Math.min(BOT_MAX_COUNT,n)):BOT_DEFAULT_COUNT;}
 function botDifficulty(){return $('difficulty').value||'normal';}
 function playerFields(){return {name:$('name').value.trim().slice(0,18)||'Agent',character:$('character').value,loadout:document.querySelector('input[name="loadout"]:checked')?.value||'black',weapon:$('weapon').value||'Glock',map:document.querySelector('input[name="map"]:checked')?.value||'courtyard'};}
+// ---------- 3D model preview ----------
+// A small Three.js stage showing the picked character with the selected
+// loadout weapon (or Rochelle's dual katanas in a duel). Same fit and
+// hand-attach patterns as the game pages: fitCharacter (theater),
+// the viewer's hand-axes grip, and the theater's attachKatanaTo.
+// Character models are cached per session, so switching back is instant.
+// If WebGL is unavailable the preview hides and the lobby keeps working.
+const previewCanvas = $('previewCanvas'), previewStatus = $('previewStatus');
+let previewOK = false, previewRenderer = null;
+try {
+  previewRenderer = new THREE.WebGLRenderer({ canvas: previewCanvas, antialias: true, alpha: true });
+  previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  previewOK = true;
+} catch (e) { $('preview').hidden = true; }
+const previewScene = new THREE.Scene();
+const previewCamera = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
+previewCamera.position.set(0, 0.95, 3.4);
+previewCamera.lookAt(0, 0.9, 0);
+previewScene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 1.1));
+const previewKeyLight = new THREE.DirectionalLight(0xffffff, 1.5); previewKeyLight.position.set(2, 4, 3); previewScene.add(previewKeyLight);
+const previewFillLight = new THREE.DirectionalLight(0xbfd4ff, 0.5); previewFillLight.position.set(-3, 2, -2); previewScene.add(previewFillLight);
+const previewGroup = new THREE.Group(); previewScene.add(previewGroup);
+const previewDisc = new THREE.Mesh(new THREE.CircleGeometry(0.55, 32), new THREE.MeshBasicMaterial({ color: 0x1d2a3e, transparent: true, opacity: 0.9 }));
+previewDisc.rotation.x = -Math.PI / 2; previewDisc.position.y = 0.005; previewScene.add(previewDisc);
+const previewGltf = new GLTFLoader();
+const previewDraco = new DRACOLoader();
+previewDraco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
+previewGltf.setDRACOLoader(previewDraco);
+const previewFbx = new FBXLoader();
+const previewTex = new THREE.TextureLoader();
+function previewResize() {
+  if (!previewOK) return;
+  const w = previewCanvas.clientWidth, h = previewCanvas.clientHeight;
+  if (!w || !h) return;
+  previewRenderer.setSize(w, h, false);
+  previewCamera.aspect = w / h;
+  previewCamera.updateProjectionMatrix();
+}
+if (previewOK) new ResizeObserver(previewResize).observe(previewCanvas);
+let previewDragging = false, previewDragX = 0, previewLastT = 0;
+function previewLoop(t) {
+  requestAnimationFrame(previewLoop);
+  if (!previewOK) return;
+  const dt = Math.min(0.05, (t - previewLastT) / 1000 || 0); previewLastT = t;
+  if (!previewDragging) previewGroup.rotation.y += dt * 0.35;
+  previewRenderer.render(previewScene, previewCamera);
+}
+if (previewOK) { previewResize(); requestAnimationFrame(previewLoop); }
+previewCanvas.addEventListener('pointerdown', (e) => {
+  previewDragging = true; previewDragX = e.clientX;
+  try { previewCanvas.setPointerCapture(e.pointerId); } catch (err) {}
+  previewCanvas.classList.add('dragging');
+});
+previewCanvas.addEventListener('pointermove', (e) => {
+  if (!previewDragging) return;
+  previewGroup.rotation.y += (e.clientX - previewDragX) * 0.008;
+  previewDragX = e.clientX;
+});
+const previewEndDrag = () => { previewDragging = false; previewCanvas.classList.remove('dragging'); };
+previewCanvas.addEventListener('pointerup', previewEndDrag);
+previewCanvas.addEventListener('pointercancel', previewEndDrag);
+// Fit (theater's fitCharacter): scale to 1.8 m, feet on y=0, centred.
+function fitPreviewCharacter(obj) {
+  obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  obj.updateMatrixWorld(true);
+  let bb = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); bb.getSize(size);
+  if (!size.y) return false;
+  obj.scale.setScalar(1.8 / size.y);
+  bb = new THREE.Box3().setFromObject(obj); const c = new THREE.Vector3(); bb.getCenter(c);
+  obj.position.set(-c.x, -bb.min.y, -c.z);
+  return true;
+}
+function previewBoneKey(name) {
+  if (!name) return '';
+  let base = name.split('.')[0].split('|')[0];
+  if (base.indexOf(':') >= 0) base = base.slice(base.indexOf(':') + 1);
+  return base.toLowerCase();
+}
+function previewFindHandBone(model, side) {
+  const key = side === 'L' ? 'lefthand' : 'righthand';
+  let found = null;
+  model.traverse((o) => { if (!o.isBone || found) return; if (previewBoneKey(o.name) === key) found = o; });
+  if (!found) model.traverse((o) => { if (!o.isBone || found) return; if (previewBoneKey(o.name).indexOf(key) >= 0) found = o; });
+  // The tux/gown GLBs use a second rig convention (hand_r / hand_l)
+  // instead of righthand / lefthand. Exact match only here — the
+  // substring form would also catch the ik_hand_* targets.
+  if (!found) {
+    const alt = side === 'L' ? 'hand_l' : 'hand_r';
+    model.traverse((o) => { if (!o.isBone || found) return; if (previewBoneKey(o.name) === alt) found = o; });
+  }
+  return found;
+}
+function previewMeasureHandAxes(model, side) {
+  const handKey = side === 'R' ? 'righthand' : 'lefthand';
+  let hand = null;
+  model.traverse((o) => { if (!o.isBone || hand) return; if (previewBoneKey(o.name) === handKey) hand = o; });
+  if (!hand) model.traverse((o) => { if (!o.isBone || hand) return; if (previewBoneKey(o.name).indexOf(handKey) >= 0) hand = o; });
+  if (!hand) return null;
+  const fingers = {};
+  for (const f of ['index', 'middle', 'ring', 'pinky', 'thumb']) {
+    const fk = handKey + f + '1';
+    model.traverse((o) => { if (!o.isBone || fingers[f]) return; if (previewBoneKey(o.name).indexOf(fk) >= 0) fingers[f] = o; });
+  }
+  model.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(hand.matrixWorld).invert();
+  const dirs = {};
+  for (const [f, bone] of Object.entries(fingers)) {
+    const p = new THREE.Vector3();
+    bone.getWorldPosition(p).applyMatrix4(inv);
+    if (p.lengthSq() > 1e-12) dirs[f] = p.normalize();
+  }
+  const four = ['index', 'middle', 'ring', 'pinky'].map((f) => dirs[f]).filter(Boolean);
+  if (!four.length || !dirs.thumb) return null;
+  const finger = four.reduce((a, d) => a.add(d), new THREE.Vector3()).normalize();
+  const dorsal = new THREE.Vector3().crossVectors(finger, dirs.thumb).normalize();
+  if (!isFinite(dorsal.x) || !isFinite(dorsal.y) || !isFinite(dorsal.z)) return null;
+  return { finger, dorsal };
+}
+function previewFitWeapon(obj) {
+  let box = new THREE.Box3().setFromObject(obj); const size = new THREE.Vector3(); box.getSize(size);
+  if (size.x > size.z && size.x >= size.y) obj.rotation.y = Math.PI / 2;
+  box = new THREE.Box3().setFromObject(obj); box.getSize(size);
+  const longest = Math.max(size.x, size.y, size.z);
+  if (!longest || longest <= 0) return false;
+  return true;
+}
+// Katana offsets, baked by Kyle in the viewer (2026-11-26) — the same
+// values the theater uses for every character. Right sword low with the
+// blade yawed 86 deg; left rolled further (rx -11, ry 76, rz 30).
+const PREVIEW_KATANA_OFFSETS = {
+  'katana': { x: 0.060, y: -0.366, z: 0.016, rx: 0, ry: 86, rz: 0, s: 1 },
+  'katana|L': { x: -0.110, y: -0.325, z: -0.147, rx: -11, ry: 76, rz: 30, s: 1 },
+};
+const PREVIEW_FINGER_DIR = new THREE.Vector3(-0.012, 1.000, 0.027).normalize();
+const PREVIEW_DORSAL_DIR = new THREE.Vector3(0.569, 0.029, -0.822).normalize();
+const PREVIEW_LEFT_FINGER_DIR = new THREE.Vector3(0.012, 1.000, 0.027).normalize();
+const PREVIEW_LEFT_DORSAL_DIR = new THREE.Vector3(0.569, -0.029, 0.822).normalize();
+// Weapon filename map (courtyard's PLAYER_LOADOUTS in index.html).
+const PREVIEW_LOADOUTS = {
+  white: { Glock: 'white_glock.glb', Walther: 'white_walther.glb', Makarov: 'white_makarov.glb', Revolver: 'white_revolver.glb', MP5K: 'white_mp5k.glb', AKS74U: 'white_aks74u.glb', Shotgun: 'white_shotgun.glb', RPG7: 'white_RPG7.glb', Knife: 'white_knife.glb', ThrowingKnife: 'white_pen.glb', Grenade: 'white_grenade.glb', Claymore: 'white_claymore.glb', SniperRifle: 'sniper_rifle.glb' },
+  black: { Glock: 'black_glock_threaded.glb', Walther: 'black_walther.glb', Makarov: 'black_makarov.glb', Revolver: 'black_revolver.glb', MP5K: 'black_mp5k.glb', AKS74U: 'black_aks74u.glb', Shotgun: 'black_shotgun.glb', RPG7: 'black_rpg.glb', Knife: 'black_knife.glb', ThrowingKnife: 'black_pen.glb', Grenade: 'black_grenade.glb', Claymore: 'black_claymore.glb', SniperRifle: 'sniper_rifle.glb' }
+};
+// Grip offsets (viewer's Kyle-approved values): pistol class, rifle
+// default, and the baked AK / shotgun entries. The small hand-held
+// consumables (knife, pen, grenade, claymore) and the sniper use the
+// rifle default — a believable fist grip for the preview.
+const PREVIEW_PISTOL_OFFSET = { x: -0.021, y: 0.059, z: 0.048, rx: -12, ry: 2, rz: 61, s: 1.32 };
+const PREVIEW_RIFLE_OFFSET = { x: -0.021, y: 0.014, z: 0.055, rx: -12, ry: 2, rz: 61, s: 1.32 };
+const PREVIEW_AK_OFFSET = { x: -0.027, y: 0.014, z: 0.055, rx: -17, ry: 5, rz: 61, s: 1.32 };
+const PREVIEW_SHOTGUN_OFFSET = { x: -0.007, y: -0.016, z: -0.092, rx: -10, ry: 13, rz: 61, s: 1.32 };
+function previewWeaponOffset(weapon) {
+  const n = (weapon || '').toLowerCase();
+  if (n === 'aks74u') return PREVIEW_AK_OFFSET;
+  if (n === 'shotgun') return PREVIEW_SHOTGUN_OFFSET;
+  if (n === 'glock' || n === 'walther' || n === 'makarov' || n === 'revolver') return PREVIEW_PISTOL_OFFSET;
+  return PREVIEW_RIFLE_OFFSET;
+}
+// Full PBR sets for the two combat characters (viewer.html / theater.html)
+// so the default picks look like they do in the game. Other characters
+// keep their own materials.
+const PREVIEW_PBR = {
+  'Rochelle_combat.fbx': {
+    base: 'assets/characters/textures/cyberpunk_warrior_3d_model_basecolor.JPEG',
+    metal: 'assets/characters/textures/cyberpunk_warrior_3d_model_metallic.JPEG',
+    rough: 'assets/characters/textures/cyberpunk_warrior_3d_model_roughness.JPEG',
+    normal: 'assets/characters/textures/cyberpunk_warrior_3d_model_normal.PNG',
+  },
+  'Kyle_combat.fbx': {
+    base: 'assets/characters/textures/tactical_combat_suit_3d_model_basecolor.JPEG',
+    metal: 'assets/characters/textures/tactical_combat_suit_3d_model_metallic.JPEG',
+    rough: 'assets/characters/textures/tactical_combat_suit_3d_model_roughness.JPEG',
+    normal: 'assets/characters/textures/tactical_combat_suit_3d_model_normal.PNG',
+  },
+};
+function previewApplyPBR(obj, set) {
+  const base = previewTex.load(set.base); base.colorSpace = THREE.SRGBColorSpace;
+  const normal = previewTex.load(set.normal);
+  const rough = previewTex.load(set.rough);
+  const metal = previewTex.load(set.metal);
+  obj.traverse((o) => { if (o.isMesh) { const mats = Array.isArray(o.material) ? o.material : [o.material]; mats.forEach((m) => {
+    m.map = base; m.normalMap = normal; m.roughnessMap = rough; m.metalnessMap = metal;
+    m.metalness = 1; m.roughness = 1; m.needsUpdate = true;
+  }); } });
+}
+const previewCharCache = new Map(); // file -> fitted character Object3D
+const previewWeaponCache = new Map(); // loadout:weapon -> fitted weapon scene
+let previewModel = null, previewModelFile = null, previewLoadSeq = 0;
+let previewWeaponPivots = []; // pivots currently attached to the model's hands
+function previewIsDuel() { const m = currentMode(); return m === 'duel' || m === 'solo-duel'; }
+function previewClearWeapons() {
+  previewWeaponPivots.forEach((p) => p.removeFromParent());
+  previewWeaponPivots = [];
+}
+// The grip basis shared by the gun and the katana: the weapon's long
+// axis (muzzle direction) maps to the hand's finger direction and the
+// weapon's top maps to the back of the hand, so the grip follows the
+// fist. Returns { q, gripLocal } or null.
+function previewGripBasis(model, side, scene) {
+  const hand = previewFindHandBone(model, side);
+  if (!hand) return null;
+  model.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(scene);
+  const size = new THREE.Vector3(); box.getSize(size);
+  let meshNode = null;
+  scene.traverse((o) => { if (!meshNode && o.isMesh) meshNode = o; });
+  if (!meshNode) return null;
+  const pivot = new THREE.Group(); pivot.add(scene);
+  previewScene.add(pivot);
+  pivot.updateMatrixWorld(true);
+  const gripLocal = pivot.worldToLocal(meshNode.getWorldPosition(new THREE.Vector3()));
+  const axes = ['x', 'y', 'z'];
+  const longAxis = axes.reduce((a, b) => (size[a] >= size[b] ? a : b));
+  const muzzleSign = (box.max[longAxis] - gripLocal[longAxis]) >= (gripLocal[longAxis] - box.min[longAxis]) ? 1 : -1;
+  const muzzleDir = new THREE.Vector3(0, 0, 0); muzzleDir[longAxis] = muzzleSign;
+  const slideTop = new THREE.Vector3(0, 1, 0);
+  const e1 = muzzleDir.clone(), e2 = slideTop.clone();
+  const e3 = new THREE.Vector3().crossVectors(e1, e2).normalize();
+  const measured = previewMeasureHandAxes(model, side);
+  const axesH = measured || (side === 'L'
+    ? { finger: PREVIEW_LEFT_FINGER_DIR, dorsal: PREVIEW_LEFT_DORSAL_DIR }
+    : { finger: PREVIEW_FINGER_DIR, dorsal: PREVIEW_DORSAL_DIR });
+  const f1 = axesH.finger.clone(), f2 = axesH.dorsal.clone();
+  const f3 = new THREE.Vector3().crossVectors(f1, f2).normalize();
+  const R = new THREE.Matrix4().multiplyMatrices(
+    new THREE.Matrix4().makeBasis(f1, f2, f3),
+    new THREE.Matrix4().makeBasis(e1, e2, e3).transpose()
+  );
+  const q = new THREE.Quaternion().setFromRotationMatrix(R);
+  return { q, gripLocal, pivot, hand };
+}
+function previewPlacePivot(pivot, hand, grip) {
+  hand.attach(pivot);
+  pivot.quaternion.copy(grip.q);
+  pivot.position.copy(grip.gripLocal.clone().applyQuaternion(grip.q).negate());
+  pivot.userData.basePos = pivot.position.clone();
+  pivot.userData.baseQuat = pivot.quaternion.clone();
+  pivot.userData.baseScale = pivot.scale.clone();
+}
+function previewApplyOffset(pivot, o) {
+  const b = pivot.userData.basePos;
+  pivot.position.set(b.x + o.x, b.y + o.y, b.z + o.z);
+  const off = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+    THREE.MathUtils.degToRad(o.rx), THREE.MathUtils.degToRad(o.ry), THREE.MathUtils.degToRad(o.rz)));
+  pivot.quaternion.copy(pivot.userData.baseQuat).multiply(off);
+  pivot.scale.set(pivot.userData.baseScale.x * o.s, pivot.userData.baseScale.y * o.s, pivot.userData.baseScale.z * o.s);
+}
+function previewAttachGun() {
+  if (!previewModel) return;
+  const loadout = document.querySelector('input[name="loadout"]:checked')?.value || 'black';
+  const weapon = $('weapon').value || 'Glock';
+  const file = (PREVIEW_LOADOUTS[loadout] || PREVIEW_LOADOUTS.black)[weapon];
+  if (!file) return;
+  if (!previewFindHandBone(previewModel, 'R')) return; // no right-hand bone: show the character without the weapon
+  const key = loadout + ':' + weapon;
+  const cached = previewWeaponCache.get(key);
+  const attach = (scene) => {
+    if (!previewModel || previewIsDuel()) return;
+    if (!scene.userData.previewFitted) {
+      if (!previewFitWeapon(scene)) return;
+      scene.userData.previewFitted = true;
+    }
+    const grip = previewGripBasis(previewModel, 'R', scene);
+    if (!grip) return;
+    previewPlacePivot(grip.pivot, grip.hand, grip);
+    previewApplyOffset(grip.pivot, previewWeaponOffset(weapon));
+    previewWeaponPivots.push(grip.pivot);
+  };
+  if (cached) { attach(cached); return; }
+  previewGltf.load('assets/weapons/' + file, (g) => {
+    previewWeaponCache.set(key, g.scene);
+    const curLoadout = document.querySelector('input[name="loadout"]:checked')?.value || 'black';
+    const curWeapon = $('weapon').value || 'Glock';
+    if (previewIsDuel() || !previewModel || curLoadout + ':' + curWeapon !== key) return;
+    attach(g.scene);
+  }, undefined, () => {});
+}
+// Dual katanas (duel mode): the theater's attachKatanaTo, one load per
+// hand. A hand without a bone gets no katana on that side.
+function previewAttachKatana(side) {
+  if (!previewModel) return;
+  const forLeft = side === 'L';
+  previewGltf.load('assets/weapons/katana.glb', (gltf) => {
+    if (!previewIsDuel() || !previewModel) return;
+    if (!previewFitWeapon(gltf.scene)) return;
+    const grip = previewGripBasis(previewModel, side, gltf.scene);
+    if (!grip) return;
+    previewPlacePivot(grip.pivot, grip.hand, grip);
+    previewApplyOffset(grip.pivot, PREVIEW_KATANA_OFFSETS[forLeft ? 'katana|L' : 'katana']);
+    previewWeaponPivots.push(grip.pivot);
+  }, undefined, () => {});
+}
+function previewAttachWeapons() {
+  previewClearWeapons();
+  if (!previewModel) return;
+  if (previewIsDuel()) { previewAttachKatana('R'); previewAttachKatana('L'); }
+  else previewAttachGun();
+}
+function previewShowCharacter(file) {
+  if (!previewOK) return;
+  const seq = ++previewLoadSeq;
+  previewClearWeapons();
+  if (previewModel) { previewGroup.remove(previewModel); previewModel = null; previewModelFile = null; }
+  const cached = previewCharCache.get(file);
+  if (cached) { previewOnCharLoaded(cached, file, seq); return; }
+  previewStatus.textContent = 'Loading…'; previewStatus.hidden = false;
+  const onLoad = (obj) => {
+    if (!fitPreviewCharacter(obj)) {
+      if (seq === previewLoadSeq) { previewStatus.textContent = 'Model could not load'; previewStatus.hidden = false; }
+      return;
+    }
+    previewCharCache.set(file, obj);
+    if (seq !== previewLoadSeq) return;
+    previewOnCharLoaded(obj, file, seq);
+  };
+  const onError = () => {
+    if (seq === previewLoadSeq) { previewStatus.textContent = 'Model could not load'; previewStatus.hidden = false; }
+  };
+  if (file.toLowerCase().endsWith('.glb')) previewGltf.load('assets/characters/' + file, (g) => onLoad(g.scene), undefined, onError);
+  else previewFbx.load('assets/characters/' + file, onLoad, undefined, onError);
+}
+function previewOnCharLoaded(obj, file, seq) {
+  if (seq !== previewLoadSeq) return;
+  previewModel = obj; previewModelFile = file;
+  previewGroup.add(obj);
+  if (PREVIEW_PBR[file]) previewApplyPBR(obj, PREVIEW_PBR[file]);
+  previewStatus.hidden = true;
+  // Duel mode needs both hands for the katanas — a pick without hand
+  // bones falls back to Rochelle_combat (the theater's rule), so the
+  // duelist is never weaponless.
+  if (previewIsDuel() && (!previewFindHandBone(obj, 'R') || !previewFindHandBone(obj, 'L')) && file !== 'Rochelle_combat.fbx') {
+    previewShowCharacter('Rochelle_combat.fbx');
+    return;
+  }
+  previewAttachWeapons();
+}
+function refreshPreview() { previewShowCharacter($('character').value); }
+function refreshPreviewWeapon() { if (previewModel) previewAttachWeapons(); }
 function updateModeUI(){
   const mode=currentMode();
   const isDuel=mode==='duel'||mode==='solo-duel';
@@ -130,6 +473,7 @@ function updateModeUI(){
   $('create').classList.toggle('hidden',mode==='solo'||mode==='solo-duel');
   $('showJoin').classList.toggle('hidden',mode==='solo'||mode==='solo-duel');
   if(mode==='solo'||mode==='solo-duel') $('joinPanel').classList.add('hidden');
+  refreshPreview();
 }
 function startSolo(){
   const f=playerFields();
@@ -173,6 +517,9 @@ $('join').addEventListener('click',()=>enter('join'));
 $('code').addEventListener('input',e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6));
 $('startSolo').addEventListener('click',startSolo);
 document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener('change',updateModeUI));
+$('character').addEventListener('change',refreshPreview);
+$('weapon').addEventListener('change',refreshPreviewWeapon);
+document.querySelectorAll('input[name="loadout"]').forEach(r=>r.addEventListener('change',refreshPreviewWeapon));
 for(let n=BOT_MIN_COUNT;n<=BOT_MAX_COUNT;n++){const o=document.createElement('option');o.value=String(n);o.textContent=n===1?'1 bot':n+' bots';if(n===BOT_DEFAULT_COUNT)o.selected=true;$('botCount').appendChild(o);}
 updateModeUI();
 </script></body></html>
