@@ -2289,7 +2289,7 @@ if (soloAiMode) spawnDmBots();
 // the grenade / claymore for the player's finish) so a throw never
 // waits on a network load.
 if (dmAnyMode){
-  dmLoadThrownModel('throwingKnife', 'black_throwing_knife.glb');
+  dmLoadThrownModel('throwingKnife', (playerLoadout === 'white' ? 'white_pen.glb' : 'black_pen.glb'));
   const dmGrenadeFile = playerLoadout === 'white' ? 'white_grenade.glb' : 'black_grenade.glb';
   const dmClaymoreFile = playerLoadout === 'white' ? 'white_claymore.glb' : 'black_claymore.glb';
   dmLoadThrownModel('grenade', dmGrenadeFile);

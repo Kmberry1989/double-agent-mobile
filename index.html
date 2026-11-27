@@ -2293,8 +2293,8 @@ const PLAYER_LOADOUTS = {
   // Throwing knife: no white_ file exists, so the white loadout shares
   // the black file. Sniper rifle: one file, no finish variants — both
   // loadouts share it. (Gaps, not placeholders.)
-  white: { Glock: 'white_glock.glb', Walther: 'white_walther.glb', Makarov: 'white_makarov.glb', Revolver: 'white_revolver.glb', MP5K: 'white_mp5k.glb', AKS74U: 'white_aks74u.glb', Shotgun: 'white_shotgun.glb', RPG7: 'white_RPG7.glb', Knife: 'white_knife.glb', ThrowingKnife: 'black_throwing_knife.glb', Grenade: 'white_grenade.glb', Claymore: 'white_claymore.glb', SniperRifle: 'sniper_rifle.glb' },
-  black: { Glock: 'black_glock_threaded.glb', Walther: 'black_walther.glb', Makarov: 'black_makarov.glb', Revolver: 'black_revolver.glb', MP5K: 'black_mp5k.glb', AKS74U: 'black_aks74u.glb', Shotgun: 'black_shotgun.glb', RPG7: 'black_rpg.glb', Knife: 'black_knife.glb', ThrowingKnife: 'black_throwing_knife.glb', Grenade: 'black_grenade.glb', Claymore: 'black_claymore.glb', SniperRifle: 'sniper_rifle.glb' }
+  white: { Glock: 'white_glock.glb', Walther: 'white_walther.glb', Makarov: 'white_makarov.glb', Revolver: 'white_revolver.glb', MP5K: 'white_mp5k.glb', AKS74U: 'white_aks74u.glb', Shotgun: 'white_shotgun.glb', RPG7: 'white_RPG7.glb', Knife: 'white_knife.glb', ThrowingKnife: 'white_pen.glb', Grenade: 'white_grenade.glb', Claymore: 'white_claymore.glb', SniperRifle: 'sniper_rifle.glb' },
+  black: { Glock: 'black_glock_threaded.glb', Walther: 'black_walther.glb', Makarov: 'black_makarov.glb', Revolver: 'black_revolver.glb', MP5K: 'black_mp5k.glb', AKS74U: 'black_aks74u.glb', Shotgun: 'black_shotgun.glb', RPG7: 'black_rpg.glb', Knife: 'black_knife.glb', ThrowingKnife: 'black_pen.glb', Grenade: 'black_grenade.glb', Claymore: 'black_claymore.glb', SniperRifle: 'sniper_rifle.glb' }
 };
 const weaponPivots = { white: { Glock: null, Walther: null, Makarov: null, Revolver: null, MP5K: null, AKS74U: null, Shotgun: null, RPG7: null, Knife: null, ThrowingKnife: null, Grenade: null, Claymore: null, SniperRifle: null }, black: { Glock: null, Walther: null, Makarov: null, Revolver: null, MP5K: null, AKS74U: null, Shotgun: null, RPG7: null, Knife: null, ThrowingKnife: null, Grenade: null, Claymore: null, SniperRifle: null } };
 // Suppressor + accessory groups (filled by loaders below; null until loaded).
@@ -5311,7 +5311,7 @@ if(deathmatchMode){
 if(soloAiMode)spawnDmBots();
 // Deathmatch: preload the thrown / placed models once, so a throw or
 // a placement never waits on a network load (see dmThrownModels).
-if (dmAnyMode){ loadDmThrownModel('throwingKnife', 'black_throwing_knife.glb'); loadDmThrownModel('grenade', (playerLoadout === 'white' ? 'white_grenade.glb' : 'black_grenade.glb')); loadDmThrownModel('claymore', (playerLoadout === 'white' ? 'white_claymore.glb' : 'black_claymore.glb')); }
+if (dmAnyMode){ loadDmThrownModel('throwingKnife', (playerLoadout === 'white' ? 'white_pen.glb' : 'black_pen.glb')); loadDmThrownModel('grenade', (playerLoadout === 'white' ? 'white_grenade.glb' : 'black_grenade.glb')); loadDmThrownModel('claymore', (playerLoadout === 'white' ? 'white_claymore.glb' : 'black_claymore.glb')); }
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 animate();
 </script>
