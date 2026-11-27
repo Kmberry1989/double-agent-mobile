@@ -1,6 +1,6 @@
 import { env, exports } from 'cloudflare:workers';
 import { describe, expect, it } from 'vitest';
-import { createBotsForRoom, tickBots, resolveHumanShot, applyGrenadeBlasts, checkMines, placeMine, grenadeDamageAt, GRENADE_FUSE_MS } from '../src/index.ts';
+import { createBotsForRoom, tickBots, resolveHumanShot, applyGrenadeBlasts, checkMines, placeMine, grenadeDamageAt, GRENADE_FUSE_MS, shouldStartMatch } from '../src/index.ts';
 import type { RoomState } from '../src/index.ts';
 
 // A fabricated co-op room for the pure-helper tests (no DO websockets:
@@ -79,6 +79,34 @@ describe('deathmatch room service', () => {
       const created = await exports.default.fetch(new Request('https://relay/api/rooms/create', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({name:'Host',weapon}) }),env);
       expect(created.status).toBe(200);
     }
+  });
+});
+
+describe('match start', () => {
+  function fakePlayer(token: string, slot: number) {
+    return { token, name: 'P', character: 'Agent_Kyle.fbx', loadout: 'black' as const, slot, x: 0, z: 0, yaw: 0, health: 100, score: 0, ammo: 12, weapon: 'Glock', lastMove: 0, lastShot: 0, reloadAt: 0, disconnectedAt: null, respawnAt: 0, counts: {} };
+  }
+  it('pvp does not start with only the host online, even when both slots are reserved', () => {
+    const players = [fakePlayer('host-token', 0), fakePlayer('guest-token', 1)];
+    expect(shouldStartMatch('pvp', players, new Set(['host-token']))).toBe(false);
+  });
+  it('pvp starts once both reserved players are online', () => {
+    const players = [fakePlayer('host-token', 0), fakePlayer('guest-token', 1)];
+    expect(shouldStartMatch('pvp', players, new Set(['host-token', 'guest-token']))).toBe(true);
+  });
+  it('pvp does not start when the guest slot is not reserved yet', () => {
+    const players = [fakePlayer('host-token', 0), null];
+    expect(shouldStartMatch('pvp', players, new Set(['host-token']))).toBe(false);
+  });
+  it('duel needs both players online too', () => {
+    const players = [fakePlayer('host-token', 0), fakePlayer('guest-token', 1)];
+    expect(shouldStartMatch('duel', players, new Set(['host-token']))).toBe(false);
+    expect(shouldStartMatch('duel', players, new Set(['host-token', 'guest-token']))).toBe(true);
+  });
+  it('coop still starts with one human online', () => {
+    const players = [fakePlayer('host-token', 0), null];
+    expect(shouldStartMatch('coop', players, new Set(['host-token']))).toBe(true);
+    expect(shouldStartMatch('coop', players, new Set())).toBe(false);
   });
 });
 

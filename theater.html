@@ -1237,7 +1237,7 @@ function duelBotCanMove(x, z) {
   return true;
 }
 // Duel state (1v1 relay + solo).
-let duelClient = null, duelSlot = -1, duelPlayers = [null, null], duelStarted = false, duelFinished = false, duelLastSent = 0, duelLastSwing = 0;
+let duelClient = null, duelSlot = -1, duelPlayers = [null, null], duelStarted = false, duelFinished = false, duelLastSent = 0, duelLastSwing = 0, duelLastSentX = null, duelLastSentZ = null, duelLastSentYaw = null;
 let duelPrevHealthMe = DUEL_HITS, duelPrevHealthOp = DUEL_HITS, duelPlayerHitsTaken = 0, duelEndShown = false;
 function duelPips(hits) { return '●'.repeat(hits) + '○'.repeat(Math.max(0, DUEL_HITS - hits)); }
 function updateDuelHud() {
@@ -1362,9 +1362,23 @@ function applyDuelState(message) {
   duelFinished = !!message.finished;
   const me = duelPlayers[duelSlot], op = duelPlayers[1 - duelSlot];
   if (me) {
-    player.position.x = me.x; player.position.z = me.z;
-    if (!dash) player.position.y = groundHeight(me.x, me.z) + CHAR_LIFT;
-    yaw = me.yaw; player.rotation.y = yaw;
+    // Reconcile, don't rewind: the relay echoes our last accepted move, so
+    // the snapshot is stale by the time it arrives. Only snap to it when it
+    // corrected us — first state, or a position/yaw far from what we last
+    // sent (bounds / speed-clamp correction). Otherwise keep local movement
+    // + aim; the per-frame code owns Y (jump arc, ground follow, dash).
+    let snap = duelLastSentX === null;
+    if (!snap) {
+      const dx = me.x - duelLastSentX, dz = me.z - duelLastSentZ;
+      let dyaw = me.yaw - duelLastSentYaw; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+      snap = Math.hypot(dx, dz) > 2 || Math.abs(dyaw) > 0.6;
+    }
+    if (snap) {
+      player.position.x = me.x; player.position.z = me.z;
+      player.position.y = groundHeight(me.x, me.z) + CHAR_LIFT;
+      yaw = me.yaw; player.rotation.y = yaw;
+      duelLastSentX = me.x; duelLastSentZ = me.z; duelLastSentYaw = me.yaw;
+    }
   }
   if (op) {
     duelRemote.visible = true;
@@ -1457,6 +1471,7 @@ function updateDuelFrame(dt) {
     updateDuelRemoteAnim(dt);
     if (started && !duelFinished && performance.now() - duelLastSent > 50) {
       duelLastSent = performance.now();
+      duelLastSentX = player.position.x; duelLastSentZ = player.position.z; duelLastSentYaw = yaw;
       duelClient?.send('move', { x: player.position.x, z: player.position.z, yaw });
     }
   }

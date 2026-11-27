@@ -156,7 +156,7 @@ const coopMode = deathmatchMode && dmParams.get('coop') === '1';
 const dmAnyMode = deathmatchMode || soloAiMode;
 const dmBotCount = (soloAiMode || coopMode) ? cleanBotCount(dmParams.get('bots')) : 0;
 const dmBotDifficulty = cleanDifficulty(dmParams.get('difficulty'));
-let dmClient = null, dmSlot = -1, dmPlayers = [null,null], dmLastSent = 0, dmStarted = false, dmPaused = false, dmFinished = false;
+let dmClient = null, dmSlot = -1, dmPlayers = [null,null], dmLastSent = 0, dmStarted = false, dmPaused = false, dmFinished = false, dmLastSentX = null, dmLastSentZ = null, dmLastSentYaw = null;
 // Deathmatch character roster — every playable character file in
 // assets/characters/. The lobby passes ?character=<file>; only a file on
 // this list is loaded (anything else falls back to Agent_Kyle.fbx, so a
@@ -5163,7 +5163,7 @@ function animate(){
     updateCarriedBody();
     updateStealthButtons();
     if(!dmAnyMode)updateCameras(dt);
-    if(deathmatchMode&&dmClient&&dmStarted&&!dmPaused&&health>0&&now-dmLastSent>=50){dmLastSent=now;dmClient.send('move',{x:player.position.x,z:player.position.z,yaw});}
+    if(deathmatchMode&&dmClient&&dmStarted&&!dmPaused&&health>0&&now-dmLastSent>=50){dmLastSent=now;dmLastSentX=player.position.x;dmLastSentZ=player.position.z;dmLastSentYaw=yaw;dmClient.send('move',{x:player.position.x,z:player.position.z,yaw});}
     // Global detection is the worst guard meter (cameras add on top).
     let worst = detection; guards.forEach(g=>{ worst=Math.max(worst,g.meter); });
     detection = worst;
@@ -5328,7 +5328,22 @@ function applyDeathmatchState(message){
   syncDmBots(message.bots);
   syncDmGrenades(message.grenades); syncDmMines(message.mines);
   const me=dmPlayers[dmSlot],op=dmPlayers[1-dmSlot];
-  if(me){player.position.set(me.x,CHAR_LIFT,me.z);yaw=me.yaw;modelYaw=me.yaw;health=me.health;ammoInMag=me.ammo;if(me.counts)dmWeaponCounts=me.counts;}
+  if(me){
+    // Reconcile, don't rewind: the relay echoes our last accepted move, so
+    // the snapshot is stale by the time it arrives. Only snap to it when it
+    // corrected us — respawn, first state, or a position/yaw far from what
+    // we last sent (bounds / speed-clamp correction). Otherwise keep local
+    // movement + aim (and the jump arc) and take health/ammo from the relay.
+    const respawned=health<=0&&me.health>0;
+    let snap=respawned||dmLastSentX===null;
+    if(!snap){
+      const dx=me.x-dmLastSentX,dz=me.z-dmLastSentZ;
+      let dyaw=me.yaw-dmLastSentYaw;dyaw=Math.atan2(Math.sin(dyaw),Math.cos(dyaw));
+      snap=Math.hypot(dx,dz)>2||Math.abs(dyaw)>0.6;
+    }
+    if(snap){player.position.set(me.x,CHAR_LIFT,me.z);yaw=me.yaw;modelYaw=me.yaw;dmLastSentX=me.x;dmLastSentZ=me.z;dmLastSentYaw=me.yaw;}
+    health=me.health;ammoInMag=me.ammo;if(me.counts)dmWeaponCounts=me.counts;
+  }
   if(op){dmRemote.visible=true;dmRemote.position.set(op.x,CHAR_LIFT,op.z);dmRemote.rotation.y=op.yaw;loadDmRemoteCharacter(op.character);}
   else dmRemote.visible=false;
   // Shot events + health deltas: the effects for shots the relay

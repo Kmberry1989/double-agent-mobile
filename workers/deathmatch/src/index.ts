@@ -504,6 +504,16 @@ function cleanName(value:unknown){return String(value||'Agent').replace(/[<>\u00
 function blankPlayer(token:string,name:string,slot:number,map:MapId,character:string,weapon:WeaponId,loadout:'white'|'black',health=100):Player{const spawn=MAPS[map].spawns[slot];return {token,name,character,loadout,slot,x:spawn.x,z:spawn.z,yaw:spawn.yaw,health,score:0,ammo:WEAPONS[weapon].cap,weapon,lastMove:0,lastShot:0,reloadAt:0,disconnectedAt:null,respawnAt:0,counts:{}};}
 function blankState():RoomState{return {map:'courtyard',players:[null,null],startedAt:null,createdAt:Date.now(),finished:false,winner:null,finishReason:null,mode:'pvp',bots:[],difficulty:'normal',teamScore:{humans:0,bots:0},winnerTeam:null,lastBotTick:0,grenades:[],mines:[],events:[]};}
 
+// When a match may start. Co-op starts with one human online (bots fill the
+// other side), but a PvP/duel match must not start while the guest is still
+// loading: both reserved slots need a live socket, or the host can shoot an
+// unattended character and the absent player's 30 s forfeit timer never runs
+// (their disconnectedAt stays null until they first connect).
+export function shouldStartMatch(mode: RoomMode, players: (Player|null)[], online: Set<string>): boolean {
+  if (mode === 'coop') return online.size >= 1;
+  return players.every(p => !!p && online.has(p.token));
+}
+
 export class DeathmatchRoom extends DurableObject<Env> {
   private statePromise:Promise<RoomState>;
   constructor(ctx:DurableObjectState,env:Env){super(ctx,env);this.statePromise=ctx.blockConcurrencyWhile(async()=>{let state=await ctx.storage.get<RoomState>('room');if(!state){state=blankState();await ctx.storage.put('room',state);}return state;});}
@@ -531,7 +541,7 @@ export class DeathmatchRoom extends DurableObject<Env> {
       for(const ws of this.ctx.getWebSockets())try{if((ws.deserializeAttachment() as any).token===token)ws.close(4001,'Reconnected');}catch{}
       const pair=new WebSocketPair(),client=pair[0],server=pair[1];server.serializeAttachment({token,slot:player.slot});this.ctx.acceptWebSocket(server);
       player.disconnectedAt=null;
-      if(state.startedAt===null&&this.onlineTokens().size>=1&&(state.mode==='coop'||state.players.every(Boolean))){state.startedAt=Date.now();state.lastBotTick=Date.now();}
+      if(state.startedAt===null&&shouldStartMatch(state.mode,state.players,this.onlineTokens())){state.startedAt=Date.now();state.lastBotTick=Date.now();}
       await this.save(state);server.send(JSON.stringify({type:'welcome',slot:player.slot,code:(await this.ctx.storage.get('code'))||'',reconnectSeconds:30}));
       await this.broadcast(state);return new Response(null,{status:101,webSocket:client});
     }
@@ -551,7 +561,7 @@ export class DeathmatchRoom extends DurableObject<Env> {
       const nextX=Math.max(-bounds.x,Math.min(bounds.x,x)),nextZ=Math.max(-bounds.z,Math.min(bounds.z,z)),elapsed=Math.max(0.05,(now-(p.lastMove||now))/1000),distance=Math.hypot(nextX-p.x,nextZ-p.z);
       if(distance>Math.min(8*elapsed+1.5,5))return;
       p.x=nextX;p.z=nextZ;p.yaw=((yaw+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI;p.lastMove=now;
-      if(!state.startedAt&&(state.mode==='coop'||state.players.every(Boolean))){state.startedAt=now;state.lastBotTick=now;}
+      if(!state.startedAt&&shouldStartMatch(state.mode,state.players,this.onlineTokens())){state.startedAt=now;state.lastBotTick=now;}
       checkMines(state,now); // walking into an enemy mine's arc detonates it
       await this.save(state);await this.broadcast(state);return;
     }

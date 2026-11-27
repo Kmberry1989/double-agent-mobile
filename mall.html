@@ -74,7 +74,7 @@ const coopMode = deathmatchMode && dmParams.get('coop') === '1';
 const dmAnyMode = deathmatchMode || soloAiMode;
 const dmBotCount = (soloAiMode || coopMode) ? cleanBotCount(dmParams.get('bots')) : 0;
 const dmBotDifficulty = cleanDifficulty(dmParams.get('difficulty'));
-let dmClient = null, dmSlot = -1, dmPlayers = [null,null], dmLastSent = 0, dmStarted = false, dmPaused = false, dmFinished = false, dmAmmo = 12, dmLastShot = 0;
+let dmClient = null, dmSlot = -1, dmPlayers = [null,null], dmLastSent = 0, dmStarted = false, dmPaused = false, dmFinished = false, dmAmmo = 12, dmLastShot = 0, dmLastSentX = null, dmLastSentZ = null, dmLastSentYaw = null;
 const DM_CHARACTER_ROSTER = new Set(['Kyle_tux.glb','Kyle_combat.fbx','Rochelle_undercover.fbx','Rochelle_combat.fbx','Donald.fbx','Eric.fbx','Kristen.fbx','Vickie.fbx','trickortreat-frankenstein.fbx','trickortreater-ghost.fbx','trickortreater-hero.fbx','trickortreater-mummy.fbx','trickortreater-pirate.fbx','trickortreater-pumpkin.fbx','trickortreater-vampire.fbx','trickortreater-werewolf.fbx','trickortreater-witch.fbx','trickortreater_princess.fbx','trickortreaterskeleton.fbx','enemy-terror1.fbx','enemy-terror2.fbx','enemy-terror3.fbx','enemy-terror4.fbx','enemy-terror5.fbx','shopper1.fbx','shopper2.fbx','shopper3.fbx','shopper4.fbx','shopper5.fbx','shopper6.fbx','shopper7.fbx','masquerade_man_black.glb','masquerade_woman_blue.glb','masquerade_red_black.glb','masquerade_man_navy.glb','enemy-frankenstein.fbx','enemy-ghost.fbx','enemy-pumpkin.fbx','enemy-skeleton.fbx','enemy-witch.fbx','enemy-santa.fbx','enemy-elf.fbx','enemy-reindeer.fbx','enemy-xmassweater.fbx','enemy-lights.fbx']);
 // The masquerade enemies live in assets/theater/enemies/, not
 // assets/characters/ — resolve the path by filename prefix. Tripo
@@ -2225,7 +2225,22 @@ function applyDeathmatchState(message) {
   syncDmBots(message.bots);
   syncDmGrenades(message.grenades); syncDmMines(message.mines);
   const me = dmPlayers[dmSlot], op = dmPlayers[1 - dmSlot];
-  if (me) { player.position.set(me.x, CHAR_LIFT, me.z); yaw = me.yaw; player.rotation.y = yaw; dmAmmo = me.ammo; dmHealth = me.health; updateDmAmmoHud(); }
+  if (me) {
+    // Reconcile, don't rewind: the relay echoes our last accepted move, so
+    // the snapshot is stale by the time it arrives. Only snap to it when it
+    // corrected us — respawn, first state, or a position/yaw far from what
+    // we last sent (bounds / speed-clamp correction). Otherwise keep local
+    // movement + aim and take health/ammo from the relay.
+    const respawned = dmHealth <= 0 && me.health > 0;
+    let snap = respawned || dmLastSentX === null;
+    if (!snap) {
+      const dx = me.x - dmLastSentX, dz = me.z - dmLastSentZ;
+      let dyaw = me.yaw - dmLastSentYaw; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+      snap = Math.hypot(dx, dz) > 2 || Math.abs(dyaw) > 0.6;
+    }
+    if (snap) { player.position.set(me.x, CHAR_LIFT, me.z); yaw = me.yaw; player.rotation.y = yaw; dmLastSentX = me.x; dmLastSentZ = me.z; dmLastSentYaw = me.yaw; }
+    dmAmmo = me.ammo; dmHealth = me.health; updateDmAmmoHud();
+  }
   if (op) { dmRemote.visible = true; dmRemote.position.set(op.x, CHAR_LIFT, op.z); dmRemote.rotation.y = op.yaw; loadDmRemoteCharacter(op.character); }
   else dmRemote.visible = false;
   // Shot events: the relay's resolved shots render their effects here
@@ -2714,6 +2729,7 @@ function animate() {
     // sees them move; the relay is authoritative for position/health.
     if (deathmatchMode && dmClient && dmStarted && !dmPaused && !dmFinished && performance.now() - dmLastSent >= 50) {
       dmLastSent = performance.now();
+      dmLastSentX = player.position.x; dmLastSentZ = player.position.z; dmLastSentYaw = yaw;
       dmClient.send('move', { x: player.position.x, z: player.position.z, yaw });
     }
   } else if (mixer) {
