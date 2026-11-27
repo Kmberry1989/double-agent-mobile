@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2712%27 fill=%27%230b1321%27/%3E%3Cpath d=%27M16 15h32v8H24v7h19v8H24v11h-8z%27 fill=%27%23ffd27a%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Undercover: Double Agent — Main Menu</title>
 <style>
@@ -119,9 +120,6 @@
 </style>
 </head>
 <body>
-  <video id="bgVideo" autoplay muted loop playsinline preload="auto">
-    <source src="assets/video/menu-background.mp4" type="video/mp4">
-  </video>
   <div class="shade" aria-hidden="true"></div>
   <main>
     <h1 class="title"><span>Undercover:</span><span class="line2">Double Agent</span></h1>
@@ -133,15 +131,15 @@
       </a>
       <a class="mission" href="ballroom.html">
         <h2>Ballroom</h2>
-        <p>Find the three cats and photograph them.</p>
+        <p>Photograph Moxie, Mabel and Margo as their photo windows open; then leave by the north door.</p>
       </a>
       <a class="mission" href="ballroom-rochelle.html">
         <h2>Rochelle</h2>
-        <p>Photographer — photo the cats in order: moon, note, rose.</p>
+        <p>Feed and photograph moon, note, rose in order. Reach the north exit after the third photo.</p>
       </a>
       <a class="mission" href="ballroom-handoff.html">
         <h2>Handoff</h2>
-        <p>Rendezvous, then the photo mission continues.</p>
+        <p>Meet your contact first, then photograph the three collars in order and escape.</p>
       </a>
       <a class="mission" href="theater.html">
         <h2>Theater</h2>
@@ -149,7 +147,11 @@
       </a>
       <a class="mission" href="halloween.html">
         <h2>Halloween</h2>
-        <p>Sniper nest — stop the 5 terrorists.</p>
+        <p>Identify each person with TAG before firing; stop 5 terrorists and avoid civilians.</p>
+      </a>
+      <a class="mission" href="deathmatch.html">
+        <h2>Deathmatch</h2>
+        <p>Private 1v1 in the Courtyard. First to 10 takedowns wins.</p>
       </a>
       <a class="mission" href="mall.html">
         <h2>Mall</h2>
@@ -163,33 +165,5 @@
     </nav>
   </main>
 
-  <script>
-    // Video background fallback: the video file (assets/video/menu-background.mp4)
-    // does not exist yet. If it fails to load, hide the <video> element so no
-    // broken-video icon or error text appears — the dark CSS gradient behind it
-    // becomes the menu background. Dropping the file into assets/video/ makes
-    // it play with no code change.
-    (function () {
-      var v = document.getElementById('bgVideo');
-      var hidden = false;
-      function hideVideo() {
-        if (hidden) return;
-        hidden = true;
-        v.style.display = 'none';
-      }
-      v.addEventListener('error', hideVideo);
-      var src = v.querySelector('source');
-      if (src) src.addEventListener('error', hideVideo);
-      // If nothing has loaded after a few seconds (e.g. a missing file that
-      // never fires an error event), hide it too.
-      setTimeout(function () {
-        if (v.readyState < 2) hideVideo();
-      }, 4000);
-      // Muted autoplay should succeed; swallow a rejection if the browser
-      // still blocks it so no console error surfaces.
-      var p = v.play();
-      if (p && p.catch) p.catch(function () {});
-    })();
-  </script>
 </body>
 </html>

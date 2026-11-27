@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 64 64%27%3E%3Crect width=%2764%27 height=%2764%27 rx=%2712%27 fill=%27%230b1321%27/%3E%3Cpath d=%27M16 15h32v8H24v7h19v8H24v11h-8z%27 fill=%27%23ffd27a%27/%3E%3C/svg%3E">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
 <title>Double Agent — Trick or Treat</title>
 <style>
@@ -22,7 +23,8 @@
   #scopeBtn{position:fixed;left:18px;bottom:24px;width:92px;height:92px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:17px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
   #scopeBtn.on{background:rgba(255,140,26,.9);color:#111}
   #zoomBtn{position:fixed;right:26px;bottom:132px;width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.4);color:#fff;font-size:15px;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
-  body.touch #fireBtn,body.touch #scopeBtn,body.touch #zoomBtn{display:block}
+  #tagBtn{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);width:78px;height:78px;border-radius:50%;background:rgba(58,145,255,.8);border:2px solid rgba(255,255,255,.45);color:#08101c;font-weight:800;display:none;z-index:5;touch-action:none;margin:0;padding:0}
+  body.touch #fireBtn,body.touch #scopeBtn,body.touch #zoomBtn,body.touch #tagBtn{display:block}
   #scopeUI{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:none;z-index:6;pointer-events:none;text-align:center}
   #scopeUI img{width:min(58vmin,400px);height:auto;display:block}
   #zoomLabel{margin-top:10px;font-size:15px;font-weight:700;color:#fff;text-shadow:0 1px 4px #000}
@@ -32,14 +34,15 @@
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
-<nav class="levels"><a href="menu.html">Main Menu</a><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html" class="cur" aria-current="page">Halloween</a><a href="mall.html">Mall</a></nav>
+<nav class="levels"><a href="menu.html">Main Menu</a><a href="index.html">Courtyard</a><a href="ballroom.html">Ballroom</a><a href="ballroom-rochelle.html">Rochelle</a><a href="ballroom-handoff.html">Handoff</a><a href="viewer.html">Viewer</a><a href="wishlist.html">Wishlist</a><a href="theater.html">Theater</a><a href="halloween.html" class="cur" aria-current="page">Halloween</a><a href="mall.html">Mall</a><a href="deathmatch.html">Deathmatch</a></nav>
 <div id="mission"><b>Terrorists stopped:</b> <span id="stopCount">0 / 5</span><div id="tagStatus"></div></div>
 <button id="fireBtn">FIRE</button>
 <button id="scopeBtn">SCOPE</button>
 <button id="zoomBtn">ZOOM</button>
+<button id="tagBtn">TAG</button>
 <div id="scopeUI"><img id="crosshairImg" src="assets/ui/crosshair-sniper.png" alt=""><div id="zoomLabel">2x</div></div>
 <div id="barTop"></div><div id="barBottom"></div>
-<div id="overlay"><h1>Trick or Treat</h1><p>Sniper nest — the street is yours to watch.</p><button id="startBtn">Enter the nest</button><p class="padControls">PS4 controller — Right stick look · R2 Scope · L3 Zoom 2x/4x · X / R1 Shoot</p><p class="padControls">Mouse — look · Right-mouse Scope · Click Shoot · Wheel Zoom · F Scope · Touch — drag look · SCOPE / FIRE / ZOOM</p></div>
+<div id="overlay"><h1>Trick or Treat</h1><p>Identify each person with TAG before you fire. Only tagged terrorists are valid targets; a tagged civilian ends the mission.</p><button id="startBtn">Enter the nest</button><p class="padControls">PS4 controller — Right stick look · Cross TAG · R1 Shoot · R2 Scope · L3 Zoom 2x/4x</p><p class="padControls">Mouse — look · Right-mouse Scope · E TAG · Click Shoot · Wheel Zoom · F Scope · Touch — drag look · TAG / SCOPE / FIRE / ZOOM</p></div>
 <div id="win"><h1>Mission complete</h1><p id="winText"></p><button onclick="location.reload()">Play again</button></div>
 <div id="fail"><h1>Mission failed</h1><p id="failText"></p><button onclick="location.reload()">Try again</button></div>
 <script type="module">
@@ -717,6 +720,9 @@ function updateNpcs(dt) {
 let stopped = 0, won = false, failed = false, started = false, winShown = false, failShown = false;
 let yaw = 0, pitch = -0.05; // near-level default: the street runs north, slightly below the nest
 let statusTimer = null;
+let taggedTarget = null, tagUntil = 0;
+const tagMarker = new THREE.Mesh(new THREE.TorusGeometry(.62,.055,8,24),new THREE.MeshBasicMaterial({color:0x54b5ff,depthTest:false}));
+tagMarker.rotation.x=Math.PI/2;tagMarker.visible=false;tagMarker.renderOrder=20;scene.add(tagMarker);
 function updateStopCount() {
   const el = document.getElementById('stopCount');
   if (el) el.textContent = stopped + ' / ' + TERRORIST_COUNT;
@@ -729,6 +735,7 @@ function setStatus(text) {
   if (text) statusTimer = setTimeout(() => { el.textContent = ''; }, 2500);
 }
 function stopTerrorist(npc) {
+  if(taggedTarget===npc){taggedTarget=null;tagMarker.visible=false;}
   npc.stopped = true; npc.fallT = 0;
   stopped++;
   updateStopCount();
@@ -817,20 +824,30 @@ function doShoot(ndcX, ndcY) {
   if (!started || won || failed) return;
   const nx = ndcX === undefined ? 0 : ndcX;
   const ny = ndcY === undefined ? 0 : ndcY;
-  bulletTimeT = 1.0; // slow-mo on every shot
   const hit = raycastNpc(nx, ny);
   const target = hit ? hit.npc : nearestInFront();
   if (target) {
+    if(target!==taggedTarget||performance.now()>tagUntil){setStatus('Tag the person first — only identified targets can be engaged');return;}
+    bulletTimeT = 1.0; // slow-mo on every confirmed shot
     const end = hit ? hit.point.clone() : new THREE.Vector3(target.outer.position.x, target.outer.position.y + 1.2, target.outer.position.z);
     spawnTracer(MUZZLE, end);
     if (target.kind === 'terrorist') stopTerrorist(target);
     else failMission();
   } else {
+    bulletTimeT = 1.0;
     // Miss: tracer far down the ray.
     shootRay.setFromCamera(new THREE.Vector2(nx, ny), camera);
     const end = new THREE.Vector3().copy(shootRay.ray.origin).addScaledVector(shootRay.ray.direction, 100);
     spawnTracer(MUZZLE, end);
   }
+}
+function tagTarget(){
+  if(!started||won||failed)return;
+  const hit=raycastNpc(0,0),target=hit?hit.npc:nearestInFront();
+  if(!target){taggedTarget=null;tagMarker.visible=false;setStatus('No one in view to identify');return;}
+  taggedTarget=target;tagUntil=performance.now()+12000;
+  tagMarker.visible=true;tagMarker.position.set(target.outer.position.x,target.outer.position.y+2.75,target.outer.position.z);
+  setStatus(target.kind==='terrorist'?'IDENTIFIED: TERRORIST — take the shot':'IDENTIFIED: CIVILIAN — do not fire');
 }
 
 // ---- Scope + zoom (Part 2) ----
@@ -877,7 +894,7 @@ document.getElementById('startBtn').onclick = () => {
 };
 addEventListener('keydown', (e) => {
   keys[e.key.toLowerCase()] = true;
-  if (e.key.toLowerCase() === 'e' && started && !e.repeat) { e.preventDefault(); doShoot(0, 0); }
+  if (e.key.toLowerCase() === 'e' && started && !e.repeat) { e.preventDefault(); tagTarget(); }
   if (e.key.toLowerCase() === 'f' && started && !e.repeat) { e.preventDefault(); scopeSources.key = !scopeSources.key; refreshScope(); noteActivity(); }
 });
 addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
@@ -909,7 +926,8 @@ function pollGamepad(dt) {
   // R2 hold = scope in (momentary).
   const r2 = gp.held(GP.R2);
   if (r2 !== scopeSources.pad) { scopeSources.pad = r2; refreshScope(); }
-  if (gp.pressed(GP.CROSS) || gp.pressed(GP.R1)) doShoot(0, 0);
+  if (gp.pressed(GP.CROSS)) tagTarget();
+  if (gp.pressed(GP.R1)) doShoot(0, 0);
   if (gp.pressed(GP.L3)) { cycleZoom(); noteActivity(); }
 }
 // Mouse: left click shoots (centre ray), right button hold scopes in.
@@ -927,6 +945,10 @@ addEventListener('wheel', (e) => { if (started && !won && !failed) cycleZoom(); 
 document.getElementById('fireBtn').addEventListener('click', (e) => {
   e.preventDefault(); e.stopPropagation();
   if (started) doShoot(0, 0);
+});
+document.getElementById('tagBtn').addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  if (started) tagTarget();
 });
 document.getElementById('scopeBtn').addEventListener('click', (e) => {
   e.preventDefault(); e.stopPropagation();
@@ -1008,6 +1030,8 @@ function animate() {
   if (bulletTimeT > 0) { bulletTimeT -= rawDt; dt = rawDt * 0.25; }
   pollGamepad(rawDt); // PS4 controller: look stays responsive in slow-mo
   updateNpcs(dt);
+  if(taggedTarget&&performance.now()<tagUntil&&!taggedTarget.stopped){tagMarker.visible=true;tagMarker.position.set(taggedTarget.outer.position.x,taggedTarget.outer.position.y+2.75,taggedTarget.outer.position.z);}
+  else{taggedTarget=null;tagMarker.visible=false;}
   updateTracers(rawDt); // tracers fade in real time, even in slow-mo
   if (started && !won && !failed) {
     let ml = 0, fx = 0, fz = 0;
@@ -1068,7 +1092,7 @@ if (new URLSearchParams(location.search).has('test')) {
     get started() { return started; },
     get scoped() { return scoped; }, get zoomLevel() { return zoomLevel; },
     get bulletTimeT() { return bulletTimeT; }, tracers,
-    doShoot, cycleZoom, refreshScope, stopTerrorist, failMission, showWin, nearestInFront, updateStopCount,
+    doShoot, tagTarget, cycleZoom, refreshScope, stopTerrorist, failMission, showWin, nearestInFront, updateStopCount,
   };
 }
 animate();
