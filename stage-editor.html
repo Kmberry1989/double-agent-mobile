@@ -1,0 +1,1928 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<link rel="icon" href="data:," />
+<title>Double Agent Stage Editor</title>
+<style>
+  :root{
+    --bg:#17130f; --panel:#221b14; --panel2:#2b2118; --line:#4a3a28;
+    --ink:#f3e9d7; --muted:#c9b998;
+    --gold:#c9a24b; --gold-ink:#1d1503; --red:#8e2f2a; --red-ink:#fff;
+    --btn:#33281b; --btn-ink:#f3e9d7; --danger:#7e2a24;
+    --field:#120e0a; --radius:12px;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg:#efe7d8; --panel:#fbf7ee; --panel2:#f3ecdc; --line:#d8c9a8;
+      --ink:#2a2013; --muted:#6f6046; --gold:#a97f22; --gold-ink:#fff8e6;
+      --btn:#efe4cb; --btn-ink:#2a2013; --field:#fffdf6; --danger:#9c322a;
+    }
+  }
+  *{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  canvas,img{-webkit-user-drag:none;user-drag:none}
+  ::selection{background:transparent;color:inherit}
+  button,[role="button"],select,input:not([type="checkbox"],[type="radio"]){min-height:44px}
+  button svg{vertical-align:-3px}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--btn);color:var(--btn-ink);border-radius:10px;padding:10px 14px;font-size:15px;font-weight:600;line-height:1.15;touch-action:manipulation}
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.42;cursor:default;transform:none}
+  button.primary{background:var(--gold);border-color:var(--gold);color:var(--gold-ink)}
+  button.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+  button.ghost{background:transparent}
+  button.on{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+  select,input[type="text"]{font:inherit;font-size:15px;background:var(--field);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+  input[type="range"]{width:100%;min-height:44px;accent-color:var(--gold)}
+
+  #app{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+  /* ---- 3D viewport ---- */
+  #stageWrap{position:relative;flex:1 1 auto;min-height:240px;background:#0d0a07}
+  #stage{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #viewBar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;pointer-events:none;z-index:8}
+  #viewBar>*{pointer-events:auto}
+  #viewBar .spacer{flex:1}
+  .chip{background:rgba(18,13,8,.88);color:#f3e9d7;border:1px solid #57452c;border-radius:999px;padding:9px 13px;font-size:13.5px;font-weight:600;min-height:40px;display:inline-flex;align-items:center}
+  #viewBar button{background:rgba(18,13,8,.88);color:#f3e9d7;border-color:#57452c;min-height:40px;padding:8px 13px;font-size:14px}
+  #viewBar button.on{background:var(--gold);color:var(--gold-ink);border-color:var(--gold)}
+  .lvlSwitch{display:flex;gap:4px;background:rgba(18,13,8,.88);border:1px solid #57452c;border-radius:999px;padding:4px}
+  .lvlSwitch button{border:none !important;background:transparent !important;min-height:38px;border-radius:999px;padding:8px 14px;font-size:14.5px}
+  .lvlSwitch button.on{background:var(--gold) !important;color:var(--gold-ink) !important}
+  #hint{position:absolute;left:10px;bottom:10px;right:10px;pointer-events:none;display:flex;justify-content:center}
+  #hint span{background:rgba(18,13,8,.82);color:#e9dcbf;border-radius:8px;padding:7px 12px;font-size:13px;text-align:center}
+  #toast{position:absolute;top:60px;left:50%;transform:translateX(-50%) translateY(-8px);background:#241a0e;color:#ffe9b0;border:1px solid var(--gold);border-radius:10px;padding:11px 16px;font-size:14.5px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:92%;text-align:center;z-index:5}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #loadErr{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#171008;color:#f3e9d7;padding:24px;text-align:center;font-size:16px;line-height:1.5;z-index:9}
+
+  /* ---- Control panel ---- */
+  #panel{flex:0 0 auto;background:var(--panel);border-top:2px solid var(--gold);max-height:52dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px calc(14px + env(safe-area-inset-bottom))}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .row + .row{margin-top:10px}
+  .grow{flex:1 1 auto}
+  h2{font-family:Georgia,"Times New Roman",serif;font-size:17px;margin:2px 0 8px;letter-spacing:.2px}
+  .label{font-size:12.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 7px}
+  .label:first-child{margin-top:0}
+  .histRow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px}
+  .histRow button{min-height:52px;font-size:16px}
+  #selName{font-size:17px;font-weight:700}
+  #selMeta{font-size:14px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+  .statGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:9px}
+  .stat{background:var(--field);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .stat b{display:block;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700}
+  .stat span{font-size:16.5px;font-weight:700;font-variant-numeric:tabular-nums}
+  .ctlGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .ctl{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);padding:10px}
+  .ctl h3{margin:0 0 6px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .ctl .row{margin-top:6px}
+  .ctl .row button{flex:1;padding:10px 6px;font-size:14px}
+  .nudge{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(2,48px);gap:6px;justify-content:center;margin-top:4px}
+  .nudge button{padding:0;font-size:19px}
+  .nudge .sp{visibility:hidden}
+  .palette{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .palette button{min-height:56px;font-size:15.5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+  .palette button small{font-size:11.5px;font-weight:500;color:var(--muted)}
+  .palette button:active small,.palette button.on small{color:inherit}
+  .fileRow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .fileRow button{min-height:52px;font-size:15.5px}
+  #noneSel{color:var(--muted);font-size:15px;padding:6px 0 2px;line-height:1.45}
+  .lvlRow{padding:3px 0}
+  .lvlRow b{color:var(--ink)}
+  .hidden{display:none !important}
+  @media (min-width:820px){
+    #app{flex-direction:row}
+    #stageWrap{flex:1 1 auto}
+    #panel{flex:0 0 380px;max-height:none;border-top:none;border-left:2px solid var(--gold);height:100dvh}
+    .palette{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="viewBar">
+      <a href="menu.html" class="chip" style="text-decoration:none">Menu</a>
+      <div class="lvlSwitch" id="lvlSwitch" role="group" aria-label="Choose a level"></div>
+      <span class="chip" id="objCount">Ballroom · 40 × 28 m</span>
+      <span class="spacer"></span>
+      <button id="btnTop" type="button">Top view</button>
+      <button id="btnOrbit" type="button" class="on">¾ view</button>
+    </div>
+    <div id="toast" role="status"></div>
+    <div id="hint"><span>Tap an object to select it, then drag it across the floor. Drag empty space to orbit · pinch or scroll to zoom.</span></div>
+    <div id="loadErr"><div><strong>The 3D view could not start.</strong><br/>Your browser may have WebGL turned off. Try reloading, or open this page in Safari or Chrome.</div></div>
+  </div>
+
+  <section id="panel" aria-label="Editor controls">
+    <div class="histRow">
+      <button id="btnUndo" type="button" disabled><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg> Undo</button>
+      <button id="btnRedo" type="button" disabled><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true" style="transform:scaleX(-1)"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg> Redo</button>
+    </div>
+    <div class="label">Selected object</div>
+    <div class="row">
+      <div class="grow">
+        <div id="selName">Nothing selected</div>
+        <div id="selMeta">Tap any object in the scene to select it.</div>
+      </div>
+    </div>
+    <div class="row">
+      <select id="objPicker" aria-label="Pick an object from a list"></select>
+    </div>
+
+    <div id="selControls" class="hidden">
+      <div class="statGrid">
+        <div class="stat"><b>X (m)</b><span id="statX">0.0</span></div>
+        <div class="stat"><b>Z (m)</b><span id="statZ">0.0</span></div>
+        <div class="stat"><b>Rotation</b><span id="statR">0°</span></div>
+      </div>
+
+      <div class="ctlGrid">
+        <div class="ctl">
+          <h3>Rotate</h3>
+          <input type="range" id="rotRange" min="-180" max="180" step="1" value="0" aria-label="Rotation in degrees" />
+          <div class="row">
+            <button id="rotL" type="button"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg> 15°</button>
+            <button id="rotR" type="button"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true" style="transform:scaleX(-1)"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg> 15°</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <h3>Scale</h3>
+          <input type="range" id="scaleRange" min="50" max="200" step="5" value="100" aria-label="Scale percent" />
+          <div class="row">
+            <button id="scaleDn" type="button">− Smaller</button>
+            <button id="scaleUp" type="button">+ Bigger</button>
+          </div>
+          <div id="scaleVal" style="font-size:13.5px;color:var(--muted);margin-top:2px">Scale 100%</div>
+        </div>
+      </div>
+
+      <div class="ctl" style="margin-top:10px">
+        <h3>Nudge position (0.5 m steps)</h3>
+        <div class="nudge">
+          <span class="sp"></span><button id="nN" type="button" aria-label="Move toward back wall"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 6l7 10H5z"/></svg></button><span class="sp"></span>
+          <button id="nW" type="button" aria-label="Move left"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M6 12l10-7v14z"/></svg></button><button id="nS" type="button" aria-label="Move toward front"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 18L5 8h14z"/></svg></button><button id="nE" type="button" aria-label="Move right"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M18 12L8 5v14z"/></svg></button>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="btnDup" type="button" class="grow">Duplicate</button>
+        <button id="btnDelete" type="button" class="danger grow">Delete object</button>
+      </div>
+    </div>
+    <div id="noneSel">Nothing is selected, so there is nothing to move yet. The list above works too — handy for objects that are hard to tap in the 3D view.</div>
+
+    <div class="label">Add a prop — it appears in the middle, ready to drag</div>
+    <div class="palette" id="palette"></div>
+
+    <div class="label">Layout file — for the game</div>
+    <div class="fileRow">
+      <button id="btnExport" type="button" class="primary">Export JSON</button>
+      <button id="btnLoad" type="button">Load JSON</button>
+      <button id="btnReset" type="button">Reset stage</button>
+    </div>
+    <p style="font-size:13.5px;color:var(--muted);line-height:1.5;margin:10px 0 0">
+      Export downloads <b id="expFile">ballroom-layout.json</b> — every object in the level you are
+      looking at, with its type, x/y/z position, rotation and scale (plus its texture name where it
+      has one). Load brings a saved file back in. Reset restores the <span id="expLevel">Ballroom</span>
+      exactly as it ships in the game.
+    </p>
+    <div class="label">Levels in the game</div>
+    <div id="allLevels" style="font-size:13.5px;color:var(--muted);line-height:1.6"></div>
+    <input type="file" id="fileInput" accept=".json,application/json" class="hidden" />
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+<script>
+(function(){
+"use strict";
+/* No text highlighting / iOS long-press callout anywhere in the editor.
+   There are no free-text fields here — the picker is a <select> and the
+   rest are buttons, sliders and the 3D canvas — so selection is off
+   globally. CSS (-webkit-user-select / -webkit-touch-callout) does most
+   of the work; these listeners catch the paths CSS alone misses. */
+document.addEventListener('selectstart', function(e){ e.preventDefault(); });
+document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+document.addEventListener('dragstart', function(e){ e.preventDefault(); });
+document.addEventListener('selectionchange', function(){
+  var s = window.getSelection && window.getSelection();
+  if (s && !s.isCollapsed) s.removeAllRanges();
+});
+/* ============================================================
+   Double Agent — stage editor (Courtyard / Ballroom / Theater)
+   Origin at each level's centre, floor at y = 0, metres.
+   Exported JSON mirrors these coordinates so the game can drop
+   objects straight in. Each level keeps its own layout and its
+   own undo history while you switch between levels.
+   The level list, names and shell sizes come from
+   assets/levels-manifest.json (fetched at boot) — nothing about
+   which levels exist is hardcoded here. The per-level editor
+   tuning in LEVEL_CODE (camera, light, palette, prop spawn
+   points) is editor behaviour, not level data, so it stays in
+   code, keyed by level id. A manifest level with no entry there
+   has no editor shell and is listed as not editable yet.
+   ============================================================ */
+var DIMS = {}; /* shell sizes, filled from the manifest at boot */
+var canvas = document.getElementById('stage');
+var wrap = document.getElementById('stageWrap');
+var renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+} catch (e) {
+  document.getElementById('loadErr').style.display = 'flex';
+  return;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x120d08);
+scene.fog = new THREE.Fog(0x120d08, 70, 130);
+
+var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
+/* Orbit state (radius limits follow the active level) */
+var cam = { theta: 0.65, phi: 0.92, radius: 42, tx: 0, ty: 1, tz: 0 };
+var camMin = 12, camMax = 75;
+function applyCam(){
+  var sp = Math.sin(cam.phi), y = Math.cos(cam.phi);
+  camera.position.set(
+    cam.tx + cam.radius * sp * Math.sin(cam.theta),
+    cam.ty + cam.radius * y,
+    cam.tz + cam.radius * sp * Math.cos(cam.theta)
+  );
+  camera.lookAt(cam.tx, cam.ty, cam.tz);
+}
+
+var ambient = new THREE.AmbientLight(0xffe6c0, 0.55);
+scene.add(ambient);
+var sun = new THREE.DirectionalLight(0xfff0d0, 0.75);
+sun.position.set(18, 26, 12);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -30; sun.shadow.camera.right = 30;
+sun.shadow.camera.top = 30; sun.shadow.camera.bottom = -30;
+scene.add(sun);
+var fill = new THREE.PointLight(0xffc978, 0.55, 90);
+fill.position.set(0, 7, 0);
+scene.add(fill);
+
+/* ---------- procedural textures (editor stand-ins that carry the
+   same texture names the game uses, so exports stay meaningful) --- */
+function cnv(w, h, draw){
+  var c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  var t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+var texWood = cnv(512, 512, function(g, w, h){
+  g.fillStyle = '#8a5a28'; g.fillRect(0, 0, w, h);
+  var rows = 8, rh = h / rows;
+  for (var r = 0; r < rows; r++){
+    var tone = 0.85 + ((r * 37) % 10) / 22;
+    g.fillStyle = 'rgb(' + Math.round(150*tone) + ',' + Math.round(96*tone) + ',' + Math.round(44*tone) + ')';
+    g.fillRect(0, r * rh, w, rh - 2);
+    g.fillStyle = 'rgba(60,32,8,.55)';
+    for (var i = 0; i < 26; i++){
+      var y = r * rh + Math.random() * (rh - 4);
+      g.fillRect(0, y, w, 1);
+    }
+    var seam = ((r * 173) % w);
+    g.fillStyle = '#5d3a14'; g.fillRect(seam, r * rh, 3, rh - 2);
+  }
+});
+texWood.repeat.set(10, 7);
+
+var texDamask = cnv(256, 256, function(g, w, h){
+  g.fillStyle = '#6d1a16'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#a87c2e';
+  function motif(cx, cy, s){
+    g.save(); g.translate(cx, cy);
+    g.beginPath();
+    g.moveTo(0, -s); g.bezierCurveTo(s*.7, -s*.4, s*.7, s*.4, 0, s);
+    g.bezierCurveTo(-s*.7, s*.4, -s*.7, -s*.4, 0, -s);
+    g.fill();
+    g.fillStyle = '#c9a24b';
+    g.beginPath(); g.arc(0, 0, s*.28, 0, 7); g.fill();
+    g.restore(); g.fillStyle = '#a87c2e';
+  }
+  motif(64, 64, 34); motif(192, 64, 34); motif(64, 192, 34); motif(192, 192, 34);
+  motif(0, 0, 22); motif(128, 128, 22); motif(256, 0, 22); motif(0, 256, 22); motif(256, 256, 22);
+});
+texDamask.repeat.set(14, 3);
+
+var texCarpet = cnv(256, 512, function(g, w, h){
+  g.fillStyle = '#7e1d18'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#8e2f2a'; g.fillRect(18, 0, w - 36, h);
+  g.fillStyle = '#c9a24b';
+  g.fillRect(8, 0, 5, h); g.fillRect(w - 13, 0, 5, h);
+  g.fillRect(24, 0, 3, h); g.fillRect(w - 27, 0, 3, h);
+  g.fillStyle = 'rgba(201,162,75,.5)';
+  for (var y = 16; y < h; y += 42){
+    g.beginPath(); g.arc(w/2, y, 7, 0, 7); g.fill();
+    g.beginPath(); g.arc(40, y + 21, 4, 0, 7); g.fill();
+    g.beginPath(); g.arc(w - 40, y + 21, 4, 0, 7); g.fill();
+  }
+});
+var texHerring = cnv(512, 512, function(g, w, h){
+  g.fillStyle = '#9c6c33'; g.fillRect(0, 0, w, h);
+  var bw = 128, bh = 32;
+  for (var y = 0; y < h + bh; y += bh){
+    for (var x = -bw; x < w + bw; x += bw){
+      var off = ((y / bh) % 2) ? bw / 2 : 0;
+      g.save(); g.translate(x + off, y); g.rotate(Math.PI / 4);
+      g.fillStyle = ((x + y) % 3 === 0) ? '#b58545' : '#8a5a28';
+      g.fillRect(-bw/2, -bh/2, bw, bh - 2);
+      g.restore();
+      g.save(); g.translate(x + off + bw/2, y + bh/2); g.rotate(-Math.PI / 4);
+      g.fillStyle = ((x + y) % 3 === 0) ? '#8a5a28' : '#a8743a';
+      g.fillRect(-bw/2, -bh/2, bw, bh - 2);
+      g.restore();
+    }
+  }
+});
+var texCeil = cnv(256, 256, function(g, w, h){
+  g.fillStyle = '#cbb98f'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#a68d55'; g.lineWidth = 4; g.strokeRect(10, 10, w - 20, h - 20);
+  g.strokeStyle = '#b39a60'; g.lineWidth = 2; g.strokeRect(30, 30, w - 60, h - 60);
+});
+texCeil.repeat.set(10, 7);
+
+var texBrick = cnv(256, 128, function(g, w, h){
+  g.fillStyle = '#7c3f30'; g.fillRect(0, 0, w, h);
+  var bh = 16, bw = 42;
+  for (var y = 0; y < h; y += bh){
+    var off = ((y / bh) % 2) ? bw / 2 : 0;
+    for (var x = -bw; x < w + bw; x += bw){
+      var tone = .85 + (((x * 7 + y * 13) % 10) + 10) % 10 / 30;
+      g.fillStyle = 'rgb(' + Math.round(150*tone) + ',' + Math.round(74*tone) + ',' + Math.round(54*tone) + ')';
+      g.fillRect(x + off + 2, y + 2, bw - 4, bh - 4);
+    }
+  }
+});
+var texConcrete = cnv(256, 256, function(g, w, h){
+  g.fillStyle = '#9a958c'; g.fillRect(0, 0, w, h);
+  for (var i = 0; i < 2200; i++){
+    var v = 110 + Math.floor(Math.random() * 80);
+    g.fillStyle = 'rgba(' + v + ',' + v + ',' + (v - 6) + ',.25)';
+    g.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+  }
+  g.fillStyle = 'rgba(70,66,60,.3)'; g.fillRect(0, h - 16, w, 3);
+});
+var texGround = cnv(512, 512, function(g, w, h){
+  g.fillStyle = '#6f675c'; g.fillRect(0, 0, w, h);
+  for (var i = 0; i < 5200; i++){
+    var v = 88 + Math.floor(Math.random() * 70);
+    g.fillStyle = 'rgba(' + v + ',' + (v - 4) + ',' + (v - 14) + ',.3)';
+    g.fillRect(Math.random() * w, Math.random() * h, 3, 3);
+  }
+  g.fillStyle = 'rgba(50,46,40,.16)';
+  g.fillRect(30, 60, 180, 120); g.fillRect(320, 300, 150, 90);
+});
+texGround.repeat.set(5, 5);
+var texChain = cnv(128, 128, function(g, w, h){
+  g.clearRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(205,210,215,.95)'; g.lineWidth = 3;
+  var s = 16;
+  for (var x = -h; x < w + h; x += s){
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x + h, h); g.stroke();
+    g.beginPath(); g.moveTo(x + h, 0); g.lineTo(x, h); g.stroke();
+  }
+});
+var texCurtain = cnv(256, 256, function(g, w, h){
+  for (var x = 0; x < w; x++){
+    var v = .55 + .45 * Math.abs(Math.sin(x / w * Math.PI * 8));
+    g.fillStyle = 'rgb(' + Math.round(122*v) + ',' + Math.round(26*v) + ',' + Math.round(30*v) + ')';
+    g.fillRect(x, 0, 1, h);
+  }
+  var gr = g.createLinearGradient(0, 0, 0, h);
+  gr.addColorStop(0, 'rgba(255,200,120,.14)'); gr.addColorStop(1, 'rgba(0,0,0,.35)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+});
+var texFlat = cnv(256, 288, function(g, w, h){
+  var sky = g.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, '#a8c4de'); sky.addColorStop(.6, '#d8e2da');
+  sky.addColorStop(.61, '#7d9a5e'); sky.addColorStop(1, '#5d7a44');
+  g.fillStyle = sky; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#e8d98a'; g.beginPath(); g.arc(52, 48, 22, 0, 7); g.fill();
+  g.fillStyle = '#688a4e';
+  g.beginPath(); g.ellipse(40, h * .72, 90, 34, 0, 0, 7); g.fill();
+  g.beginPath(); g.ellipse(210, h * .75, 100, 40, 0, 0, 7); g.fill();
+  g.fillStyle = '#5d4630'; g.fillRect(120, h * .42, 10, 60);
+  g.fillStyle = '#3f6034'; g.beginPath(); g.arc(125, h * .4, 34, 0, 7); g.fill();
+});
+
+function paintingTexture(kind){
+  return cnv(256, 320, function(g, w, h){
+    var sky;
+    if (kind === 'lady_gold'){
+      g.fillStyle = '#3d2c12'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#c9a24b'; g.beginPath(); g.arc(w/2, h/2, 92, 0, 7); g.fill();
+      g.fillStyle = '#e8cf8f'; g.beginPath(); g.arc(w/2, 118, 30, 0, 7); g.fill();
+      g.fillStyle = '#7a5a20'; g.beginPath(); g.moveTo(w/2 - 46, h); g.quadraticCurveTo(w/2, 150, w/2 + 46, h); g.fill();
+    } else if (kind === 'gentleman'){
+      g.fillStyle = '#2c2118'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#8a6f45'; g.beginPath(); g.arc(w/2, h/2, 88, 0, 7); g.fill();
+      g.fillStyle = '#d9b48c'; g.beginPath(); g.arc(w/2, 128, 30, 0, 7); g.fill();
+      g.fillStyle = '#4a3820'; g.fillRect(w/2 - 26, 104, 52, 10);
+      g.fillStyle = '#1d150c'; g.beginPath(); g.moveTo(w/2 - 50, h); g.quadraticCurveTo(w/2, 168, w/2 + 50, h); g.fill();
+      g.fillStyle = '#e8e2d2'; g.beginPath(); g.moveTo(w/2 - 10, 190); g.lineTo(w/2 + 10, 190); g.lineTo(w/2, 216); g.fill();
+    } else if (kind === 'moonlit_garden'){
+      sky = g.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#16233f'); sky.addColorStop(1, '#3c5a3a');
+      g.fillStyle = sky; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#e9e4c8'; g.beginPath(); g.arc(196, 58, 20, 0, 7); g.fill();
+      g.fillStyle = '#22351e'; g.fillRect(0, h - 80, w, 80);
+      g.fillStyle = '#4d7a42'; for (var i = 0; i < 8; i++){ g.beginPath(); g.arc(20 + i * 30, h - 70 + (i % 3) * 12, 16, 0, 7); g.fill(); }
+      g.fillStyle = '#c9a24b'; g.fillRect(w/2 - 3, h - 130, 6, 60);
+    } else if (kind === 'roses'){
+      g.fillStyle = '#33231a'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#2e4423'; for (var j = 0; j < 10; j++){ g.beginPath(); g.ellipse(30 + (j * 47) % 200, 40 + (j * 61) % 240, 20, 12, j, 0, 7); g.fill(); }
+      var cols = ['#a92c34', '#c14a52', '#8e2430', '#d4707c'];
+      for (var k = 0; k < 9; k++){
+        g.fillStyle = cols[k % 4];
+        g.beginPath(); g.arc(40 + (k * 53) % 180, 50 + (k * 71) % 220, 17, 0, 7); g.fill();
+        g.fillStyle = 'rgba(255,210,200,.5)'; g.beginPath(); g.arc(34 + (k * 53) % 180, 44 + (k * 71) % 220, 6, 0, 7); g.fill();
+      }
+    } else { /* dancers */
+      g.fillStyle = '#241a2e'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#57431c'; g.fillRect(0, h - 60, w, 60);
+      g.fillStyle = '#e8cf8f'; g.beginPath(); g.arc(52, 52, 13, 0, 7); g.fill();
+      g.fillStyle = '#c9a24b'; g.beginPath(); g.arc(w - 52, 52, 13, 0, 7); g.fill();
+      g.fillStyle = '#d9c9a8'; g.beginPath(); g.moveTo(96, h - 60); g.quadraticCurveTo(112, 150, 128, h - 60); g.fill();
+      g.fillStyle = '#1d150c'; g.beginPath(); g.moveTo(128, h - 60); g.quadraticCurveTo(146, 150, 160, h - 60); g.fill();
+      g.fillStyle = '#d9b48c'; g.beginPath(); g.arc(112, 138, 11, 0, 7); g.fill();
+      g.beginPath(); g.arc(144, 138, 11, 0, 7); g.fill();
+    }
+  });
+}
+
+/* ---------- the game's real texture files (the repo's own WebP assets
+   under assets/textures/; the canvas textures above stay on as
+   stand-ins only if a file somehow fails to load) ---------- */
+var TEX_BASE = 'assets/textures/';
+function realTex(file, rx, ry, fallback, clamp){
+  var url = file.indexOf('assets/') === 0 ? file : TEX_BASE + file;
+  var t = new THREE.TextureLoader().load(url, undefined, undefined, function(){
+    if (fallback){ t.image = fallback.image; t.needsUpdate = true; }
+  });
+  t.wrapS = t.wrapT = clamp ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.anisotropy = 4;
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+var texFloorReal = realTex('ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 8, 6, texWood);
+var texDamaskReal = realTex('ballroom/ballroom_wall_damask_burgundy_gold_1024.webp', 14, 3, texDamask);
+var texCeilReal = realTex('ballroom/ballroom_ceiling_plaster_moulding_1024.webp', 10, 7, texCeil);
+var texWainsReal = realTex('ballroom/ballroom_wall_wood_wainscoting_dark_1024.webp', 12, 1, texWood);
+var texCarpetReal = realTex('ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 3, texCarpet);
+var texBranchReal = realTex('ballroom/ballroom_carpet_runner_red_gold_border_1024.webp', 1, 3, texCarpet);
+texBranchReal.center.set(.5, .5); texBranchReal.rotation = Math.PI / 2;
+var texHerringReal = realTex('ballroom/ballroom_floor_herringbone_marble_border_1024.webp', 1, 1, texHerring);
+var texStageReal = realTex('ballroom/ballroom_floor_polished_wood_honey_brown_1024.webp', 6, 3, texWood);
+/* The Theater's own real textures (same files and repeats the game's
+   theater.html uses). */
+var texThStageReal = realTex('theater/theater_stage_wood_floor_1024.webp', 6, 3, texWood);
+var texThWallReal = realTex('theater/theater_house_wallpaper_1024.webp', 8, 2, texDamask);
+var texThCeilReal = realTex('theater/theater_ceiling_1024.webp', 6, 8, texCeil);
+var texThGoldReal = realTex('theater/theater_gold_trim_1024.webp', 12, 1, null);
+var texThGoldColReal = realTex('theater/theater_gold_trim_1024.webp', 1, 4, null);
+var texThVelvetReal = realTex('theater/theater_red_velvet_curtain_1024.webp', 2, 1, texCurtain);
+var texThSeatReal = realTex('theater/theater_seat_velvet_1024.webp', 3, 1, null);
+var texThCarpetReal = realTex('theater/theater_red_carpet_1024.webp', 1, 8, texCarpet);
+/* The painted garden artwork from the game's own set_flat texture. */
+var texSetFlatReal = realTex('assets/theater/objects/set_flat.png', 1, 1, texFlat, true);
+var texRugReal = realTex('ballroom/ballroom_rug_medallion_large_1024.webp', 1, 1, texCarpet);
+var PAINT_TEX = {};
+function paintingTextureReal(kind){
+  if (!PAINT_TEX[kind]){
+    PAINT_TEX[kind] = realTex('ballroom/ballroom_painting_' + kind + '_1024.webp', 1, 1, paintingTexture(kind), true);
+  }
+  return PAINT_TEX[kind];
+}
+
+/* ---------- materials ---------- */
+function M(color, rough, metal){ return new THREE.MeshStandardMaterial({ color: color, roughness: rough == null ? .8 : rough, metalness: metal || 0 }); }
+var matDarkWood = M(0x4a2e17, .65), matWoodMid = M(0x6d4520, .7), matGold = M(0xc9a24b, .35, .8),
+    matBrass = M(0xa8813a, .4, .7), matCream = M(0xe9dfc4, .9), matBlack = M(0x17130f, .6),
+    matMetal = M(0x8b9096, .45, .7), matSand = M(0x9a8a68, .95), matSeatRed = M(0x7e2230, .9),
+    matGlassNight = new THREE.MeshStandardMaterial({ color: 0x14263f, roughness: .15, metalness: .3, emissive: 0x0a1830, emissiveIntensity: .7 });
+
+/* ---------- prop builders: each returns a THREE.Group ---------- */
+function shadowed(g){ g.traverse(function(o){ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } }); return g; }
+
+function buildTable(){
+  var g = new THREE.Group();
+  var cloth = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.25, .5, 24), matCream);
+  cloth.position.y = .55; g.add(cloth);
+  var top = new THREE.Mesh(new THREE.CylinderGeometry(1.18, 1.18, .06, 24), M(0xf2ead2, .85));
+  top.position.y = .83; g.add(top);
+  var leg = new THREE.Mesh(new THREE.CylinderGeometry(.09, .13, .55, 10), matDarkWood);
+  leg.position.y = .27; g.add(leg);
+  var base = new THREE.Mesh(new THREE.CylinderGeometry(.42, .46, .06, 16), matDarkWood);
+  base.position.y = .03; g.add(base);
+  return shadowed(g);
+}
+function buildChair(){
+  var g = new THREE.Group();
+  var seat = new THREE.Mesh(new THREE.BoxGeometry(.52, .07, .5), M(0x5d1f1c, .85));
+  seat.position.y = .46; g.add(seat);
+  var back = new THREE.Mesh(new THREE.BoxGeometry(.52, .62, .06), matDarkWood);
+  back.position.set(0, .82, -.23); g.add(back);
+  var crest = new THREE.Mesh(new THREE.BoxGeometry(.4, .12, .05), M(0x5d1f1c, .85));
+  crest.position.set(0, .98, -.22); g.add(crest);
+  [[-.22, -.2], [.22, -.2], [-.22, .2], [.22, .2]].forEach(function(p){
+    var leg = new THREE.Mesh(new THREE.CylinderGeometry(.025, .02, .46, 8), matDarkWood);
+    leg.position.set(p[0], .23, p[1]); g.add(leg);
+  });
+  return shadowed(g);
+}
+var PAINTINGS = [
+  { kind: 'lady_gold', tex: 'ballroom_painting_lady_gold_1024.webp', label: 'Lady in Gold' },
+  { kind: 'gentleman', tex: 'ballroom_painting_gentleman_1024.webp', label: 'Gentleman' },
+  { kind: 'moonlit_garden', tex: 'ballroom_painting_moonlit_garden_1024.webp', label: 'Moonlit Garden' },
+  { kind: 'roses', tex: 'ballroom_painting_roses_1024.webp', label: 'Roses' },
+  { kind: 'dancers', tex: 'ballroom_painting_dancers_1024.webp', label: 'Dancers at a Ball' }
+];
+function buildPainting(kind){
+  var p = PAINTINGS.filter(function(x){ return x.kind === kind; })[0] || PAINTINGS[0];
+  var g = new THREE.Group();
+  var frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 2.1, .09), matGold);
+  g.add(frame);
+  var art = new THREE.Mesh(new THREE.PlaneGeometry(1.45, 1.85), new THREE.MeshStandardMaterial({ map: paintingTextureReal(p.kind), roughness: .85 }));
+  art.position.z = .055; g.add(art);
+  g.userData.paintKind = p.kind;
+  return shadowed(g);
+}
+function buildCarpet(texName){
+  var g = new THREE.Group();
+  var tex = texName === 'theater_red_carpet_1024.webp' ? texThCarpetReal : texCarpetReal;
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 11), new THREE.MeshStandardMaterial({ map: tex, roughness: .95 }));
+  m.rotation.x = -Math.PI / 2; m.position.y = .015; m.receiveShadow = true; g.add(m);
+  return g;
+}
+function buildCarpetBranch(){
+  var g = new THREE.Group();
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(8, 3), new THREE.MeshStandardMaterial({ map: texBranchReal, roughness: .95 }));
+  m.rotation.x = -Math.PI / 2; m.position.y = .015; m.receiveShadow = true; g.add(m);
+  return g;
+}
+function buildChandelier(){
+  var g = new THREE.Group();
+  var stem = new THREE.Mesh(new THREE.CylinderGeometry(.04, .04, 1.6, 8), matBlack);
+  stem.position.y = .8; g.add(stem);
+  var hub = new THREE.Mesh(new THREE.SphereGeometry(.22, 12, 10), matBrass);
+  g.add(hub);
+  [0, 1, 2].forEach(function(i){
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(.55 + i * .28, .035, 8, 28), i === 1 ? matGold : matBrass);
+    ring.rotation.x = Math.PI / 2; ring.position.y = -.12 - i * .16; g.add(ring);
+  });
+  for (var i = 0; i < 10; i++){
+    var a = (i / 10) * Math.PI * 2;
+    var candle = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 8),
+      new THREE.MeshStandardMaterial({ color: 0xffd98a, emissive: 0xffb84d, emissiveIntensity: 1.6 }));
+    candle.position.set(Math.cos(a) * 1.05, -.05, Math.sin(a) * 1.05); g.add(candle);
+  }
+  var light = new THREE.PointLight(0xffc978, .5, 18);
+  light.position.y = -.2; g.add(light);
+  return shadowed(g);
+}
+function buildPlant(){
+  var g = new THREE.Group();
+  var pot = new THREE.Mesh(new THREE.CylinderGeometry(.3, .22, .5, 12), M(0x7a4630, .8));
+  pot.position.y = .25; g.add(pot);
+  var trunk = new THREE.Mesh(new THREE.CylinderGeometry(.04, .05, .7, 8), matWoodMid);
+  trunk.position.y = .8; g.add(trunk);
+  var leafMat = M(0x2e5a26, .9);
+  [[0, 1.45, 0, .5], [.3, 1.25, .15, .36], [-.28, 1.3, -.1, .38], [.05, 1.3, -.3, .33], [-.1, 1.22, .28, .34]].forEach(function(s){
+    var leaf = new THREE.Mesh(new THREE.SphereGeometry(s[3], 10, 8), leafMat);
+    leaf.position.set(s[0], s[1], s[2]); leaf.scale.y = .78; g.add(leaf);
+  });
+  return shadowed(g);
+}
+function buildBar(){
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.BoxGeometry(6.4, 1.1, 1.1), matDarkWood);
+  body.position.y = .55; g.add(body);
+  var top = new THREE.Mesh(new THREE.BoxGeometry(6.8, .09, 1.35), matWoodMid);
+  top.position.y = 1.14; g.add(top);
+  var rail = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, 6.4, 8), matBrass);
+  rail.rotation.z = Math.PI / 2; rail.position.set(0, .3, .62); g.add(rail);
+  for (var i = 0; i < 5; i++){
+    var bottle = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, .42, 8),
+      M([0x2e5a26, 0x6d1a16, 0x274b6d, 0x8a6f1e, 0x3c2412][i], .3));
+    bottle.position.set(-2.2 + i * 1.1, 1.4, 0); g.add(bottle);
+  }
+  var shelf = new THREE.Mesh(new THREE.BoxGeometry(6.4, .07, .5), matDarkWood);
+  shelf.position.set(0, 1.9, -.85); g.add(shelf);
+  [-2.9, 2.9].forEach(function(x){
+    var post = new THREE.Mesh(new THREE.BoxGeometry(.09, 1.9, .09), matDarkWood);
+    post.position.set(x, .95, -.85); g.add(post);
+  });
+  return shadowed(g);
+}
+function buildStaircase(){
+  var g = new THREE.Group();
+  for (var i = 0; i < 9; i++){
+    var step = new THREE.Mesh(new THREE.BoxGeometry(3, .28, .62), i % 2 ? matWoodMid : matDarkWood);
+    step.position.set(0, .14 + i * .28, -i * .6); g.add(step);
+  }
+  for (var j = 0; j < 6; j++){
+    var post = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, 1, 8), matBrass);
+    post.position.set(1.42, .8 + j * .45, -j * .95); g.add(post);
+  }
+  var rail = new THREE.Mesh(new THREE.CylinderGeometry(.04, .04, 6.4, 8), matBrass);
+  rail.position.set(1.42, 2.1, -2.4);
+  rail.rotation.x = 1.06; g.add(rail);
+  return shadowed(g);
+}
+function buildBalcony(){
+  var g = new THREE.Group();
+  var deck = new THREE.Mesh(new THREE.BoxGeometry(DIMS.ballroom.w - 2, .35, 3.2), matWoodMid);
+  g.add(deck);
+  var fascia = new THREE.Mesh(new THREE.BoxGeometry(DIMS.ballroom.w - 2, .5, .1), matDarkWood);
+  fascia.position.set(0, -.1, 1.58); g.add(fascia);
+  for (var x = -18; x <= 18; x += 1.5){
+    var bal = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, 1, 6), matBlack);
+    bal.position.set(x, .68, 1.5); g.add(bal);
+  }
+  var top = new THREE.Mesh(new THREE.CylinderGeometry(.05, .05, DIMS.ballroom.w - 2, 8), matWoodMid);
+  top.rotation.z = Math.PI / 2; top.position.set(0, 1.2, 1.5); g.add(top);
+  return shadowed(g);
+}
+function buildDoor(){
+  var g = new THREE.Group();
+  var frame = new THREE.Mesh(new THREE.BoxGeometry(3.3, 3.5, .16), matGold);
+  g.add(frame);
+  [-0.78, 0.78].forEach(function(x){
+    var leaf = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3.3, .12), matDarkWood);
+    leaf.position.set(x, 0, .03); g.add(leaf);
+    var panel = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.3, .05), matWoodMid);
+    panel.position.set(x, .55, .1); g.add(panel);
+    var panel2 = new THREE.Mesh(new THREE.BoxGeometry(1.05, .95, .05), matWoodMid);
+    panel2.position.set(x, -.85, .1); g.add(panel2);
+    var knob = new THREE.Mesh(new THREE.SphereGeometry(.06, 10, 8), matBrass);
+    knob.position.set(x > 0 ? x - .55 : x + .55, 0, .14); g.add(knob);
+  });
+  return shadowed(g);
+}
+function buildWindow(){
+  var g = new THREE.Group();
+  var frame = new THREE.Mesh(new THREE.BoxGeometry(2, 3.4, .14), matCream);
+  g.add(frame);
+  var glass = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 3.1), matGlassNight);
+  glass.position.z = .08; g.add(glass);
+  var moon = new THREE.Mesh(new THREE.CircleGeometry(.22, 20),
+    new THREE.MeshBasicMaterial({ color: 0xf2ecc8 }));
+  moon.position.set(.42, .95, .09); g.add(moon);
+  var mullV = new THREE.Mesh(new THREE.BoxGeometry(.06, 3.1, .03), matCream);
+  mullV.position.z = .1; g.add(mullV);
+  [-0.52, 0.52].forEach(function(y){
+    var mullH = new THREE.Mesh(new THREE.BoxGeometry(1.7, .06, .03), matCream);
+    mullH.position.set(0, y, .1); g.add(mullH);
+  });
+  [-1.18, 1.18].forEach(function(x){
+    var curtain = new THREE.Mesh(new THREE.BoxGeometry(.34, 3.5, .1), M(0x6d1a16, .95));
+    curtain.position.set(x, 0, .05); g.add(curtain);
+  });
+  return shadowed(g);
+}
+function buildDancefloor(){
+  var g = new THREE.Group();
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(13, 9.5), new THREE.MeshStandardMaterial({ map: texHerringReal, roughness: .55 }));
+  m.rotation.x = -Math.PI / 2; m.position.y = .02; m.receiveShadow = true; g.add(m);
+  var border = new THREE.Mesh(new THREE.BoxGeometry(13.5, .045, 10), matCream);
+  border.position.y = .005; border.receiveShadow = true; g.add(border);
+  m.position.y = .035;
+  return g;
+}
+
+function buildRugMedallion(){
+  var g = new THREE.Group();
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 5.5), new THREE.MeshStandardMaterial({ map: texRugReal, roughness: .95 }));
+  m.rotation.x = -Math.PI / 2; m.position.y = .018; m.receiveShadow = true; g.add(m);
+  return g;
+}
+
+/* ----- courtyard builders ----- */
+function buildBrickWall(){
+  var g = new THREE.Group();
+  var t = texBrick.clone(); t.needsUpdate = true; t.repeat.set(3, 1.5);
+  var m = new THREE.Mesh(new THREE.BoxGeometry(6, 3, .45), new THREE.MeshStandardMaterial({ map: t, roughness: .9 }));
+  m.position.y = 1.5; g.add(m);
+  var cap = new THREE.Mesh(new THREE.BoxGeometry(6.2, .16, .6), M(0x8f8a80, .85));
+  cap.position.y = 3.06; g.add(cap);
+  return shadowed(g);
+}
+function buildSandbags(){
+  var g = new THREE.Group();
+  var geo = new THREE.SphereGeometry(.5, 10, 8);
+  for (var r = 0; r < 4; r++){
+    var n = (r === 3) ? 5 : 6;
+    for (var i = 0; i < n; i++){
+      var bag = new THREE.Mesh(geo, matSand);
+      bag.scale.set(.95, .34, .55);
+      bag.position.set(-2.2 + i * .88 + (r % 2 ? .44 : 0), .17 + r * .3, (i % 2 ? .03 : -.03));
+      bag.rotation.y = (i % 2 ? .12 : -.1);
+      g.add(bag);
+    }
+  }
+  return shadowed(g);
+}
+function buildCrateBox(s){
+  var g = new THREE.Group();
+  var t = texWood.clone(); t.needsUpdate = true; t.repeat.set(1, 1);
+  var box = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), new THREE.MeshStandardMaterial({ map: t, roughness: .8 }));
+  box.position.y = s / 2; g.add(box);
+  var e = s * .07;
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function(c){
+    var post = new THREE.Mesh(new THREE.BoxGeometry(e * 1.6, s, e * 1.6), matDarkWood);
+    post.position.set(c[0] * (s / 2 - e * .8), s / 2, c[1] * (s / 2 - e * .8)); g.add(post);
+  });
+  [s * .25, s * .75].forEach(function(y){
+    var band = new THREE.Mesh(new THREE.BoxGeometry(s + .02, e, s + .02), matDarkWood);
+    band.position.y = y; g.add(band);
+  });
+  return shadowed(g);
+}
+function buildCrate(){ return buildCrateBox(1); }
+function buildCrate2(){ return buildCrateBox(2); }
+function buildFence(){
+  var g = new THREE.Group();
+  var t = texChain.clone(); t.needsUpdate = true; t.repeat.set(10, 3);
+  var mesh = new THREE.Mesh(new THREE.PlaneGeometry(8, 2.6),
+    new THREE.MeshStandardMaterial({ map: t, alphaTest: .08, side: THREE.DoubleSide, roughness: .5, metalness: .6 }));
+  mesh.position.y = 1.5; g.add(mesh);
+  [-4, 0, 4].forEach(function(x){
+    var post = new THREE.Mesh(new THREE.CylinderGeometry(.05, .05, 2.9, 8), matMetal);
+    post.position.set(x, 1.45, 0); g.add(post);
+  });
+  var rail = new THREE.Mesh(new THREE.CylinderGeometry(.04, .04, 8, 8), matMetal);
+  rail.rotation.z = Math.PI / 2; rail.position.y = 2.82; g.add(rail);
+  return shadowed(g);
+}
+function buildGuardPost(){
+  var g = new THREE.Group();
+  [[-.85, -.85], [.85, -.85], [-.85, .85], [.85, .85]].forEach(function(p){
+    var leg = new THREE.Mesh(new THREE.CylinderGeometry(.07, .09, 2.3, 8), matMetal);
+    leg.position.set(p[0], 1.15, p[1]); g.add(leg);
+  });
+  var deck = new THREE.Mesh(new THREE.BoxGeometry(2.2, .16, 2.2), matWoodMid);
+  deck.position.y = 2.35; g.add(deck);
+  var cabin = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.25, 1.9), M(0x5c6650, .8));
+  cabin.position.y = 3.05; g.add(cabin);
+  var win = new THREE.Mesh(new THREE.BoxGeometry(1.94, .5, 1.94), matGlassNight);
+  win.position.y = 3.2; g.add(win);
+  var roof = new THREE.Mesh(new THREE.ConeGeometry(1.9, .8, 4), M(0x3c3428, .85));
+  roof.position.y = 4.05; roof.rotation.y = Math.PI / 4; g.add(roof);
+  return shadowed(g);
+}
+function buildOffice(){
+  var g = new THREE.Group();
+  var t = texConcrete.clone(); t.needsUpdate = true; t.repeat.set(3, 1.5);
+  var body = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 4), new THREE.MeshStandardMaterial({ map: t, roughness: .9 }));
+  body.position.y = 1.5; g.add(body);
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(6.6, .22, 4.6), M(0x3a3630, .8));
+  roof.position.y = 3.12; g.add(roof);
+  var door = new THREE.Mesh(new THREE.BoxGeometry(.95, 2.1, .08), matDarkWood);
+  door.position.set(1.6, 1.05, 2.02); g.add(door);
+  var win = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.05, .08), matGlassNight);
+  win.position.set(-1.4, 1.7, 2.02); g.add(win);
+  var sign = new THREE.Mesh(new THREE.BoxGeometry(2.4, .5, .07), matBrass);
+  sign.position.set(0, 2.62, 2.03); g.add(sign);
+  var ac = new THREE.Mesh(new THREE.BoxGeometry(1.1, .6, 1.1), matMetal);
+  ac.position.set(-1.8, 3.55, -.8); g.add(ac);
+  return shadowed(g);
+}
+function buildPipes(){
+  var g = new THREE.Group();
+  var cols = [M(0x7a5a48, .55, .35), M(0x6d7276, .45, .6), M(0x7a5a48, .55, .35)];
+  [[-.38, .36], [.38, .36], [0, .98]].forEach(function(p, i){
+    var pipe = new THREE.Mesh(new THREE.CylinderGeometry(.34, .34, 5.6, 16), cols[i]);
+    pipe.rotation.z = Math.PI / 2; pipe.position.set(0, p[1], p[0]); g.add(pipe);
+  });
+  [-2.2, 2.2].forEach(function(x){
+    var sup = new THREE.Mesh(new THREE.BoxGeometry(.18, .36, 1.1), matDarkWood);
+    sup.position.set(x, .18, 0); g.add(sup);
+  });
+  return shadowed(g);
+}
+function buildExfil(){
+  var g = new THREE.Group();
+  var inner = new THREE.Mesh(new THREE.PlaneGeometry(6, 6),
+    new THREE.MeshBasicMaterial({ color: 0x39d353, transparent: true, opacity: .22, side: THREE.DoubleSide }));
+  inner.rotation.x = -Math.PI / 2; inner.position.y = .03; g.add(inner);
+  var bMat = new THREE.MeshStandardMaterial({ color: 0x2ea043, emissive: 0x1d7a30, emissiveIntensity: .8, roughness: .6 });
+  [[0, -3.05, 6.4, .35], [0, 3.05, 6.4, .35], [-3.05, 0, .35, 6.4], [3.05, 0, .35, 6.4]].forEach(function(b){
+    var bar = new THREE.Mesh(new THREE.BoxGeometry(b[2], .07, b[3]), bMat);
+    bar.position.set(b[0], .035, b[1]); g.add(bar);
+  });
+  var ring = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.3, 36),
+    new THREE.MeshBasicMaterial({ color: 0x39d353, transparent: true, opacity: .75, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = .04; g.add(ring);
+  var beam = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 7, 20, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0x39d353, transparent: true, opacity: .05, side: THREE.DoubleSide, depthWrite: false }));
+  beam.position.y = 3.5; g.add(beam);
+  return g;
+}
+
+/* ----- theater builders ----- */
+function buildSeatBlock(){
+  var g = new THREE.Group();
+  var plinth = new THREE.Mesh(new THREE.BoxGeometry(5, .16, .95), M(0x241a12, .8));
+  plinth.position.y = .08; g.add(plinth);
+  var velvet = new THREE.MeshStandardMaterial({ map: texThSeatReal, roughness: .95 });
+  for (var i = 0; i < 8; i++){
+    var x = -2.1 + i * .6;
+    var base = new THREE.Mesh(new THREE.BoxGeometry(.5, .34, .42), M(0x3a2027, .85));
+    base.position.set(x, .33, .02); g.add(base);
+    var cush = new THREE.Mesh(new THREE.BoxGeometry(.54, .13, .48), velvet);
+    cush.position.set(x, .55, .03); g.add(cush);
+    var back = new THREE.Mesh(new THREE.BoxGeometry(.54, .6, .13), velvet);
+    back.position.set(x, .92, .24); back.rotation.x = .1; g.add(back);
+  }
+  return shadowed(g);
+}
+function buildCurtain(){
+  var g = new THREE.Group();
+  var m = new THREE.Mesh(new THREE.BoxGeometry(6, 7, .3), new THREE.MeshStandardMaterial({ map: texThVelvetReal, roughness: .95 }));
+  g.add(m);
+  var hem = new THREE.Mesh(new THREE.BoxGeometry(6.1, .18, .34), matGold);
+  hem.position.y = 3.45; g.add(hem);
+  return shadowed(g);
+}
+function buildFootlights(){
+  var g = new THREE.Group();
+  var strip = new THREE.Mesh(new THREE.BoxGeometry(10, .14, .34), matBlack);
+  strip.position.y = .07; g.add(strip);
+  for (var i = 0; i < 9; i++){
+    var cup = new THREE.Mesh(new THREE.CylinderGeometry(.11, .13, .08, 10), matBrass);
+    cup.position.set(-4.4 + i * 1.1, .13, 0); g.add(cup);
+    var bulb = new THREE.Mesh(new THREE.SphereGeometry(.09, 10, 8),
+      new THREE.MeshStandardMaterial({ color: 0xffe2a0, emissive: 0xffbe5a, emissiveIntensity: 1.8 }));
+    bulb.position.set(-4.4 + i * 1.1, .22, 0); g.add(bulb);
+  }
+  return shadowed(g);
+}
+function buildSpotlight(){
+  var g = new THREE.Group();
+  var pole = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, 1.5, 8), matBlack);
+  pole.position.y = .85; g.add(pole);
+  for (var i = 0; i < 3; i++){
+    var a = i / 3 * Math.PI * 2;
+    var leg = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, 1, 6), matBlack);
+    leg.position.set(Math.cos(a) * .3, .35, Math.sin(a) * .3);
+    leg.rotation.z = Math.cos(a) * .5; leg.rotation.x = -Math.sin(a) * .5;
+    g.add(leg);
+  }
+  var head = new THREE.Group();
+  var can = new THREE.Mesh(new THREE.CylinderGeometry(.17, .2, .46, 14), matBlack);
+  can.rotation.x = Math.PI / 2; head.add(can);
+  var lens = new THREE.Mesh(new THREE.CircleGeometry(.15, 14),
+    new THREE.MeshStandardMaterial({ color: 0xfff2c8, emissive: 0xffdf9a, emissiveIntensity: 2 }));
+  lens.position.z = .24; head.add(lens);
+  head.position.y = 1.65; head.rotation.x = .45;
+  g.add(head);
+  return shadowed(g);
+}
+function buildSetFlat(){
+  var g = new THREE.Group();
+  var face = new THREE.MeshStandardMaterial({ map: texSetFlatReal, roughness: .9 });
+  var panel = new THREE.Mesh(new THREE.BoxGeometry(3, 3.6, .08),
+    [matWoodMid, matWoodMid, matWoodMid, matWoodMid, face, matWoodMid]);
+  panel.position.y = 1.85; g.add(panel);
+  [-1.2, 1.2].forEach(function(x){
+    var strut = new THREE.Mesh(new THREE.BoxGeometry(.09, 3.4, .09), matDarkWood);
+    strut.position.set(x, 1.55, -.55); strut.rotation.x = .55; g.add(strut);
+  });
+  var foot = new THREE.Mesh(new THREE.BoxGeometry(3, .09, .5), matDarkWood);
+  foot.position.set(0, .05, -.95); g.add(foot);
+  return shadowed(g);
+}
+
+var BUILDERS = {
+  table: buildTable, chair: buildChair, painting: buildPainting, carpet: buildCarpet,
+  carpet_branch: buildCarpetBranch, chandelier: buildChandelier, plant: buildPlant,
+  bar: buildBar, staircase: buildStaircase, balcony: buildBalcony, door: buildDoor,
+  window: buildWindow, dancefloor: buildDancefloor, rug_medallion: buildRugMedallion,
+  brick_wall: buildBrickWall, sandbag_wall: buildSandbags, security_office: buildOffice,
+  crate: buildCrate, crate2: buildCrate2, guard_post: buildGuardPost, fence: buildFence,
+  pipes: buildPipes, exfil: buildExfil,
+  seat_block: buildSeatBlock, curtain: buildCurtain, footlights: buildFootlights,
+  spotlight: buildSpotlight, set_flat: buildSetFlat
+};
+var BASE_Y = { painting: 3.1, window: 3.4, door: 1.75, chandelier: 4.85, balcony: 5.6,
+  table: 0, chair: 0, carpet: 0, carpet_branch: 0, plant: 0, bar: 0, staircase: 0, dancefloor: 0, rug_medallion: 0,
+  brick_wall: 0, sandbag_wall: 0, security_office: 0, crate: 0, crate2: 0, guard_post: 0,
+  fence: 0, pipes: 0, exfil: 0, seat_block: 0, curtain: 4.5, footlights: 1, spotlight: 0, set_flat: 1 };
+var TYPE_LABEL = { table: 'Table', chair: 'Chair', painting: 'Painting', carpet: 'Carpet runner',
+  carpet_branch: 'Carpet branch', chandelier: 'Chandelier', plant: 'Plant', bar: 'Bar',
+  staircase: 'Staircase', balcony: 'Balcony', door: 'Double doors', window: 'Window', dancefloor: 'Dance floor',
+  rug_medallion: 'Medallion rug',
+  brick_wall: 'Brick wall', sandbag_wall: 'Sandbag wall', security_office: 'Security office',
+  crate: 'Crate', crate2: '2 m crate', guard_post: 'Guard post', fence: 'Chain-link fence',
+  pipes: 'Pipes', exfil: 'EXFIL zone',
+  seat_block: 'Seat row', curtain: 'Curtain', footlights: 'Footlights', spotlight: 'Spotlight', set_flat: 'Set flat' };
+var PALETTE_INFO = {
+  table: ['Table', 'round, cloth top'], chair: ['Chair', 'dining chair'],
+  painting: ['Painting', 'gold frame'], carpet: ['Carpet runner', 'red & gold'],
+  chandelier: ['Chandelier', 'hangs from ceiling'], plant: ['Plant', 'potted palm'],
+  rug_medallion: ['Medallion rug', 'red & gold'],
+  brick_wall: ['Brick wall', '6 m cover wall'], sandbag_wall: ['Sandbag wall', 'stacked bags'],
+  security_office: ['Security office', 'guard building'], crate: ['Crate', '1 m wooden'],
+  crate2: ['2 m crate', 'big wooden crate'], guard_post: ['Guard post', 'watch tower'],
+  fence: ['Chain-link fence', '8 m section'], pipes: ['Pipes', 'stacked run'],
+  exfil: ['EXFIL zone', 'extraction marker'],
+  seat_block: ['Seat row', '8 seats'], curtain: ['Curtain', 'stage drape'],
+  footlights: ['Footlights', 'stage edge strip'], spotlight: ['Spotlight', 'on tripod'],
+  set_flat: ['Set flat', 'destructible scenery']
+};
+var RING_F = { carpet: 2.6, dancefloor: 2.6, rug_medallion: 2.2, exfil: 3.1, seat_block: 2.5, brick_wall: 2.7,
+  sandbag_wall: 2.5, fence: 3.4, security_office: 2.9, guard_post: 1.6, balcony: 3,
+  staircase: 1.8, bar: 2.6, footlights: 3.4, curtain: 2.2 };
+
+/* ---------- fixed level shells (not editable, not exported) ---------- */
+function buildBallroomShell(){
+  var R = DIMS.ballroom;
+  var g = new THREE.Group();
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(R.w, R.d), new THREE.MeshStandardMaterial({ map: texFloorReal, roughness: .7 }));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; g.add(floor);
+
+  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(R.w, R.d), new THREE.MeshStandardMaterial({ map: texCeilReal, roughness: .95 }));
+  ceil.rotation.x = Math.PI / 2; ceil.position.y = R.h; g.add(ceil);
+
+  var wallMat = new THREE.MeshStandardMaterial({ map: texDamaskReal, roughness: .92 });
+  var wainsMat = new THREE.MeshStandardMaterial({ map: texWainsReal, roughness: .7 });
+  function wall(wdt, x, z, ry){
+    var grp = new THREE.Group();
+    var upper = new THREE.Mesh(new THREE.BoxGeometry(wdt, R.h - 1.6, .3), wallMat);
+    upper.position.y = 1.6 + (R.h - 1.6) / 2; upper.receiveShadow = true; grp.add(upper);
+    var lower = new THREE.Mesh(new THREE.BoxGeometry(wdt, 1.6, .34), wainsMat);
+    lower.position.y = .8; lower.receiveShadow = true; grp.add(lower);
+    var trim = new THREE.Mesh(new THREE.BoxGeometry(wdt, .12, .38), matGold);
+    trim.position.y = 1.66; grp.add(trim);
+    grp.position.set(x, 0, z); grp.rotation.y = ry; g.add(grp);
+  }
+  wall(R.w, 0, -R.d / 2, 0);
+  wall(R.w, 0, R.d / 2, Math.PI);
+  wall(R.d, -R.w / 2, 0, Math.PI / 2);
+  wall(R.d, R.w / 2, 0, -Math.PI / 2);
+
+  var grid = new THREE.GridHelper(R.w, R.w, 0xc9a24b, 0x8a6f35);
+  grid.material.transparent = true; grid.material.opacity = .13;
+  grid.position.y = .02; grid.scale.z = R.d / R.w;
+  g.add(grid);
+  return g;
+}
+function buildCourtyardShell(){
+  var R = DIMS.courtyard;
+  var g = new THREE.Group();
+  /* The game's real courtyard ground: a concrete slab base with the
+     dirt path, grass, gravel and asphalt patches in their exact game
+     positions (same sizes, texture repeats and tints as the game's
+     groundPatch calls). */
+  function groundMat(file, rx, ry, tint){
+    return new THREE.MeshStandardMaterial({ map: realTex(file, rx, ry, texGround), color: tint, roughness: .95 });
+  }
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(R.w, R.d), groundMat('ground/ground_concrete_slab_1024.webp', 12, 12, 0x6f7d5a));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; g.add(ground);
+  [[0, 36, 40, 3, 'ground/ground_dirt_path_1024.webp', 10, 1, 0x8a7a5a, .02],
+   [31, -32, 14, 12, 'ground/ground_grass_1024.webp', 3, 3, 0x6f7d5a, .02],
+   [-31, -31, 14, 14, 'ground/ground_gravel_1024.webp', 4, 4, 0x8a857a, .02],
+   [8, -14, 16, 12, 'ground/ground_asphalt_1024.webp', 4, 3, 0x333333, .02],
+   [8, -14, 6, 4, 'ground/ground_asphalt_tire_marks_oil_stains_1024.webp', 1, 1, 0x222222, .035]
+  ].forEach(function(p){
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(p[2], p[3]), groundMat(p[4], p[5], p[6], p[7]));
+    m.rotation.x = -Math.PI / 2; m.position.set(p[0], p[8], p[1]); m.receiveShadow = true; g.add(m);
+  });
+
+  var wt = texConcrete.clone(); wt.needsUpdate = true; wt.repeat.set(12, 1);
+  var wallMat = new THREE.MeshStandardMaterial({ map: wt, roughness: .9 });
+  var capMat = M(0x55504a, .8);
+  function pwall(len, x, z, ry){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(len, 4, .6), wallMat);
+    m.position.set(x, 2, z); m.rotation.y = ry; m.castShadow = true; m.receiveShadow = true; g.add(m);
+    var cap = new THREE.Mesh(new THREE.BoxGeometry(len, .22, .85), capMat);
+    cap.position.set(x, 4.08, z); cap.rotation.y = ry; g.add(cap);
+  }
+  pwall(R.w + 1, 0, -R.d / 2, 0);
+  pwall(R.w + 1, 0, R.d / 2, 0);
+  pwall(R.w + 1, -R.w / 2, 0, Math.PI / 2);
+  pwall(R.w + 1, R.w / 2, 0, Math.PI / 2);
+
+  var grid = new THREE.GridHelper(R.w, R.w / 5, 0xd8cf9a, 0x9a927c);
+  grid.material.transparent = true; grid.material.opacity = .1;
+  grid.position.y = .06;
+  g.add(grid);
+  return g;
+}
+function buildTheaterShell(){
+  var R = DIMS.theater;
+  var g = new THREE.Group();
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(R.w, R.d), M(0x241812, .95));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; g.add(floor);
+
+  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(R.w, R.d), new THREE.MeshStandardMaterial({ map: texThCeilReal, roughness: .95 }));
+  ceil.rotation.x = Math.PI / 2; ceil.position.y = R.h; g.add(ceil);
+
+  var wallMat = new THREE.MeshStandardMaterial({ map: texThWallReal, roughness: .92 });
+  function twall(wdt, x, z, ry){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(wdt, R.h, .4), wallMat);
+    m.position.set(x, R.h / 2, z); m.rotation.y = ry; m.receiveShadow = true; g.add(m);
+  }
+  twall(R.w, 0, -R.d / 2, 0);
+  twall(R.w, 0, R.d / 2, 0);
+  twall(R.d, -R.w / 2, 0, Math.PI / 2);
+  twall(R.d, R.w / 2, 0, Math.PI / 2);
+
+  /* stage platform: 24 × 12 m, top at y = 1, front edge at z = -4 */
+  var stage = new THREE.Mesh(new THREE.BoxGeometry(24, 1, 12), new THREE.MeshStandardMaterial({ map: texThStageReal, roughness: .65 }));
+  stage.position.set(0, .5, -10); stage.castShadow = true; stage.receiveShadow = true; g.add(stage);
+  var stageTrim = new THREE.Mesh(new THREE.BoxGeometry(24, .12, .12), new THREE.MeshStandardMaterial({ map: texThGoldReal, roughness: .5 }));
+  stageTrim.position.set(0, .96, -3.98); g.add(stageTrim);
+  /* 3 centre steps down to the house floor */
+  [[.75, -3.78], [.5, -3.31], [.25, -2.84]].forEach(function(s){
+    var step = new THREE.Mesh(new THREE.BoxGeometry(3.2, s[0], .45), matWoodMid);
+    step.position.set(0, s[0] / 2, s[1]); step.castShadow = true; step.receiveShadow = true; g.add(step);
+  });
+  /* proscenium: gold-trim pillars and beam, as in the game */
+  var goldMat = new THREE.MeshStandardMaterial({ map: texThGoldReal, roughness: .5 });
+  var goldColMat = new THREE.MeshStandardMaterial({ map: texThGoldColReal, roughness: .5 });
+  [-12.45, 12.45].forEach(function(x){
+    var col = new THREE.Mesh(new THREE.BoxGeometry(1.5, R.h, 1.3), goldColMat);
+    col.position.set(x, R.h / 2, -4); col.castShadow = true; g.add(col);
+  });
+  var beam = new THREE.Mesh(new THREE.BoxGeometry(26.4, 1.7, 1.3), goldMat);
+  beam.position.set(0, R.h - .85, -4); g.add(beam);
+  /* masking legs in the wings (red velvet, as in the game) */
+  var legMat = new THREE.MeshStandardMaterial({ map: texThVelvetReal, roughness: .95 });
+  [-11.4, 11.4].forEach(function(x){
+    [-7, -12].forEach(function(z){
+      var leg = new THREE.Mesh(new THREE.BoxGeometry(.3, 8, 2.5), legMat);
+      leg.position.set(x, 5, z); g.add(leg);
+    });
+  });
+  /* balcony: deck top at y = 4.7, front edge at z = 10.45 */
+  var deck = new THREE.Mesh(new THREE.BoxGeometry(28, .4, 5.5), matWoodMid);
+  deck.position.set(0, 4.5, 13.2); deck.castShadow = true; deck.receiveShadow = true; g.add(deck);
+  var fascia = new THREE.Mesh(new THREE.BoxGeometry(28, .55, .12), M(0x4a1f24, .8));
+  fascia.position.set(0, 4.42, 10.5); g.add(fascia);
+  for (var bx = -13; bx <= 13; bx += 1.65){
+    var bal = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, 1.05, 6), matBlack);
+    bal.position.set(bx, 5.22, 10.55); g.add(bal);
+  }
+  var brail = new THREE.Mesh(new THREE.CylinderGeometry(.05, .05, 27.5, 8), matWoodMid);
+  brail.rotation.z = Math.PI / 2; brail.position.set(0, 5.78, 10.55); g.add(brail);
+  [-11, 11].forEach(function(x){
+    var col = new THREE.Mesh(new THREE.BoxGeometry(.5, 4.3, .5), M(0x3a2c20, .8));
+    col.position.set(x, 2.15, 15.2); g.add(col);
+  });
+
+  var grid = new THREE.GridHelper(R.w, R.w, 0xc9a24b, 0x8a6f35);
+  grid.material.transparent = true; grid.material.opacity = .08;
+  grid.position.y = .02; grid.scale.z = R.d / R.w;
+  g.add(grid);
+  return g;
+}
+
+/* ---------- default layouts, as they ship in the game ---------- */
+function defaultBallroom(){
+  var L = [];
+  function add(type, name, x, z, rot, scale, extra){
+    var o = { id: type + '-' + (L.length + 1), type: type, name: name,
+      position: { x: x, y: BASE_Y[type] || 0, z: z }, rotationY: rot || 0, scale: scale || 1 };
+    if (extra) for (var k in extra) o[k] = extra[k];
+    L.push(o); return o;
+  }
+  add('dancefloor', 'Dance floor', -6, 1, 0, 1);
+  add('carpet', 'Red carpet runner', 7.5, 1.5, 0, 1, { texture: 'carpet_runner_red_gold' });
+  add('carpet_branch', 'Carpet branch to the bar', 12.5, -3.8, 0, 1, { texture: 'carpet_runner_red_gold' });
+  var tables = [[-14.5, -6.5], [-11, 7.5], [13.5, 5.5], [-16, 2]];
+  tables.forEach(function(t, ti){
+    add('table', 'Table ' + (ti + 1), t[0], t[1], 0, 1);
+    for (var c = 0; c < 4; c++){
+      var a = c * Math.PI / 2 + (ti % 2 ? .4 : 0);
+      add('chair', 'Chair — table ' + (ti + 1), t[0] + Math.cos(a) * 1.75, t[1] + Math.sin(a) * 1.75,
+        Math.round((-a * 180 / Math.PI) + 90), 1);
+    }
+  });
+  add('bar', 'Bar', 13, -9.5, 0, 1);
+  add('staircase', 'Staircase to balcony', -14.5, -9.8, 0, 1);
+  add('balcony', 'Balcony (north)', 0, -12.2, 0, 1);
+  add('balcony', 'Balcony (west)', -18.2, 0, 90, 0.72);
+  add('chandelier', 'Chandelier — centre', -4, 0, 0, 1);
+  add('chandelier', 'Chandelier — north', 6, -7, 0, 1);
+  add('chandelier', 'Chandelier — south', 6, 8, 0, 0.9);
+  add('door', 'Doors — north', 3, -13.8, 0, 1);
+  add('door', 'Doors — west', -19.8, -4, 90, 1);
+  add('door', 'Doors — east', 19.8, 3, -90, 1);
+  add('window', 'Window — north-west', -9, -13.85, 0, 1);
+  add('window', 'Window — north-east', 13, -13.85, 0, 1);
+  add('window', 'Window — west', -19.85, 5, 90, 1);
+  add('window', 'Window — east', 19.85, -7, -90, 1);
+  add('window', 'Window — south-west', -12, 13.85, 180, 1);
+  add('window', 'Window — south-east', 10, 13.85, 180, 1);
+  var spots = [
+    ['north', -16, -13.8, 0], ['north', -4.5, -13.8, 0], ['north', 17.5, -13.8, 0],
+    ['south', -18, 13.8, 180], ['south', -2, 13.8, 180], ['south', 17, 13.8, 180],
+    ['west', -19.8, -9.5, 90], ['west', -19.8, 10.5, 90],
+    ['east', 19.8, -11.5, -90], ['east', 19.8, 9, -90],
+    ['north', 9, -13.8, 0], ['south', 5.5, 13.8, 180], ['west', -19.8, .5, 90]
+  ];
+  spots.forEach(function(s, i){
+    var p = PAINTINGS[i % PAINTINGS.length];
+    add('painting', 'Painting — ' + p.label + ' (' + s[0] + ')', s[1], s[2], s[3], 1,
+      { texture: p.tex, paintKind: p.kind });
+  });
+  add('plant', 'Plant — south-west corner', -18, 12, 0, 1);
+  add('plant', 'Plant — north-east corner', 18.2, -12.2, 0, 1.15);
+  add('plant', 'Plant — by the bar', 8.6, -11.5, 0, 0.9);
+  add('rug_medallion', 'Medallion rug', 8.9, -3.1, 0, 1, { texture: 'ballroom_rug_medallion_large_1024.webp' });
+  return L;
+}
+function defaultCourtyard(){
+  var L = [];
+  function add(type, name, x, z, rot, y){
+    L.push({ id: type + '-' + (L.length + 1), type: type, name: name,
+      position: { x: x, y: y || 0, z: z }, rotationY: rot || 0, scale: 1 });
+  }
+  add('exfil', 'EXFIL zone', 34, 34, 0);
+  add('security_office', 'Security office', -31, -30, 45);
+  add('guard_post', 'Guard post — north-east', 38, -38, -135);
+  add('guard_post', 'Guard post — south-west', -38, 36, 45);
+  add('guard_post', 'Guard post — by the office', -22, -38, 180);
+  add('brick_wall', 'Brick wall — centre north', -12, -14, 0);
+  add('brick_wall', 'Brick wall — east run', 8, -22, 90);
+  add('brick_wall', 'Brick wall — east', 20, 2, 0);
+  add('brick_wall', 'Brick wall — west run', -22, 12, 90);
+  add('brick_wall', 'Brick wall — south', 2, 20, 45);
+  add('brick_wall', 'Brick wall — north lane', -4, -30, 0);
+  add('sandbag_wall', 'Sandbags — EXFIL approach', 28, 29, -45);
+  add('sandbag_wall', 'Sandbags — centre', -8, 6, 90);
+  add('sandbag_wall', 'Sandbags — south-east', 14, 14, 0);
+  add('sandbag_wall', 'Sandbags — west lane', -28, -16, 30);
+  add('crate', 'Crate — east stack A', 16, -10, 0);
+  add('crate', 'Crate — east stack B', 17.3, -10, 15);
+  add('crate', 'Crate — east stack top', 16.6, -9.3, 0, 1);
+  add('crate', 'Crate — west pair A', -18, 22, 0);
+  add('crate', 'Crate — west pair B', -16.8, 22, 40);
+  add('crate', 'Crate — south-east', 24, 26, 0);
+  add('crate', 'Crate — centre south', 6, -16, 0);
+  add('crate', 'Crate — west wall', -34, -6, 20);
+  add('crate2', '2 m crate — east yard', 22, 20, 10);
+  add('crate2', '2 m crate — north-west', -26, 28, 0);
+  add('crate2', '2 m crate — south lane', 4, 34, -15);
+  add('crate2', '2 m crate — west wall', -36, 14, 25);
+  add('fence', 'Fence — office pen A', -24, -22, 0);
+  add('fence', 'Fence — office pen B', -16, -22, 0);
+  add('fence', 'Fence — office pen side', -27.8, -18, 90);
+  add('pipes', 'Pipes — west wall', -40, 18, 90);
+  add('pipes', 'Pipes — north lane', 18, -36, 0);
+  return L;
+}
+function defaultTheater(){
+  var L = [];
+  function add(type, name, x, z, rot, y, scale){
+    L.push({ id: type + '-' + (L.length + 1), type: type, name: name,
+      position: { x: x, y: y == null ? (BASE_Y[type] || 0) : y, z: z },
+      rotationY: rot || 0, scale: scale || 1 });
+  }
+  for (var r = 0; r < 10; r++){
+    add('seat_block', 'Seats — row ' + (r + 1) + ' left', -4.7, 0.5 + r * 1.05, 0, 0);
+    add('seat_block', 'Seats — row ' + (r + 1) + ' right', 4.7, 0.5 + r * 1.05, 0, 0);
+  }
+  for (var b = 0; b < 2; b++){
+    add('seat_block', 'Balcony seats — row ' + (b + 1) + ' left', -4.7, 12.1 + b * 1.25, 0, 4.7);
+    add('seat_block', 'Balcony seats — row ' + (b + 1) + ' right', 4.7, 12.1 + b * 1.25, 0, 4.7);
+  }
+  L.push({ id: 'carpet-' + (L.length + 1), type: 'carpet', name: 'Red carpet aisle',
+    position: { x: 0, y: 0, z: 5 }, rotationY: 90, scale: 1.35, texture: 'theater_red_carpet_1024.webp' });
+  add('curtain', 'Curtain — left', -9.3, -4.8, 0, 4.5);
+  add('curtain', 'Curtain — right', 9.3, -4.8, 0, 4.5);
+  add('curtain', 'Curtain — back wall', 0, -15.3, 0, 4.5, 2.2);
+  add('footlights', 'Footlights', 0, -4.4, 0, 1);
+  add('chandelier', 'Chandelier', 0, 4, 0, 7);
+  add('spotlight', 'Spotlight — rear left', -6, 14.6, 180, 0);
+  add('spotlight', 'Spotlight — rear right', 6, 14.6, 180, 0);
+  add('spotlight', 'Spotlight — balcony left', -5, 11.2, 180, 4.7);
+  add('spotlight', 'Spotlight — balcony right', 5, 11.2, 180, 4.7);
+  add('set_flat', 'Set flat — cottage', -7, -10, 15, 1);
+  add('set_flat', 'Set flat — garden', 6.5, -11, -20, 1);
+  add('set_flat', 'Set flat — backdrop centre', 0, -13.8, 0, 1);
+  add('set_flat', 'Set flat — angled', -3.5, -8, 40, 1);
+  add('sandbag_wall', 'Sandbags — stage left wing', -10.8, -6, 90, 1);
+  add('sandbag_wall', 'Sandbags — stage right wing', 10.8, -6, 90, 1);
+  return L;
+}
+
+/* ---------- level definitions (built from the manifest) ---------- */
+var LEVELS = {};
+/* Editor tuning per level id — camera, light, palette, prop spawn
+   points. The label, room size and whether a level is editable
+   come from the manifest; this table only says how the editor
+   presents a level it knows how to draw. */
+var LEVEL_CODE = {
+  courtyard: {
+    bounds: { x: 43.5, z: 43.5 }, wallBounds: { x: 44.4, z: 44.4 },
+    cam: { theta: .7, phi: .95, radius: 100, min: 18, max: 175, top: 125 },
+    bg: 0x8fa9bd, fog: [120, 260], sunI: 1.0, ambI: .85, shadow: 55, sunPos: [40, 55, 25],
+    buildShell: buildCourtyardShell, defaults: defaultCourtyard,
+    palette: ['security_office', 'guard_post', 'brick_wall', 'sandbag_wall', 'fence', 'crate2', 'crate', 'pipes', 'exfil'],
+    spawn: { exfil: { x: 16, y: 0, z: 16 } } },
+  ballroom: {
+    bounds: { x: 19.2, z: 13.2 }, wallBounds: { x: 19.9, z: 13.9 },
+    cam: { theta: .65, phi: .92, radius: 42, min: 12, max: 75, top: 46 },
+    bg: 0x120d08, fog: [70, 130], sunI: .75, ambI: .55, shadow: 30, sunPos: [18, 26, 12],
+    buildShell: buildBallroomShell, defaults: defaultBallroom,
+    palette: ['table', 'chair', 'painting', 'carpet', 'rug_medallion', 'chandelier', 'plant'],
+    spawn: { painting: { x: 0, y: 3.1, z: -13.8 }, chandelier: { x: 0, y: 4.85, z: 0 } } },
+  theater: {
+    bounds: { x: 14.2, z: 15.2 }, wallBounds: { x: 14.7, z: 15.7 },
+    cam: { theta: .55, phi: .95, radius: 38, min: 10, max: 70, top: 50 },
+    bg: 0x0d0a10, fog: [60, 120], sunI: .6, ambI: .45, shadow: 26, sunPos: [14, 24, 10],
+    buildShell: buildTheaterShell, defaults: defaultTheater,
+    palette: ['seat_block', 'curtain', 'set_flat', 'footlights', 'spotlight', 'sandbag_wall', 'chandelier'],
+    spawn: { curtain: { x: 0, y: 4.5, z: -4.8 }, footlights: { x: 0, y: 1, z: -4.4 },
+      set_flat: { x: 0, y: 1, z: -10 }, chandelier: { x: 0, y: 7, z: 4 },
+      seat_block: { x: -4.7, y: 0, z: 5 }, spotlight: { x: 0, y: 0, z: 12 },
+      sandbag_wall: { x: -10.5, y: 1, z: -6, rot: 90 } } }
+};
+/* Build the editor's level table from the manifest. Only entries
+   flagged editable with a known editor shell become switchable
+   levels; the rest are listed in the panel as not editable yet. */
+function buildLevels(manifest){
+  (manifest.levels || []).forEach(function(m){
+    var code = LEVEL_CODE[m.id];
+    if (!m.editable || !code || !m.editor) return;
+    LEVELS[m.id] = {
+      label: m.name,
+      dims: m.editor.widthM + ' × ' + m.editor.depthM + ' m',
+      room: { w: m.editor.widthM, d: m.editor.depthM, h: m.editor.heightM },
+      bounds: code.bounds, wallBounds: code.wallBounds, cam: code.cam,
+      bg: code.bg, fog: code.fog, sunI: code.sunI, ambI: code.ambI,
+      shadow: code.shadow, sunPos: code.sunPos, buildShell: code.buildShell,
+      defaults: code.defaults, palette: code.palette, spawn: code.spawn
+    };
+    DIMS[m.id] = { w: m.editor.widthM, d: m.editor.depthM, h: m.editor.heightM };
+    levelState[m.id] = { defs: null, undo: [], redo: [] };
+  });
+}
+function buildSwitcher(manifest){
+  var sw = el('lvlSwitch');
+  sw.innerHTML = '';
+  (manifest.levels || []).forEach(function(m){
+    if (!m.editable || !LEVELS[m.id]) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('data-level', m.id);
+    b.textContent = m.name;
+    sw.appendChild(b);
+  });
+}
+function buildAllLevelsList(manifest){
+  var host = el('allLevels');
+  if (!host) return;
+  host.innerHTML = (manifest.levels || []).map(function(m){
+    var pages = (m.pages || []).join(', ');
+    var dims = (m.widthM && m.depthM) ? ' · ' + m.widthM + ' × ' + m.depthM + ' m' : '';
+    var state = (m.editable && LEVELS[m.id]) ? 'Editable here' : 'No editor shell yet';
+    return '<div class="lvlRow"><b>' + escapeHtml(m.name) + '</b> <span>' +
+      escapeHtml(pages) + dims + ' — ' + state + '</span></div>';
+  }).join('');
+}
+
+/* ---------- editor state ---------- */
+var curLevel = 'ballroom';
+var levelState = {}; /* per-level undo history, filled from the manifest */
+var shellGroup = null;
+var objects = [];   /* {data fields..., group} */
+var selected = null;
+var uidCounter = 1000;
+
+var selBox = new THREE.BoxHelper(new THREE.Object3D(), 0xffcf5e);
+selBox.visible = false; scene.add(selBox);
+var selRing = new THREE.Mesh(new THREE.RingGeometry(.9, 1.05, 40),
+  new THREE.MeshBasicMaterial({ color: 0xffcf5e, side: THREE.DoubleSide, transparent: true, opacity: .9 }));
+selRing.rotation.x = -Math.PI / 2; selRing.position.y = .04; selRing.visible = false; scene.add(selRing);
+
+var el = function(id){ return document.getElementById(id); };
+function round2(v){ return Math.round(v * 100) / 100; }
+
+/* ---------- real game models (GLB) ----------
+   Prop types with a real model in the repo's assets/props (or
+   assets/theater/models for theater pieces) load that GLB and swap
+   it in over the placeholder geometry, normalised to the
+   placeholder's footprint so all the editing maths stays the same.
+   If a model fails to load, the object becomes a labelled box
+   instead — the editor never breaks. */
+var GLB_MAP = {
+  table:        { f: 'ballroom_table.glb',     fit: 'w', target: 2.4, y: 'ground' },
+  chair:        { f: 'ballroom_chair.glb',     fit: 'h', target: 1.05, y: 'ground' },
+  chandelier:   { f: 'ballroom_chandelier.glb', fit: 'h', target: 2.1, y: 'hang' },
+  bar:          { f: 'ballroom_bar.glb',       fit: 'w', target: 6.8, y: 'ground' },
+  plant:        { f: 'desk_plant.glb',         fit: 'h', target: 1.5, y: 'ground' },
+  crate:        { f: 'crate.glb',              fit: 'w', target: 1, y: 'ground' },
+  crate2:       { f: 'crates.glb',             fit: 'w', target: 2.1, y: 'ground' },
+  sandbag_wall: { f: 'sandbags.glb',           fit: 'w', target: 5.2, y: 'ground' },
+  pipes:        { f: 'pipe.glb',               fit: 'w', target: 5.6, y: 'ground' },
+  /* The Theater's own models (assets/theater/models in the game).
+     seat_block and footlights repeat one real model side by side,
+     exactly as the game does (6 seat units per 9 m block there; 3 per
+     4.5 m block here — one editor seat row spans half a game block). */
+  seat_block:   { dir: 'assets/theater/models/', f: 'audience_seats.glb', fit: 'w', target: 4.5, y: 'ground', copies: 3 },
+  curtain:      { dir: 'assets/theater/models/', f: 'curtain.glb',        fit: 'h', target: 7.1, y: 'hang' },
+  footlights:   { dir: 'assets/theater/models/', f: 'footlights.glb',     fit: 'w', target: 10.6, y: 'ground', copies: 5 },
+  spotlight:    { dir: 'assets/theater/models/', f: 'spotlight.glb',      fit: 'h', target: 1.7, y: 'ground' },
+  set_flat:     { dir: 'assets/theater/models/', f: 'set_flat.glb',       fit: 'h', target: 5, y: 'ground' }
+};
+/* Load GLB textures through <img> (THREE.TextureLoader), never
+   createImageBitmap: this loader picks ImageBitmapLoader whenever
+   createImageBitmap exists, and browsers that refuse to decode the
+   game's embedded WebP textures through it (Safari) then fail every
+   GLB and drop the prop to a labelled box. The TextureLoader path —
+   the one this loader always uses on Firefox — decodes WebP fine. */
+if (window.createImageBitmap) window.createImageBitmap = undefined;
+var gltfLoader = null;
+if (THREE.GLTFLoader){
+  var dracoLoader = null;
+  if (THREE.DRACOLoader){
+    dracoLoader = new THREE.DRACOLoader();
+    dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+    dracoLoader.setDecoderConfig({ type: 'wasm' });
+  }
+  gltfLoader = new THREE.GLTFLoader();
+  if (dracoLoader) gltfLoader.setDRACOLoader(dracoLoader);
+}
+var glbTemplates = {}, glbLoading = {}, glbFailToastShown = false;
+function loadRealModel(rec){
+  if (!gltfLoader){ applyFallback(rec); return; }
+  var cfg = GLB_MAP[rec.type];
+  if (glbTemplates[cfg.f]){ applyModel(rec, glbTemplates[cfg.f]); return; }
+  if (glbLoading[cfg.f]){ glbLoading[cfg.f].push(rec); return; }
+  glbLoading[cfg.f] = [rec];
+  gltfLoader.load((cfg.dir || 'assets/props/') + cfg.f, function(gltf){
+    glbTemplates[cfg.f] = gltf.scene;
+    var waiters = glbLoading[cfg.f] || []; delete glbLoading[cfg.f];
+    waiters.forEach(function(r){ applyModel(r, gltf.scene); });
+  }, undefined, function(err){
+    console.error('Stage editor: real game model failed to load (' + cfg.f + ')', err);
+    var waiters = glbLoading[cfg.f] || []; delete glbLoading[cfg.f];
+    waiters.forEach(function(r){ applyFallback(r); });
+    if (!glbFailToastShown){
+      glbFailToastShown = true;
+      toast('Some real game models could not load — those objects show as labelled boxes.');
+    }
+  });
+}
+function clearGroup(gr){ while (gr.children.length) gr.remove(gr.children[0]); }
+function addChandelierLight(gr){
+  var l = new THREE.PointLight(0xffc978, .55, 18);
+  l.position.y = -.2; gr.add(l);
+}
+function applyModel(rec, template){
+  if (objects.indexOf(rec) === -1) return;
+  var cfg = GLB_MAP[rec.type];
+  var probe = template.clone(true);
+  var box = new THREE.Box3().setFromObject(probe);
+  var size = box.getSize(new THREE.Vector3());
+  var center = box.getCenter(new THREE.Vector3());
+  var copies = cfg.copies || 1;
+  var base = cfg.fit === 'h' ? size.y : Math.max(size.x, size.z);
+  var s = base > 0 ? cfg.target / (base * copies) : 1;
+  var inner = new THREE.Group();
+  inner.scale.setScalar(s);
+  /* hanging props: the model's centre sits on the group origin (the
+     same centring the game's fitPropGroup uses), so the group's y IS
+     the hang height — the chandelier centre is 4.85 m in the game. */
+  if (cfg.y === 'hang') inner.position.set(-center.x * s, -center.y * s, -center.z * s);
+  else inner.position.set(-center.x * s, -box.min.y * s, -center.z * s);
+  for (var ci = 0; ci < copies; ci++){
+    var model = ci === 0 ? probe : template.clone(true);
+    model.position.x = (ci - (copies - 1) / 2) * size.x;
+    model.traverse(function(o){ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    inner.add(model);
+  }
+  clearGroup(rec.group);
+  rec.group.add(inner);
+  if (rec.type === 'chandelier') addChandelierLight(rec.group);
+  if (rec.type === 'footlights') addFootlightBulbs(rec.group);
+  rec.group.traverse(function(o){ o.userData.rec = rec; });
+  if (selected === rec) syncStats();
+}
+/* The game's glowing footlight lamps: emissive spheres along the
+   strip, sitting just above the real footlights model. */
+function addFootlightBulbs(gr){
+  for (var i = 0; i < 9; i++){
+    var bulb = new THREE.Mesh(new THREE.SphereGeometry(.09, 10, 8),
+      new THREE.MeshStandardMaterial({ color: 0xffd97a, emissive: 0xffc94d, emissiveIntensity: 1.6 }));
+    bulb.position.set(-4.4 + i * 1.1, .3, 0); gr.add(bulb);
+  }
+}
+var FALLBACK_DIMS = { table: [2.2, .9, 2.2], chair: [.55, 1, .55], chandelier: [1.8, 1, 1.8],
+  bar: [6.4, 1.15, 1.1], plant: [.6, 1.4, .6], crate: [1, 1, 1], crate2: [2, 2, 2],
+  sandbag_wall: [5, 1.2, 1], pipes: [5.6, 1.2, 1.1],
+  seat_block: [4.5, .6, .45], curtain: [4.6, 7.1, .35], footlights: [10.6, .25, .35],
+  spotlight: [1.4, 1.7, 2], set_flat: [3, 5, .1] };
+function applyFallback(rec){
+  if (objects.indexOf(rec) === -1) return;
+  var d = FALLBACK_DIMS[rec.type] || [1.5, 1, 1.5];
+  var label = TYPE_LABEL[rec.type] || rec.type;
+  var tex = cnv(256, 128, function(g, w, h){
+    g.fillStyle = '#3a2c1c'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#c9a24b'; g.lineWidth = 6; g.strokeRect(6, 6, w - 12, h - 12);
+    g.fillStyle = '#f3e9d7'; g.font = 'bold 30px Georgia, serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(label, w / 2, h / 2);
+  });
+  var boxMesh = new THREE.Mesh(new THREE.BoxGeometry(d[0], d[1], d[2]),
+    new THREE.MeshStandardMaterial({ map: tex, roughness: .85 }));
+  boxMesh.position.y = (rec.type === 'chandelier' || rec.type === 'curtain') ? 0 : d[1] / 2;
+  boxMesh.castShadow = true; boxMesh.receiveShadow = true;
+  clearGroup(rec.group);
+  rec.group.add(boxMesh);
+  if (rec.type === 'chandelier') addChandelierLight(rec.group);
+  rec.group.traverse(function(o){ o.userData.rec = rec; });
+  if (selected === rec) syncStats();
+}
+
+function makeObject(def){
+  var builder = BUILDERS[def.type];
+  if (!builder) return null;
+  var group = def.type === 'painting' ? builder(def.paintKind || 'lady_gold')
+    : def.type === 'carpet' ? builder(def.texture)
+    : builder();
+  group.position.set(def.position.x, def.position.y, def.position.z);
+  group.rotation.y = THREE.MathUtils.degToRad(def.rotationY || 0);
+  group.scale.setScalar(def.scale || 1);
+  var rec = { id: def.id || (def.type + '-' + (++uidCounter)), type: def.type, name: def.name || TYPE_LABEL[def.type] || def.type,
+    texture: def.texture || null, paintKind: def.paintKind || null, group: group };
+  if (def.type === 'painting' && !rec.texture){
+    var p = PAINTINGS.filter(function(x){ return x.kind === rec.paintKind; })[0];
+    if (p) rec.texture = p.tex;
+  }
+  group.userData.rec = rec;
+  group.traverse(function(o){ o.userData.rec = rec; });
+  scene.add(group);
+  objects.push(rec);
+  if (GLB_MAP[rec.type]) loadRealModel(rec);
+  return rec;
+}
+function removeObject(rec){
+  scene.remove(rec.group);
+  objects = objects.filter(function(o){ return o !== rec; });
+  if (selected === rec) select(null);
+}
+function loadLayout(list){
+  objects.slice().forEach(removeObject);
+  select(null);
+  list.forEach(function(def){ makeObject(JSON.parse(JSON.stringify(def))); });
+  refreshPicker(); updateCount();
+}
+function refreshPicker(){
+  var sel = el('objPicker');
+  var cur = selected ? selected.id : '';
+  sel.innerHTML = '<option value="">— Pick an object from the list —</option>' +
+    objects.map(function(o){ return '<option value="' + o.id + '">' + escapeHtml(o.name) + '</option>'; }).join('');
+  sel.value = cur;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function updateCount(){
+  var L = LEVELS[curLevel];
+  el('objCount').textContent = L.label + ' · ' + L.dims + ' · ' + objects.length + ' objects';
+}
+
+/* ---------- serialization + undo / redo history (per level) ---------- */
+function serializeRec(o){
+  var p = o.group.position;
+  var out = { id: o.id, type: o.type, name: o.name,
+    position: { x: round2(p.x), y: round2(p.y), z: round2(p.z) },
+    rotationY: Math.round(THREE.MathUtils.radToDeg(o.group.rotation.y)),
+    scale: round2(o.group.scale.x) };
+  if (o.texture) out.texture = o.texture;
+  if (o.paintKind) out.paintKind = o.paintKind;
+  return out;
+}
+function snapshotDefs(){ return objects.map(serializeRec); }
+function pushHistory(){
+  var st = levelState[curLevel];
+  st.undo.push(JSON.stringify(snapshotDefs()));
+  if (st.undo.length > 100) st.undo.shift();
+  st.redo.length = 0;
+  updateUndoBtns();
+}
+function updateUndoBtns(){
+  var st = levelState[curLevel];
+  el('btnUndo').disabled = !st.undo.length;
+  el('btnRedo').disabled = !st.redo.length;
+}
+function doUndo(){
+  var st = levelState[curLevel];
+  if (!st.undo.length) return;
+  st.redo.push(JSON.stringify(snapshotDefs()));
+  loadLayout(JSON.parse(st.undo.pop()));
+  updateUndoBtns();
+  toast('Undid the last change');
+}
+function doRedo(){
+  var st = levelState[curLevel];
+  if (!st.redo.length) return;
+  st.undo.push(JSON.stringify(snapshotDefs()));
+  loadLayout(JSON.parse(st.redo.pop()));
+  updateUndoBtns();
+  toast('Redid the change');
+}
+el('btnUndo').addEventListener('click', doUndo);
+el('btnRedo').addEventListener('click', doRedo);
+window.addEventListener('keydown', function(ev){
+  if (!(ev.ctrlKey || ev.metaKey)) return;
+  var tag = ev.target && ev.target.tagName;
+  if (tag === 'TEXTAREA' || (tag === 'INPUT' && ev.target.type === 'text')) return;
+  var k = (ev.key || '').toLowerCase();
+  if (k === 'z' && !ev.shiftKey){ ev.preventDefault(); doUndo(); }
+  else if ((k === 'z' && ev.shiftKey) || k === 'y'){ ev.preventDefault(); doRedo(); }
+});
+
+/* ---------- selection + info panel ---------- */
+function select(rec){
+  selected = rec;
+  selBox.visible = !!rec; selRing.visible = !!rec;
+  el('selControls').classList.toggle('hidden', !rec);
+  el('noneSel').classList.toggle('hidden', !!rec);
+  if (rec){
+    selBox.setFromObject(rec.group);
+    el('selName').textContent = rec.name;
+    el('rotRange').value = Math.round(THREE.MathUtils.radToDeg(rec.group.rotation.y));
+    el('scaleRange').value = Math.round(rec.group.scale.x * 100);
+    syncStats();
+  } else {
+    el('selName').textContent = 'Nothing selected';
+    el('selMeta').textContent = 'Tap any object in the scene to select it.';
+  }
+  refreshPicker();
+}
+function syncStats(){
+  if (!selected) return;
+  var p = selected.group.position;
+  var deg = Math.round(THREE.MathUtils.radToDeg(selected.group.rotation.y));
+  el('statX').textContent = p.x.toFixed(1);
+  el('statZ').textContent = p.z.toFixed(1);
+  el('statR').textContent = deg + '°';
+  el('selMeta').textContent = (TYPE_LABEL[selected.type] || selected.type) +
+    (selected.texture ? ' · texture: ' + selected.texture : '');
+  el('scaleVal').textContent = 'Scale ' + Math.round(selected.group.scale.x * 100) + '%';
+  selBox.setFromObject(selected.group);
+  var s = Math.max(selected.group.scale.x, .4);
+  selRing.scale.setScalar(s * (RING_F[selected.type] || 1.3));
+  selRing.position.set(p.x, Math.max(p.y, 0) + .04, p.z);
+}
+function clampToRoom(rec){
+  var p = rec.group.position;
+  var wallTypes = { painting: 1, window: 1, door: 1, curtain: 1 };
+  var L = LEVELS[curLevel];
+  var lim = wallTypes[rec.type] ? L.wallBounds : L.bounds;
+  p.x = Math.max(-lim.x, Math.min(lim.x, p.x));
+  p.z = Math.max(-lim.z, Math.min(lim.z, p.z));
+}
+
+/* ---------- pointer interaction: select / drag / orbit / pinch ---------- */
+var ray = new THREE.Raycaster();
+var ndc = new THREE.Vector2();
+var floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+var hitPoint = new THREE.Vector3();
+var pointers = new Map();
+var dragRec = null, dragOff = { x: 0, z: 0 }, dragMoved = false, dragHist = false, dragY = 0;
+/* Ceiling-hung props (chandeliers) keep their hang height: a drag
+   moves them in X/Z only and can never drop one to the floor. */
+function isHang(rec){ var c = GLB_MAP[rec.type]; return !!(c && c.y === 'hang'); }
+var orbiting = false, lastPX = 0, lastPY = 0, pinchD = 0;
+
+function pick(ev){
+  var r = canvas.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  var meshes = [];
+  objects.forEach(function(o){ o.group.traverse(function(m){ if (m.isMesh) meshes.push(m); }); });
+  var hits = ray.intersectObjects(meshes, false);
+  return hits.length ? hits[0].object.userData.rec : null;
+}
+function planeHit(ev){
+  var r = canvas.getBoundingClientRect();
+  ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  return ray.ray.intersectPlane(floorPlane, hitPoint) ? hitPoint : null;
+}
+canvas.addEventListener('pointerdown', function(ev){
+  canvas.setPointerCapture(ev.pointerId);
+  pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (pointers.size === 2){
+    var pts = Array.from(pointers.values());
+    pinchD = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    dragRec = null; orbiting = false;
+    return;
+  }
+  var rec = pick(ev);
+  if (rec){
+    select(rec);
+    var hit = planeHit(ev);
+    if (hit){ dragOff.x = rec.group.position.x - hit.x; dragOff.z = rec.group.position.z - hit.z; }
+    dragRec = rec; dragMoved = false; dragHist = false; dragY = rec.group.position.y;
+  } else {
+    orbiting = true; lastPX = ev.clientX; lastPY = ev.clientY;
+  }
+});
+canvas.addEventListener('pointermove', function(ev){
+  if (!pointers.has(ev.pointerId)) return;
+  pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (pointers.size === 2){
+    var pts = Array.from(pointers.values());
+    var d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    if (pinchD) cam.radius = Math.max(camMin, Math.min(camMax, cam.radius * pinchD / d));
+    pinchD = d;
+    return;
+  }
+  if (dragRec){
+    var hit = planeHit(ev);
+    if (hit){
+      if (!dragHist){ pushHistory(); dragHist = true; }
+      dragRec.group.position.x = hit.x + dragOff.x;
+      dragRec.group.position.z = hit.z + dragOff.z;
+      clampToRoom(dragRec);
+      if (isHang(dragRec)) dragRec.group.position.y = dragY;
+      dragMoved = true; syncStats();
+    }
+  } else if (orbiting){
+    cam.theta -= (ev.clientX - lastPX) * .007;
+    cam.phi = Math.max(.08, Math.min(1.45, cam.phi - (ev.clientY - lastPY) * .007));
+    lastPX = ev.clientX; lastPY = ev.clientY;
+    setViewBtns(false);
+  }
+});
+function endPointer(ev){
+  pointers.delete(ev.pointerId);
+  if (pointers.size < 2) pinchD = 0;
+  if (pointers.size === 0){ dragRec = null; orbiting = false; }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('wheel', function(ev){
+  ev.preventDefault();
+  cam.radius = Math.max(camMin, Math.min(camMax, cam.radius * (ev.deltaY > 0 ? 1.09 : .92)));
+}, { passive: false });
+
+/* ---------- panel controls ---------- */
+function toast(msg){
+  var t = el('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._h); toast._h = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+el('objPicker').addEventListener('change', function(){
+  var rec = objects.filter(function(o){ return o.id === this.value; })[0] || null;
+  select(rec);
+  if (rec){ cam.tx = rec.group.position.x * .5; cam.tz = rec.group.position.z * .5; }
+});
+var rotGest = false, scaleGest = false;
+el('rotRange').addEventListener('input', function(){
+  if (!selected) return;
+  if (!rotGest){ pushHistory(); rotGest = true; }
+  selected.group.rotation.y = THREE.MathUtils.degToRad(parseFloat(this.value));
+  syncStats();
+});
+el('rotRange').addEventListener('change', function(){ rotGest = false; });
+el('rotL').addEventListener('click', function(){ nudgeRot(-15); });
+el('rotR').addEventListener('click', function(){ nudgeRot(15); });
+function nudgeRot(d){
+  if (!selected) return;
+  pushHistory();
+  var deg = Math.round(THREE.MathUtils.radToDeg(selected.group.rotation.y)) + d;
+  selected.group.rotation.y = THREE.MathUtils.degToRad(deg);
+  el('rotRange').value = ((deg + 180) % 360 + 360) % 360 - 180;
+  syncStats();
+}
+el('scaleRange').addEventListener('input', function(){
+  if (!selected) return;
+  if (!scaleGest){ pushHistory(); scaleGest = true; }
+  selected.group.scale.setScalar(parseFloat(this.value) / 100);
+  syncStats();
+});
+el('scaleRange').addEventListener('change', function(){ scaleGest = false; });
+el('scaleDn').addEventListener('click', function(){ nudgeScale(.9); });
+el('scaleUp').addEventListener('click', function(){ nudgeScale(1.1); });
+function nudgeScale(f){
+  if (!selected) return;
+  pushHistory();
+  var s = Math.max(.3, Math.min(2.5, selected.group.scale.x * f));
+  selected.group.scale.setScalar(s);
+  el('scaleRange').value = Math.round(s * 100);
+  syncStats();
+}
+[['nN', 0, -.5], ['nS', 0, .5], ['nW', -.5, 0], ['nE', .5, 0]].forEach(function(n){
+  el(n[0]).addEventListener('click', function(){
+    if (!selected) return;
+    pushHistory();
+    selected.group.position.x += n[1];
+    selected.group.position.z += n[2];
+    clampToRoom(selected); syncStats();
+  });
+});
+el('btnDelete').addEventListener('click', function(){
+  if (!selected) return;
+  pushHistory();
+  var name = selected.name;
+  removeObject(selected);
+  refreshPicker(); updateCount();
+  toast('Deleted ' + name);
+});
+el('btnDup').addEventListener('click', function(){
+  if (!selected) return;
+  pushHistory();
+  var s = selected;
+  var rec = makeObject({ type: s.type, name: s.name + ' copy', paintKind: s.paintKind, texture: s.texture,
+    position: { x: s.group.position.x + 1.2, y: s.group.position.y, z: s.group.position.z + 1.2 },
+    rotationY: Math.round(THREE.MathUtils.radToDeg(s.group.rotation.y)), scale: s.group.scale.x });
+  if (rec){ clampToRoom(rec); select(rec); refreshPicker(); updateCount(); toast('Duplicated — drag the copy into place'); }
+});
+
+/* ---------- add palette (rebuilt per level) ---------- */
+var newPaintIdx = 0;
+function buildPalette(){
+  el('palette').innerHTML = LEVELS[curLevel].palette.map(function(t){
+    var info = PALETTE_INFO[t];
+    return '<button type="button" data-add="' + t + '">' + info[0] + '<small>' + info[1] + '</small></button>';
+  }).join('');
+}
+el('palette').addEventListener('click', function(ev){
+  var btn = ev.target.closest('button[data-add]');
+  if (!btn) return;
+  var type = btn.getAttribute('data-add');
+  var sp = (LEVELS[curLevel].spawn || {})[type];
+  var def = { type: type, name: TYPE_LABEL[type], rotationY: sp && sp.rot ? sp.rot : 0, scale: 1,
+    position: sp ? { x: sp.x, y: sp.y, z: sp.z } : { x: 0, y: BASE_Y[type] || 0, z: 2 } };
+  if (type === 'painting'){
+    var p = PAINTINGS[newPaintIdx++ % PAINTINGS.length];
+    def.paintKind = p.kind; def.texture = p.tex; def.name = 'Painting — ' + p.label;
+  }
+  pushHistory();
+  var rec = makeObject(def);
+  if (rec){ select(rec); refreshPicker(); updateCount(); toast('Added ' + rec.name + ' — drag it into place'); }
+});
+
+/* ---------- camera presets ---------- */
+function setViewBtns(top){
+  el('btnTop').classList.toggle('on', !!top);
+  el('btnOrbit').classList.toggle('on', !top);
+}
+el('btnTop').addEventListener('click', function(){
+  cam.phi = .1; cam.radius = LEVELS[curLevel].cam.top; cam.theta = 0; cam.tx = 0; cam.tz = 0; setViewBtns(true);
+});
+el('btnOrbit').addEventListener('click', function(){
+  var c = LEVELS[curLevel].cam;
+  cam.phi = c.phi; cam.radius = c.radius; cam.theta = c.theta; cam.tx = 0; cam.tz = 0; setViewBtns(false);
+});
+
+/* ---------- level switching ---------- */
+function enterLevel(id){
+  var L = LEVELS[id];
+  objects.slice().forEach(removeObject);
+  select(null);
+  if (shellGroup){ scene.remove(shellGroup); shellGroup = null; }
+  curLevel = id;
+  scene.background = new THREE.Color(L.bg);
+  scene.fog = new THREE.Fog(L.bg, L.fog[0], L.fog[1]);
+  sun.intensity = L.sunI;
+  sun.position.set(L.sunPos[0], L.sunPos[1], L.sunPos[2]);
+  sun.shadow.camera.left = -L.shadow; sun.shadow.camera.right = L.shadow;
+  sun.shadow.camera.top = L.shadow; sun.shadow.camera.bottom = -L.shadow;
+  sun.shadow.camera.updateProjectionMatrix();
+  ambient.intensity = L.ambI;
+  shellGroup = L.buildShell();
+  scene.add(shellGroup);
+  cam.theta = L.cam.theta; cam.phi = L.cam.phi; cam.radius = L.cam.radius;
+  cam.tx = 0; cam.ty = 1; cam.tz = 0;
+  camMin = L.cam.min; camMax = L.cam.max;
+  var defs = levelState[id].defs || L.defaults();
+  loadLayout(JSON.parse(JSON.stringify(defs)));
+  buildPalette();
+  var btns = el('lvlSwitch').querySelectorAll('button[data-level]');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-level') === id);
+  el('expFile').textContent = id + '-layout.json';
+  el('expLevel').textContent = L.label;
+  delete el('btnReset').dataset.armed;
+  el('btnReset').textContent = 'Reset stage';
+  updateUndoBtns();
+  setViewBtns(false);
+}
+function switchLevel(id){
+  if (!LEVELS[id] || id === curLevel) return;
+  levelState[curLevel].defs = snapshotDefs();
+  enterLevel(id);
+  toast(LEVELS[id].label + ' loaded — ' + objects.length + ' objects. Your other levels keep their edits.');
+}
+el('lvlSwitch').addEventListener('click', function(ev){
+  var b = ev.target.closest('button[data-level]');
+  if (b) switchLevel(b.getAttribute('data-level'));
+});
+
+/* ---------- export / load / reset ---------- */
+function serialize(){
+  var R = LEVELS[curLevel].room;
+  return {
+    stage: curLevel, version: 1, game: 'double-agent',
+    room: { width: R.w, depth: R.d, height: R.h, floorY: 0 },
+    exportedAt: new Date().toISOString(),
+    objects: snapshotDefs()
+  };
+}
+el('btnExport').addEventListener('click', function(){
+  var blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = curLevel + '-layout.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  toast('Exported ' + curLevel + '-layout.json (' + objects.length + ' objects)');
+});
+el('btnLoad').addEventListener('click', function(){ el('fileInput').click(); });
+el('fileInput').addEventListener('change', function(){
+  var f = this.files && this.files[0];
+  this.value = '';
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function(){
+    try {
+      var data = JSON.parse(reader.result);
+      var list = Array.isArray(data) ? data : data.objects;
+      if (!Array.isArray(list) || !list.length) throw new Error('no objects');
+      var clean = list.filter(function(o){ return o && BUILDERS[o.type] && o.position; });
+      if (!clean.length) throw new Error('no usable objects');
+      if (data.stage && LEVELS[data.stage] && data.stage !== curLevel) switchLevel(data.stage);
+      pushHistory();
+      loadLayout(clean);
+      toast('Loaded ' + clean.length + ' objects from ' + f.name);
+    } catch (e) {
+      toast('That file is not a stage layout JSON — nothing was changed.');
+    }
+  };
+  reader.readAsText(f);
+});
+el('btnReset').addEventListener('click', function(){
+  if (el('btnReset').dataset.armed){
+    delete el('btnReset').dataset.armed;
+    el('btnReset').textContent = 'Reset stage';
+    pushHistory();
+    loadLayout(LEVELS[curLevel].defaults());
+    toast(LEVELS[curLevel].label + ' restored to the game layout');
+  } else {
+    el('btnReset').dataset.armed = '1';
+    el('btnReset').textContent = 'Tap again to reset';
+    setTimeout(function(){ delete el('btnReset').dataset.armed; el('btnReset').textContent = 'Reset stage'; }, 3000);
+  }
+});
+
+/* ---------- boot + render loop ---------- */
+function resize(){
+  var w = wrap.clientWidth, h = wrap.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+function loop(){
+  requestAnimationFrame(loop);
+  applyCam();
+  if (selected) selBox.setFromObject(selected.group);
+  renderer.render(scene, camera);
+}
+/* Levels come from assets/levels-manifest.json. If it cannot load,
+   the editor says so instead of showing made-up levels. */
+function showManifestError(msg){
+  var e = document.getElementById('loadErr');
+  e.innerHTML = '<div><strong>The level list could not load.</strong><br/>' + msg + '</div>';
+  e.style.display = 'flex';
+}
+fetch('assets/levels-manifest.json')
+  .then(function(r){ if (!r.ok) throw new Error('levels-manifest.json returned ' + r.status); return r.json(); })
+  .then(function(manifest){
+    buildLevels(manifest);
+    buildSwitcher(manifest);
+    buildAllLevelsList(manifest);
+    var def = (manifest.defaultEditorLevel && LEVELS[manifest.defaultEditorLevel])
+      ? manifest.defaultEditorLevel : Object.keys(LEVELS)[0];
+    if (!def){ showManifestError('No editable level is listed in the manifest.'); return; }
+    enterLevel(def);
+    resize(); applyCam();
+    loop();
+  })
+  .catch(function(err){
+    showManifestError('Could not load assets/levels-manifest.json — check the file is in the repo. (' + (err && err.message ? err.message : 'fetch failed') + ')');
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+{
+  "defaultEditorLevel": "ballroom",
+  "game": "double-agent",
+  "levels": [
+    {
+      "depthM": null,
+      "editable": false,
+      "entities": {
+        "missions": 7
+      },
+      "heightM": null,
+      "id": "menu",
+      "name": "Main Menu",
+      "objective": "Mission select",
+      "pages": [
+        "menu.html"
+      ],
+      "widthM": null
+    },
+    {
+      "depthM": 90,
+      "editable": true,
+      "editor": {
+        "depthM": 90,
+        "heightM": 12,
+        "widthM": 90
+      },
+      "entities": {
+        "exfilZones": 1,
+        "guards": 4,
+        "intel": 3
+      },
+      "heightM": 4,
+      "id": "courtyard",
+      "name": "Courtyard",
+      "objective": "Collect 3 intel, then reach EXFIL at (38, -38)",
+      "pages": [
+        "index.html"
+      ],
+      "spawn": {
+        "x": -38,
+        "z": 38
+      },
+      "widthM": 90
+    },
+    {
+      "depthM": 28,
+      "editable": true,
+      "editor": {
+        "depthM": 28,
+        "heightM": 9,
+        "widthM": 40
+      },
+      "entities": {
+        "cats": 3,
+        "guests": 4
+      },
+      "heightM": 6,
+      "id": "ballroom",
+      "name": "Ballroom",
+      "note": "One physical room across 3 pages; only the mission and player logic differ.",
+      "objective": "Photograph the 3 cats (Moxie, Mabel, Margo); the door code is moon, note, rose",
+      "pages": [
+        "ballroom.html",
+        "ballroom-rochelle.html",
+        "ballroom-handoff.html"
+      ],
+      "widthM": 40
+    },
+    {
+      "depthM": 42,
+      "editable": true,
+      "editor": {
+        "depthM": 32,
+        "heightM": 10,
+        "widthM": 30
+      },
+      "entities": {
+        "enemies": 8,
+        "stageDepthM": 12,
+        "stageWidthM": 24
+      },
+      "heightM": 10,
+      "id": "theater",
+      "name": "Theater",
+      "objective": "Rochelle defeats 8 enemies; 3 sword hits each",
+      "pages": [
+        "theater.html"
+      ],
+      "widthM": 30
+    },
+    {
+      "depthM": 116,
+      "editable": false,
+      "entities": {
+        "civilians": 11,
+        "terrorists": 5
+      },
+      "heightM": null,
+      "id": "halloween",
+      "name": "Halloween",
+      "note": "Residential street, fixed sniper nest at the south end; the player does not walk.",
+      "objective": "Stop 5 terrorists from the sniper nest; shooting a civilian fails the mission",
+      "pages": [
+        "halloween.html"
+      ],
+      "spawn": {
+        "x": -3,
+        "z": 60.5
+      },
+      "widthM": 40
+    },
+    {
+      "depthM": 60,
+      "editable": false,
+      "entities": {
+        "bombs": 4,
+        "shoppers": 7,
+        "terrorists": 5
+      },
+      "heightM": 12,
+      "id": "mall",
+      "name": "Mall",
+      "note": "Two stories: ground floor y=0, upper floor y=4.5 around the central atrium.",
+      "objective": "Defuse 4 C4 in 5:00; shooting a shopper fails the mission",
+      "pages": [
+        "mall.html"
+      ],
+      "spawn": {
+        "x": 0,
+        "z": 26
+      },
+      "timerSeconds": 300,
+      "widthM": 40
+    },
+    {
+      "depthM": null,
+      "editable": false,
+      "entities": {},
+      "heightM": null,
+      "id": "viewer",
+      "name": "Viewer",
+      "objective": "Inspect models, animations and weapon offsets",
+      "pages": [
+        "viewer.html"
+      ],
+      "widthM": null
+    },
+    {
+      "depthM": null,
+      "editable": false,
+      "entities": {},
+      "heightM": null,
+      "id": "wishlist",
+      "name": "Wishlist",
+      "objective": "Asset wishlist and wiring notes",
+      "pages": [
+        "wishlist.html"
+      ],
+      "widthM": null
+    }
+  ],
+  "note": "The real levels of Undercover: Double Agent. Dimensions are the game's own room sizes, measured from the level pages. 'editor' gives the working size the stage editor uses for its shell: the theater shell covers the stage and front house (the full room is deeper), the ballroom shell's ceiling is the editor's own framing, and the courtyard shell is open sky above the 4 m perimeter walls.",
+  "version": 1
+}
