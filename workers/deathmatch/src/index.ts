@@ -1,8 +1,15 @@
 import { DurableObject } from 'cloudflare:workers';
+import { BOT_DEFAULT_CHARACTERS, BOT_DIFFICULTIES, BOT_MAX_COUNT, BOT_MIN_COUNT, BOT_SCORE_TARGET, BOT_RESPAWN_MS, cleanBotCount, cleanDifficulty, cleanBotWeapon, createBot, updateBot, respawnBot } from '../../../assets/js/dm-bot-brain.js';
 
 export interface Env { ROOMS: DurableObjectNamespace<DeathmatchRoom> }
 type Player = { token: string; name: string; character: string; loadout: 'white'|'black'; slot: number; x: number; z: number; yaw: number; health: number; score: number; ammo: number; weapon: string; lastMove: number; lastShot: number; reloadAt: number; disconnectedAt: number|null; respawnAt: number };
-type RoomState = { map: MapId; players: (Player|null)[]; startedAt: number|null; createdAt: number; finished: boolean; winner: number|null; finishReason: 'score'|'forfeit'|'expired'|null };
+// A bot is the brain's createBot() shape (see assets/js/dm-bot-brain.js)
+// plus lastShotAt, the ms timestamp of its last shot, so clients can
+// draw the bot's tracer. The brain keeps lastShot (cadence) separately.
+export type Bot = { id: string; name: string; character: string; weapon: string; loadout: 'white'|'black'; difficulty: string; x: number; z: number; yaw: number; health: number; score: number; ammo: number; dead: boolean; respawnAt: number; lastShot: number; lastShotAt: number; reloadUntil: number; [key: string]: any };
+export type RoomMode = 'pvp'|'coop';
+export type Difficulty = 'easy'|'normal'|'hard';
+export type RoomState = { map: MapId; players: (Player|null)[]; startedAt: number|null; createdAt: number; finished: boolean; winner: number|null; finishReason: 'score'|'forfeit'|'expired'|null; mode: RoomMode; bots: Bot[]; difficulty: Difficulty; teamScore: { humans: number; bots: number }; winnerTeam: 'humans'|'bots'|null; lastBotTick: number };
 // Per-map arena bounds (x/z half-extents) and diagonal-opposite spawns,
 // mirroring the courtyard's pattern. The lobby only offers the maps whose
 // pages wire deathmatch mode (courtyard, mall); ballroom and theater are
@@ -39,9 +46,136 @@ type WeaponId = keyof typeof WEAPONS;
 const cleanWeapon = (v: unknown): WeaponId => (typeof v === 'string' && v in WEAPONS ? (v as WeaponId) : 'Glock');
 const cleanLoadout = (v: unknown): 'white'|'black' => (v === 'white' ? 'white' : 'black');
 const ROOM_TTL_MS=2*60*60*1000;
+const BOT_TICK_MS=500;
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomId = (length:number) => Array.from(crypto.getRandomValues(new Uint8Array(length)), n => alphabet[n % alphabet.length]).join('');
 const json = (body:unknown,status=200) => new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json; charset=utf-8','access-control-allow-origin':'*','access-control-allow-headers':'content-type','access-control-allow-methods':'GET,POST,OPTIONS'}});
+
+// A bot count is only valid as a plain 1..4 integer (a JSON number, or a
+// digit string). Anything else — 0, 5, 'three', a float — is rejected
+// with a 400 at room creation, never silently clamped.
+const isValidBotCount = (v: unknown): boolean => {
+  if (typeof v === 'number') return Number.isInteger(v) && v >= BOT_MIN_COUNT && v <= BOT_MAX_COUNT;
+  if (typeof v === 'string' && /^\d+$/.test(v.trim())) { const n = parseInt(v, 10); return n >= BOT_MIN_COUNT && n <= BOT_MAX_COUNT; }
+  return false;
+};
+// Bot spawn for slot i: the human-opposite spawn (MAPS[map].spawns[1]),
+// jittered per bot so the squad does not stack, clamped inside bounds.
+function botSpawn(map: MapId, index: number) {
+  const base = MAPS[map].spawns[1], bounds = MAPS[map].bounds;
+  const offsets = [[0, 0], [2, 1.5], [-2, 1.5], [0, 3]][index % 4];
+  return { x: Math.max(-bounds.x, Math.min(bounds.x, base.x + offsets[0])), z: Math.max(-bounds.z, Math.min(bounds.z, base.z + offsets[1])), yaw: base.yaw };
+}
+
+// Build the bot squad for a co-op room: names always "BOT 1".."BOT N"
+// (bots never pretend to be people), characters cycling the five real
+// terrorist files, every bot on the given weapon, black loadout.
+export function createBotsForRoom(map: MapId, count: number, difficulty: string, weapon?: string): Bot[] {
+  const n = cleanBotCount(count), diff = cleanDifficulty(difficulty) as Difficulty, w = cleanBotWeapon(weapon);
+  return Array.from({ length: n }, (_, i) => {
+    const spawn = botSpawn(map, i);
+    const bot = createBot({ id: `bot-${i + 1}`, name: `BOT ${i + 1}`, character: BOT_DEFAULT_CHARACTERS[i % BOT_DEFAULT_CHARACTERS.length], weapon: w, loadout: 'black', difficulty: diff, x: spawn.x, z: spawn.z, yaw: spawn.yaw, waypoints: null }) as Bot;
+    bot.lastShotAt = 0;
+    return bot;
+  });
+}
+
+// One 500 ms relay bot tick over a co-op room: each living bot runs the
+// shared brain (updateBot) against the living humans, its shots are
+// applied (a kill scores for the bots and respawns the human after
+// BOT_RESPAWN_MS), and dead bots whose respawn time has come are put
+// back on a bot spawn. Bots only tick while the match has started and
+// at least one human is connected. The relay holds no obstacle map, so
+// canMove is bounds-only and hasLOS is range-only — the brain's
+// sightRange plus its 22 m shooting gate does the rest (see README).
+// Returns the bot shoot events (hit or miss) for the caller to render.
+export function tickBots(state: RoomState, now: number, random?: () => number) {
+  const events: any[] = [];
+  if (state.mode !== 'coop' || state.finished || !state.startedAt) return events;
+  const humans = state.players.filter((p): p is Player => !!p && p.disconnectedAt === null);
+  if (humans.length === 0) return events;
+  const dt = state.lastBotTick ? Math.min(Math.max((now - state.lastBotTick) / 1000, 0), 1) : 0.5;
+  const bounds = MAPS[state.map].bounds;
+  const targets = humans.map(p => ({ id: `player-${p.slot}`, x: p.x, z: p.z, alive: p.health > 0 }));
+  for (let i = 0; i < state.bots.length; i++) {
+    if (state.finished) break;
+    const bot = state.bots[i];
+    if (bot.dead) { if (bot.respawnAt && bot.respawnAt <= now) respawnBot(bot, botSpawn(state.map, i)); continue; }
+    const botEvents = updateBot(bot, { now, dt, targets, bounds, canMove: (x: number, z: number) => x >= -bounds.x && x <= bounds.x && z >= -bounds.z && z <= bounds.z, hasLOS: () => true, random }, dt);
+    for (const ev of botEvents) {
+      if (ev.type !== 'shoot') continue;
+      bot.lastShotAt = now;
+      events.push(ev);
+      if (!ev.hit) continue;
+      const target = humans.find(p => `player-${p.slot}` === ev.targetId);
+      if (!target || target.health <= 0) continue;
+      target.health = Math.max(0, target.health - ev.damage);
+      if (target.health === 0) {
+        bot.score++;
+        state.teamScore.bots++;
+        target.respawnAt = now + BOT_RESPAWN_MS;
+        if (state.teamScore.bots >= BOT_SCORE_TARGET) { state.finished = true; state.winnerTeam = 'bots'; state.finishReason = 'score'; }
+      }
+    }
+  }
+  state.lastBotTick = now;
+  return events;
+}
+
+// The shoot packet's hit resolution, shared by the DO handler and the
+// tests: the same ray math as the PvP path (target point at 1.25 m
+// height, 0.78 m hit radius, up to 60 m), tested against the opponent
+// and against each living bot, and applied to the nearest target the
+// ray actually crosses. A bot kill scores for the shooter and for the
+// humans' team; the humans win the match at BOT_SCORE_TARGET (10).
+// Returns {fired, hit, changed} — changed is true whenever the helper
+// mutated state (a shot fired, or an empty mag starting its reload),
+// so the caller knows whether to save/broadcast.
+export function resolveHumanShot(state: RoomState, shooterSlot: number, packet: any, now: number) {
+  const result = { fired: false, hit: false, changed: false };
+  const shooter = state.players[shooterSlot];
+  if (!shooter || state.finished || !state.startedAt) return result;
+  if (typeof packet.weapon !== 'string' || !(packet.weapon in WEAPONS)) return result;
+  const w = WEAPONS[packet.weapon as WeaponId], rate = w.rate, capacity = w.cap, damage = w.dmg;
+  if (now < shooter.reloadAt || now - shooter.lastShot < rate) return result;
+  if (shooter.weapon !== packet.weapon) { shooter.weapon = packet.weapon; shooter.ammo = capacity; shooter.reloadAt = 0; }
+  if (shooter.ammo <= 0) { shooter.reloadAt = now + 1400; result.changed = true; return result; }
+  const d = packet.dir || {}, o = packet.origin || {}, dx = Number(d.x), dy = Number(d.y), dz = Number(d.z), ox = Number(o.x), oy = Number(o.y), oz = Number(o.z), len = Math.hypot(dx, dy, dz);
+  if (!Number.isFinite(len) || len < 0.9 || len > 1.1 || ![ox, oy, oz].every(Number.isFinite) || Math.hypot(ox - shooter.x, oz - shooter.z) > 5 || oy < 1.1 || oy > 4.5) return result;
+  shooter.lastShot = now; shooter.ammo--;
+  result.fired = true; result.changed = true;
+  const dir = new Vec3(dx / len, dy / len, dz / len);
+  // Nearest target the ray crosses: the opponent, then each living bot.
+  let best: { along: number; apply: () => void } | null = null;
+  const consider = (tx: number, tz: number, apply: () => void) => {
+    const target = new Vec3(tx - ox, 1.25 - oy, tz - oz), along = target.dot(dir), miss = Math.sqrt(Math.max(0, target.lengthSq() - along * along));
+    if (along > 0 && along <= 60 && miss <= 0.78 && (!best || along < best.along)) best = { along, apply };
+  };
+  const other = state.players[1 - shooterSlot];
+  // Co-op: humans are one team — a teammate is never a target, so a
+  // shot passes through them to the bot behind (no friendly fire).
+  if (state.mode !== 'coop' && other && other.health > 0) consider(other.x, other.z, () => {
+    other.health = Math.max(0, other.health - damage);
+    if (other.health === 0) {
+      shooter.score++; other.respawnAt = now + 2500;
+      if (shooter.score >= 10) { state.finished = true; state.winner = shooterSlot; if (state.mode === 'coop') state.winnerTeam = 'humans'; state.finishReason = 'score'; }
+    }
+  });
+  for (const bot of state.bots) {
+    if (bot.dead || bot.health <= 0) continue;
+    consider(bot.x, bot.z, () => {
+      bot.health = Math.max(0, bot.health - damage);
+      if (bot.health === 0) {
+        bot.dead = true; bot.respawnAt = now + BOT_RESPAWN_MS;
+        shooter.score++; state.teamScore.humans++;
+        if (state.teamScore.humans >= BOT_SCORE_TARGET) { state.finished = true; state.winnerTeam = 'humans'; state.finishReason = 'score'; }
+      }
+    });
+  }
+  if (best) { best.apply(); result.hit = true; }
+  if (shooter.ammo === 0) shooter.reloadAt = now + 1400;
+  return result;
+}
 
 export default {
   async fetch(request:Request, env:Env):Promise<Response> {
@@ -60,10 +194,17 @@ export default {
       if (body.character !== undefined && cleanCharacter(body.character) !== body.character) return json({error:'Unknown character.'},400);
       if (body.weapon !== undefined && !(typeof body.weapon === 'string' && body.weapon in WEAPONS)) return json({error:'Unknown weapon.'},400);
       if (body.loadout !== undefined && body.loadout !== 'white' && body.loadout !== 'black') return json({error:'Unknown loadout.'},400);
+      if (body.mode !== undefined && body.mode !== 'pvp' && body.mode !== 'coop') return json({error:'Unknown mode.'},400);
+      if (body.botCount !== undefined && !isValidBotCount(body.botCount)) return json({error:'Bot count must be an integer from 1 to 4.'},400);
+      if (body.difficulty !== undefined && !(typeof body.difficulty === 'string' && (BOT_DIFFICULTIES as readonly string[]).includes(body.difficulty))) return json({error:'Unknown difficulty.'},400);
+      if (body.botWeapon !== undefined && !(typeof body.botWeapon === 'string' && body.botWeapon in WEAPONS)) return json({error:'Unknown bot weapon.'},400);
+      const mode: RoomMode = body.mode === 'coop' ? 'coop' : 'pvp';
+      const botCount = mode === 'coop' ? cleanBotCount(body.botCount) : 0;
+      const difficulty = cleanDifficulty(body.difficulty) as Difficulty;
       const room = env.ROOMS.get(env.ROOMS.idFromName(code));
-      const response = await room.fetch('https://room/reserve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token,name:cleanName(body.name),slot:0,map:cleanMap(body.map),character:cleanCharacter(body.character),weapon:cleanWeapon(body.weapon),loadout:cleanLoadout(body.loadout)})});
+      const response = await room.fetch('https://room/reserve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token,name:cleanName(body.name),slot:0,map:cleanMap(body.map),character:cleanCharacter(body.character),weapon:cleanWeapon(body.weapon),loadout:cleanLoadout(body.loadout),mode,botCount,difficulty,botWeapon:cleanBotWeapon(body.botWeapon)})});
       if (!response.ok) return json({error:'Could not create room'},500);
-      return json({code,token,map:cleanMap(body.map)});
+      return json({code,token,map:cleanMap(body.map),mode,botCount,difficulty});
     }
     if (url.pathname === '/api/rooms/join') {
       const code = String(body.code||'').toUpperCase();
@@ -74,7 +215,8 @@ export default {
       const token = randomId(32), room = env.ROOMS.get(env.ROOMS.idFromName(code));
       const response = await room.fetch('https://room/reserve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({token,name:cleanName(body.name),slot:1,character:cleanCharacter(body.character),weapon:cleanWeapon(body.weapon),loadout:cleanLoadout(body.loadout)})});
       if (!response.ok) return json({error:(await response.json() as any).error||'Room is unavailable.'},response.status);
-      return json({code,token,map:((await response.json()) as any).map||'courtyard'});
+      const reserved = await response.json() as any;
+      return json({code,token,map:reserved.map||'courtyard',mode:reserved.mode||'pvp',botCount:reserved.botCount??0,difficulty:reserved.difficulty||'normal'});
     }
     return json({error:'Not found'},404);
   }
@@ -82,15 +224,16 @@ export default {
 
 function cleanName(value:unknown){return String(value||'Agent').replace(/[<>\u0000-\u001f]/g,'').trim().slice(0,18)||'Agent';}
 function blankPlayer(token:string,name:string,slot:number,map:MapId,character:string,weapon:WeaponId,loadout:'white'|'black'):Player{const spawn=MAPS[map].spawns[slot];return {token,name,character,loadout,slot,x:spawn.x,z:spawn.z,yaw:spawn.yaw,health:100,score:0,ammo:WEAPONS[weapon].cap,weapon,lastMove:0,lastShot:0,reloadAt:0,disconnectedAt:null,respawnAt:0};}
+function blankState():RoomState{return {map:'courtyard',players:[null,null],startedAt:null,createdAt:Date.now(),finished:false,winner:null,finishReason:null,mode:'pvp',bots:[],difficulty:'normal',teamScore:{humans:0,bots:0},winnerTeam:null,lastBotTick:0};}
 
 export class DeathmatchRoom extends DurableObject<Env> {
   private statePromise:Promise<RoomState>;
-  constructor(ctx:DurableObjectState,env:Env){super(ctx,env);this.statePromise=ctx.blockConcurrencyWhile(async()=>{let state=await ctx.storage.get<RoomState>('room');if(!state){state={map:'courtyard',players:[null,null],startedAt:null,createdAt:Date.now(),finished:false,winner:null,finishReason:null};await ctx.storage.put('room',state);}return state;});}
+  constructor(ctx:DurableObjectState,env:Env){super(ctx,env);this.statePromise=ctx.blockConcurrencyWhile(async()=>{let state=await ctx.storage.get<RoomState>('room');if(!state){state=blankState();await ctx.storage.put('room',state);}return state;});}
   private async load(){await this.statePromise;return (await this.ctx.storage.get<RoomState>('room'))!;}
   private async save(state:RoomState){await this.ctx.storage.put('room',state);}
-  private async scheduleAlarm(state:RoomState){const times:number[]=[state.createdAt+ROOM_TTL_MS];for(const p of state.players){if(!p)continue;if(p.reloadAt>0)times.push(p.reloadAt);if(p.respawnAt>0)times.push(p.respawnAt);if(p.disconnectedAt&&!state.finished)times.push(p.disconnectedAt+30_000);}await this.ctx.storage.setAlarm(Math.min(...times));}
+  private async scheduleAlarm(state:RoomState){const times:number[]=[state.createdAt+ROOM_TTL_MS];for(const p of state.players){if(!p)continue;if(p.reloadAt>0)times.push(p.reloadAt);if(p.respawnAt>0)times.push(p.respawnAt);if(p.disconnectedAt&&!state.finished)times.push(p.disconnectedAt+30_000);}if(state.mode==='coop'&&state.startedAt&&!state.finished&&state.players.some(p=>p&&!p.disconnectedAt))times.push((state.lastBotTick||Date.now())+BOT_TICK_MS);await this.ctx.storage.setAlarm(Math.min(...times));}
   private onlineTokens(exclude?:WebSocket){return new Set(this.ctx.getWebSockets().filter(ws=>ws!==exclude).map(ws=>{try{return (ws.deserializeAttachment() as any).token;}catch{return '';}}));}
-  private publicState(state:RoomState){const online=this.onlineTokens();return {type:'state',map:state.map,started:state.startedAt!==null&&!state.finished,finished:state.finished,reason:state.finishReason,paused:state.players.some(p=>!!p?.disconnectedAt),winner:state.winner,players:state.players.map(p=>p?{slot:p.slot,name:p.name,character:p.character,loadout:p.loadout,x:p.x,z:p.z,yaw:p.yaw,health:p.health,score:p.score,ammo:p.ammo,weapon:p.weapon,respawnAt:p.respawnAt,connected:online.has(p.token)}:null)};}
+  private publicState(state:RoomState){const online=this.onlineTokens();const anyConnected=state.players.some(p=>p&&!p.disconnectedAt);return {type:'state',map:state.map,mode:state.mode,started:state.startedAt!==null&&!state.finished,finished:state.finished,reason:state.finishReason,paused:state.mode==='coop'?!anyConnected:state.players.some(p=>!!p?.disconnectedAt),winner:state.winner,winnerTeam:state.winnerTeam,teamScore:state.teamScore,bots:state.bots.map(b=>({id:b.id,name:b.name,character:b.character,loadout:b.loadout,weapon:b.weapon,x:b.x,z:b.z,yaw:b.yaw,health:b.health,score:b.score,ammo:b.ammo,dead:b.dead,respawnAt:b.respawnAt,lastShotAt:b.lastShotAt||0})),players:state.players.map(p=>p?{slot:p.slot,name:p.name,character:p.character,loadout:p.loadout,x:p.x,z:p.z,yaw:p.yaw,health:p.health,score:p.score,ammo:p.ammo,weapon:p.weapon,respawnAt:p.respawnAt,connected:online.has(p.token)}:null)};}
   private async broadcast(state:RoomState){const message=JSON.stringify(this.publicState(state));for(const ws of this.ctx.getWebSockets())try{ws.send(message);}catch{}}
   async fetch(request:Request):Promise<Response>{
     const url=new URL(request.url);
@@ -101,8 +244,8 @@ export class DeathmatchRoom extends DurableObject<Env> {
       if(existing)return json({slot:existing.slot,map:state.map});
       if(input.slot===1&&state.players[0]===null)return json({error:'Room code was not found.'},404);
       if(state.players[input.slot])return json({error:'Room already has two agents.'},409);
-      if(input.slot===0)state.map=cleanMap(input.map);
-      state.players[input.slot]=blankPlayer(input.token,cleanName(input.name),input.slot,state.map,cleanCharacter(input.character),cleanWeapon(input.weapon),cleanLoadout(input.loadout));await this.save(state);await this.scheduleAlarm(state);return json({slot:input.slot,map:state.map});
+      if(input.slot===0){state.map=cleanMap(input.map);state.mode=input.mode==='coop'?'coop':'pvp';state.difficulty=cleanDifficulty(input.difficulty) as Difficulty;state.bots=state.mode==='coop'?createBotsForRoom(state.map,cleanBotCount(input.botCount),state.difficulty,cleanBotWeapon(input.botWeapon)):[];state.teamScore={humans:0,bots:0};state.winnerTeam=null;state.lastBotTick=0;}
+      state.players[input.slot]=blankPlayer(input.token,cleanName(input.name),input.slot,state.map,cleanCharacter(input.character),cleanWeapon(input.weapon),cleanLoadout(input.loadout));await this.save(state);await this.scheduleAlarm(state);return json({slot:input.slot,map:state.map,mode:state.mode,botCount:state.bots.length,difficulty:state.difficulty});
     }
     if(url.pathname==='/room'&&request.headers.get('upgrade')==='websocket'){
       const token=url.searchParams.get('token')||'',state=await this.load(),player=state.players.find(p=>p?.token===token);
@@ -110,7 +253,7 @@ export class DeathmatchRoom extends DurableObject<Env> {
       for(const ws of this.ctx.getWebSockets())try{if((ws.deserializeAttachment() as any).token===token)ws.close(4001,'Reconnected');}catch{}
       const pair=new WebSocketPair(),client=pair[0],server=pair[1];server.serializeAttachment({token,slot:player.slot});this.ctx.acceptWebSocket(server);
       player.disconnectedAt=null;
-      if(state.players.every(Boolean)&&this.onlineTokens().size>=1&&state.startedAt===null)state.startedAt=Date.now();
+      if(state.startedAt===null&&this.onlineTokens().size>=1&&(state.mode==='coop'||state.players.every(Boolean))){state.startedAt=Date.now();state.lastBotTick=Date.now();}
       await this.save(state);server.send(JSON.stringify({type:'welcome',slot:player.slot,code:(await this.ctx.storage.get('code'))||'',reconnectSeconds:30}));
       await this.broadcast(state);return new Response(null,{status:101,webSocket:client});
     }
@@ -121,27 +264,29 @@ export class DeathmatchRoom extends DurableObject<Env> {
     let packet:any;try{packet=JSON.parse(typeof message==='string'?message:new TextDecoder().decode(message));}catch{return;}
     const now=Date.now(), other=state.players[1-p.slot];
     if(packet.type==='move'&&!state.finished){
-      if(state.players.some(pl=>pl?.disconnectedAt))return;
+      // PvP blocks on ANY disconnected player; co-op blocks only when NO
+      // human is connected, so a lone human keeps playing with a partner down.
+      const blocked=state.mode==='coop'?!state.players.some(pl=>pl&&!pl.disconnectedAt):state.players.some(pl=>pl?.disconnectedAt);
+      if(blocked)return;
       const x=Number(packet.x),z=Number(packet.z),yaw=Number(packet.yaw);if(!Number.isFinite(x)||!Number.isFinite(z)||!Number.isFinite(yaw))return;
       const bounds=MAPS[state.map].bounds;
       const nextX=Math.max(-bounds.x,Math.min(bounds.x,x)),nextZ=Math.max(-bounds.z,Math.min(bounds.z,z)),elapsed=Math.max(0.05,(now-(p.lastMove||now))/1000),distance=Math.hypot(nextX-p.x,nextZ-p.z);
       if(distance>Math.min(8*elapsed+1.5,5))return;
       p.x=nextX;p.z=nextZ;p.yaw=((yaw+Math.PI)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)-Math.PI;p.lastMove=now;
-      if(state.players.every(Boolean)&&!state.startedAt)state.startedAt=now;
+      if(!state.startedAt&&(state.mode==='coop'||state.players.every(Boolean))){state.startedAt=now;state.lastBotTick=now;}
       await this.save(state);await this.broadcast(state);return;
     }
-    if(packet.type==='shoot'&&!state.finished&&state.startedAt&&other&&other.health>0&&!state.players.some(pl=>pl?.disconnectedAt)){
-      if(typeof packet.weapon!=='string'||!(packet.weapon in WEAPONS))return;
-      const w=WEAPONS[packet.weapon as WeaponId],rate=w.rate,capacity=w.cap,damage=w.dmg;
-      if(now<p.reloadAt||now-p.lastShot<rate)return;
-      if(p.weapon!==packet.weapon){p.weapon=packet.weapon;p.ammo=capacity;p.reloadAt=0;}
-      if(p.ammo<=0){p.reloadAt=now+1400;await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);return;}
-      const d=packet.dir||{},o=packet.origin||{},dx=Number(d.x),dy=Number(d.y),dz=Number(d.z),ox=Number(o.x),oy=Number(o.y),oz=Number(o.z),len=Math.hypot(dx,dy,dz);
-      if(!Number.isFinite(len)||len<0.9||len>1.1||![ox,oy,oz].every(Number.isFinite)||Math.hypot(ox-p.x,oz-p.z)>5||oy<1.1||oy>4.5)return;
-      p.lastShot=now;p.ammo--;const target=new Vec3(other.x-ox,1.25-oy,other.z-oz),dir=new Vec3(dx/len,dy/len,dz/len),along=target.dot(dir),miss=Math.sqrt(Math.max(0,target.lengthSq()-along*along));
-      if(along>0&&along<=60&&miss<=0.78){other.health=Math.max(0,other.health-damage);if(other.health===0){p.score++;other.respawnAt=now+2500;this.ctx.storage.setAlarm(now+2500);if(p.score>=10){state.finished=true;state.winner=p.slot;state.finishReason='score';}}}
-      if(p.ammo===0)p.reloadAt=now+1400;
-      await this.save(state);if(p.reloadAt)await this.scheduleAlarm(state);await this.broadcast(state);return;
+    if(packet.type==='shoot'&&!state.finished&&state.startedAt){
+      // PvP needs a living opponent and no disconnected player, as before.
+      // Co-op needs a living target (opponent or bot) and at least one
+      // connected human; a lone human + bots is a valid match.
+      if(state.mode==='coop'){
+        if(!(other&&other.health>0)&&!state.bots.some(b=>!b.dead))return;
+        if(!state.players.some(pl=>pl&&!pl.disconnectedAt))return;
+      } else if(!other||other.health<=0||state.players.some(pl=>pl?.disconnectedAt))return;
+      const result=resolveHumanShot(state,p.slot,packet,now);
+      if(!result.changed)return;
+      await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);return;
     }
     if(packet.type==='weapon'&&!state.finished){
       if(typeof packet.weapon!=='string'||!(packet.weapon in WEAPONS))return;
@@ -152,7 +297,9 @@ export class DeathmatchRoom extends DurableObject<Env> {
   }
   async webSocketClose(ws:WebSocket){const a:any=ws.deserializeAttachment();if(!a||this.onlineTokens(ws).has(a.token))return;const state=await this.load(),p=state.players[a.slot];if(!p||p.token!==a.token)return;p.disconnectedAt=Date.now();await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);}
   async webSocketError(ws:WebSocket){await this.webSocketClose(ws);}
-  async alarm(){const state=await this.load(),now=Date.now();if(now>=state.createdAt+ROOM_TTL_MS){state.finished=true;state.finishReason='expired';await this.save(state);await this.broadcast(state);for(const ws of this.ctx.getWebSockets())try{ws.close(1000,'Room expired');}catch{}await this.ctx.storage.deleteAll();return;}for(const p of state.players){if(!p)continue;if(p.reloadAt&&p.reloadAt<=now){p.ammo=WEAPONS[p.weapon as WeaponId].cap;p.reloadAt=0;}if(p.respawnAt&&p.respawnAt<=now){const spawn=MAPS[state.map].spawns[p.slot];p.x=spawn.x;p.z=spawn.z;p.yaw=spawn.yaw;p.health=100;p.ammo=WEAPONS[p.weapon as WeaponId].cap;p.respawnAt=0;}if(p.disconnectedAt&&now-p.disconnectedAt>=30_000&&!state.finished){state.finished=true;state.winner=1-p.slot;state.finishReason='forfeit';}}
+  async alarm(){const state=await this.load(),now=Date.now();if(now>=state.createdAt+ROOM_TTL_MS){state.finished=true;state.finishReason='expired';await this.save(state);await this.broadcast(state);for(const ws of this.ctx.getWebSockets())try{ws.close(1000,'Room expired');}catch{}await this.ctx.storage.deleteAll();return;}for(const p of state.players){if(!p)continue;if(p.reloadAt&&p.reloadAt<=now){p.ammo=WEAPONS[p.weapon as WeaponId].cap;p.reloadAt=0;}if(p.respawnAt&&p.respawnAt<=now){const spawn=MAPS[state.map].spawns[p.slot];p.x=spawn.x;p.z=spawn.z;p.yaw=spawn.yaw;p.health=100;p.ammo=WEAPONS[p.weapon as WeaponId].cap;p.respawnAt=0;}if(p.disconnectedAt&&now-p.disconnectedAt>=30_000&&!state.finished&&state.mode!=='coop'){state.finished=true;state.winner=1-p.slot;state.finishReason='forfeit';}}
+    if(state.mode==='coop'&&!state.finished){const humans=state.players.filter((p):p is Player=>!!p);if(humans.length&&humans.every(p=>p.disconnectedAt)&&now-Math.max(...humans.map(p=>p.disconnectedAt!))>=30_000){state.finished=true;state.winnerTeam='bots';state.finishReason='forfeit';}}
+    if(state.mode==='coop'&&!state.finished)tickBots(state,now);
     await this.save(state);await this.scheduleAlarm(state);await this.broadcast(state);
   }
 }

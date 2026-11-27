@@ -58,14 +58,25 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { createGamepad, GP } from './assets/js/gamepad.js';
 import { DeathmatchClient } from './assets/js/deathmatch-client.js';
 import { DEATHMATCH_RELAY_URL } from './assets/js/deathmatch-config.js';
+import { createBot, updateBot, respawnBot, cleanBotCount, cleanDifficulty, BOT_DEFAULT_CHARACTERS, BOT_SCORE_TARGET, BOT_WEAPONS } from './assets/js/dm-bot-brain.js';
 // Deathmatch mode (?mode=deathmatch): 1v1 over the relay. The mission
 // (bombs, terrorists, shoppers, timer, roof-climb intro) is hidden and
 // the arena is the mall ground floor. Single-player is untouched.
 const dmParams = new URLSearchParams(location.search);
 const deathmatchMode = dmParams.get('mode') === 'deathmatch';
+// Deathmatch bots: solo vs AI runs entirely in the page (no relay, no
+// room code); co-op vs bots is the relay 1v1 with relay-driven bots
+// added (coop=1). dmAnyMode = any deathmatch flavour — the mission
+// (bombs, terrorists, shoppers, timer, roof-climb intro) is hidden or
+// skipped for all of them.
+const soloAiMode = dmParams.get('mode') === 'solo-ai';
+const coopMode = deathmatchMode && dmParams.get('coop') === '1';
+const dmAnyMode = deathmatchMode || soloAiMode;
+const dmBotCount = (soloAiMode || coopMode) ? cleanBotCount(dmParams.get('bots')) : 0;
+const dmBotDifficulty = cleanDifficulty(dmParams.get('difficulty'));
 let dmClient = null, dmSlot = -1, dmPlayers = [null,null], dmLastSent = 0, dmStarted = false, dmPaused = false, dmFinished = false, dmAmmo = 12, dmLastShot = 0;
 const DM_CHARACTER_ROSTER = new Set(['Agent_Kyle.fbx','Kyle_undercover.fbx','Kyle_combat.fbx','Kyle_tux.glb','Rochelle_undercover.fbx','Rochelle_combat.fbx','Rochelle_gown.glb','Rochelle_undercover_textured.glb','Donald.fbx','Donald_tux.fbx','Eric.fbx','Eric_tux.glb','Kristen.fbx','Kristen_gown.glb','Vickie.fbx','Vickie_gown.glb','enemy-terror1.fbx','enemy-terror2.fbx','enemy-terror3.fbx','enemy-terror4.fbx','enemy-terror5.fbx','enemy-elf.fbx','enemy-frankenstein.fbx','enemy-ghost.fbx','enemy-lights.fbx','enemy-pumpkin.fbx','enemy-reindeer.fbx','enemy-santa.fbx','enemy-skeleton.fbx','enemy-witch.fbx','enemy-xmassweater.fbx','trickortreat-frankenstein.fbx','trickortreater-ghost.fbx','trickortreater-hero.fbx','trickortreater-mummy.fbx','trickortreater-pirate.fbx','trickortreater-pumpkin.fbx','trickortreater-vampire.fbx','trickortreater-werewolf.fbx','trickortreater-witch.fbx','trickortreater_princess.fbx','trickortreaterskeleton.fbx','shopper1.fbx','shopper2.fbx','shopper3.fbx','shopper4.fbx','shopper5.fbx','shopper6.fbx','shopper7.fbx']);
-function dmCharacter(){ return deathmatchMode && DM_CHARACTER_ROSTER.has(dmParams.get('character')||'') ? dmParams.get('character') : 'Kyle_combat.fbx'; }
+function dmCharacter(){ return dmAnyMode && DM_CHARACTER_ROSTER.has(dmParams.get('character')||'') ? dmParams.get('character') : 'Kyle_combat.fbx'; }
 const DM_MAP_SPAWNS = { courtyard: [{x:-14,z:20,yaw:-0.61},{x:14,z:-20,yaw:2.53}], ballroom: [{x:-14,z:9,yaw:-0.61},{x:14,z:-9,yaw:2.53}], theater: [{x:-10,z:16,yaw:-0.61},{x:10,z:-16,yaw:2.53}], mall: [{x:-14,z:24,yaw:-0.61},{x:14,z:-24,yaw:2.53}] };
 function dmSpawn(){ const m = DM_MAP_SPAWNS[dmParams.get('map')] || DM_MAP_SPAWNS.mall; return m[dmSlot] || m[0]; }
 // Deathmatch loadout — the lobby's starting weapon, mirrored from the
@@ -75,8 +86,8 @@ function dmSpawn(){ const m = DM_MAP_SPAWNS[dmParams.get('map')] || DM_MAP_SPAWN
 // stays the simple pistol tracer. The Shotgun's rate is its pump gate
 // (600 ms) — the mall has no pump sound, so the gate is the cadence.
 const DM_WEAPON_STATS = { Glock:{rate:280,cap:12}, Walther:{rate:280,cap:12}, Makarov:{rate:280,cap:12}, Revolver:{rate:350,cap:6}, MP5K:{rate:110,cap:30}, AKS74U:{rate:110,cap:30}, Shotgun:{rate:600,cap:5}, RPG7:{rate:110,cap:30} };
-function dmWeapon(){ const w = dmParams.get('weapon'); return (deathmatchMode && w && DM_WEAPON_STATS[w]) ? w : 'Glock'; }
-if(deathmatchMode){document.body.classList.add('deathmatch');document.title='Mall Deathmatch — Undercover: Double Agent';document.querySelector('#overlay h1').textContent='MALL DEATHMATCH';document.getElementById('startBtn').textContent='Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · '+dmWeapon()+' · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent='Two agents · private room · no bombs, terrorists or shoppers · 30 second reconnect window';}
+function dmWeapon(){ const w = dmParams.get('weapon'); return (dmAnyMode && w && DM_WEAPON_STATS[w]) ? w : 'Glock'; }
+if(dmAnyMode){document.body.classList.add('deathmatch');document.title=(soloAiMode?'Mall Solo vs AI — ':(coopMode?'Mall Co-op vs Bots — ':'Mall Deathmatch — '))+'Undercover: Double Agent';document.querySelector('#overlay h1').textContent=soloAiMode?'MALL SOLO VS AI':(coopMode?'MALL CO-OP VS BOTS':'MALL DEATHMATCH');document.getElementById('startBtn').textContent=soloAiMode?'Start match':'Join match';document.querySelectorAll('.padControls')[0].textContent='WASD / left stick move · Mouse / right stick look · Fire to shoot · '+dmWeapon()+' · First to 10 takedowns';document.querySelectorAll('.padControls')[1].textContent=soloAiMode?('You vs '+dmBotCount+' BOT'+(dmBotCount>1?'s':'')+' ('+dmBotDifficulty+') · no bombs, terrorists or shoppers'):(coopMode?('Humans vs '+dmBotCount+' BOT'+(dmBotCount>1?'s':'')+' ('+dmBotDifficulty+') · first team to 10 · 30 second reconnect window'):'Two agents · private room · no bombs, terrorists or shoppers · 30 second reconnect window');}
 const gltfLoader = new GLTFLoader();
 const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/');
@@ -1316,6 +1327,223 @@ function updateDmRemoteAnim(dt) {
   dmRemoteLastPos = dmRemote.position.clone();
   playCharClip(dmRemoteChar, moved ? 'walk' : 'idle');
 }
+// ---------- Deathmatch bots (solo vs AI + co-op vs bots) ----------
+// Same shape as the courtyard's dmBots, adapted to the mall's helpers
+// (fitCharacter at 1.8 m, playCharClip, circle colliders). Solo bots run
+// their brain in the page; co-op bots are driven by the relay and only
+// rendered here. The mall has no player-health variable and no blood
+// system, so solo bot damage uses dmHealth and a kill is a tip-over,
+// and bot shots are tracers only (no muzzle flash helper here).
+// Bots are always named "BOT n" — never presented as real people.
+const dmBots = [];
+let dmHealth = 100, dmRespawnAt = 0, dmPlayerScore = 0, dmBotScore = 0, dmTeamScore = { humans: 0, bots: 0 }, dmReloadUntil = 0;
+const DM_BOT_LOOP = [[-14,-20],[14,-20],[14,20],[-14,20]];
+function dmBotSpawn(i){
+  // Bots start on the opposite side from the player (slot 0 spawns at
+  // (-14, 24)), jittered so they do not stack.
+  return { x: 14 + (i % 2 ? -4 : 4), z: -24 + (i < 2 ? 0 : 8), yaw: 2.53 };
+}
+function dmBotWaypoints(i){
+  // Shared arena loop, staggered start so bots spread out.
+  return DM_BOT_LOOP.map((_, k) => DM_BOT_LOOP[(k + i) % DM_BOT_LOOP.length]);
+}
+function dmBotCanMove(x, z){
+  if (Math.abs(x) > 19 || Math.abs(z) > 29) return false;
+  for (const c of colliders){
+    if (c.floor === 1) continue; // upper floor only — bots stay on the ground floor
+    if (Math.hypot(x - c.x, z - c.z) < c.r + 0.5) return false;
+  }
+  return true;
+}
+function dmBotMuzzle(ent, out){
+  // Bot muzzle: 0.5 m ahead of the bot at chest height, like the guards'.
+  return out.set(ent.group.position.x + Math.sin(ent.bot.yaw) * 0.5, ent.group.position.y + 1.45, ent.group.position.z + Math.cos(ent.bot.yaw) * 0.5);
+}
+function loadDmBotCharacter(ent, file){
+  const f = DM_CHARACTER_ROSTER.has(file || '') ? file : 'Kyle_combat.fbx';
+  if (f === ent.charFile) return;
+  ent.charFile = f;
+  if (ent.model) { ent.group.remove(ent.model); ent.model = null; }
+  ent.char.mixer = null; ent.char.model = null; ent.char._cur = null; ent.char._tripoClips = {};
+  const isGlb = f.toLowerCase().endsWith('.glb');
+  const onLoad = (obj) => {
+    fitCharacter(obj, 1.8);
+    obj.rotation.y = Math.PI;
+    ent.model = obj; ent.group.add(obj);
+    ent.body.visible = false; ent.head.visible = false;
+    ent.char.model = obj; ent.char.isTripo = f.indexOf('shopper') === 0;
+    ent.char.mixer = new THREE.AnimationMixer(obj);
+    playCharClip(ent.char, 'idle');
+  };
+  const onError = () => { ent.body.visible = true; ent.head.visible = true; };
+  if (isGlb) gltfLoader.load('assets/characters/' + f, (gltf) => onLoad(gltf.scene), undefined, onError);
+  else fbxLoader.load('assets/characters/' + f, onLoad, undefined, onError);
+}
+function makeDmBotEnt(bot){
+  const group = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.48, 1.15, 4, 8), new THREE.MeshStandardMaterial({ color: 0xc83e43, roughness: 0.75 }));
+  body.position.y = 1.05; group.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 10), new THREE.MeshStandardMaterial({ color: 0xd8b08a }));
+  head.position.y = 1.95; group.add(head);
+  group.position.set(bot.x, CHAR_LIFT, bot.z); group.rotation.y = bot.yaw;
+  scene.add(group);
+  const ent = { bot, group, body, head, model: null, char: { mixer: null, model: null, isTripo: false, _cur: null, _tripoClips: {} }, charFile: null, lastPos: null, lastShotAt: 0 };
+  loadDmBotCharacter(ent, bot.character);
+  return ent;
+}
+function spawnDmBots(){
+  // Solo: create the bots locally. Co-op: the relay sends them in the
+  // state broadcast (syncDmBots) — nothing to create here.
+  if (!soloAiMode) return;
+  for (let i = 0; i < dmBotCount; i++){
+    const sp = dmBotSpawn(i);
+    dmBots.push(makeDmBotEnt(createBot({ id: 'bot-' + i, name: 'BOT ' + (i + 1), character: BOT_DEFAULT_CHARACTERS[i % BOT_DEFAULT_CHARACTERS.length], weapon: 'Glock', loadout: 'black', difficulty: dmBotDifficulty, x: sp.x, z: sp.z, yaw: sp.yaw, waypoints: dmBotWaypoints(i) })));
+  }
+  dmStarted = true; dmPaused = false;
+  dmAmmo = DM_WEAPON_STATS[dmWeapon()].cap;
+  document.getElementById('dmScore').textContent = 'SOLO VS AI · first to 10';
+  updateDmScoreHud();
+}
+function syncDmBots(botStates){
+  // Co-op: reconcile the rendered bots with the relay's bot list.
+  if (!coopMode || !Array.isArray(botStates)) return;
+  const seen = new Set();
+  for (const s of botStates){
+    seen.add(s.id);
+    let ent = dmBots.find(e => e.bot.id === s.id);
+    if (!ent){
+      ent = makeDmBotEnt(createBot({ id: s.id, name: s.name, character: s.character, weapon: s.weapon, loadout: s.loadout, difficulty: dmBotDifficulty, x: s.x, z: s.z, yaw: s.yaw }));
+      dmBots.push(ent);
+    }
+    ent.bot.x = s.x; ent.bot.z = s.z; ent.bot.yaw = s.yaw; ent.bot.health = s.health; ent.bot.score = s.score || 0; ent.bot.ammo = s.ammo; ent.bot.dead = !!s.dead; ent.bot.respawnAt = s.respawnAt || 0;
+    loadDmBotCharacter(ent, s.character);
+    ent.group.visible = !ent.bot.dead;
+    ent.group.position.set(s.x, CHAR_LIFT, s.z); ent.group.rotation.y = s.yaw;
+    // The relay marks each bot shot with lastShotAt: draw its tracer so
+    // a bot shooting reads on screen (the damage itself comes through
+    // the state broadcast, like the 1v1 opponent's shots).
+    if (s.lastShotAt && s.lastShotAt !== ent.lastShotAt){
+      ent.lastShotAt = s.lastShotAt;
+      const m = dmBotMuzzle(ent, new THREE.Vector3());
+      const dir = new THREE.Vector3(Math.sin(ent.bot.yaw), 0, Math.cos(ent.bot.yaw));
+      spawnTracer(m, m.clone().addScaledVector(dir, 60));
+    }
+  }
+  for (let i = dmBots.length - 1; i >= 0; i--){
+    if (!seen.has(dmBots[i].bot.id)){ scene.remove(dmBots[i].group); dmBots.splice(i, 1); }
+  }
+}
+function updateDmScoreHud(){
+  const score = document.getElementById('dmScore'); if (!score) return;
+  if (soloAiMode) score.textContent = `You ${dmPlayerScore}  —  ${dmBotScore} BOT${dmBotCount > 1 ? 's' : ''}`;
+  else if (coopMode) score.textContent = `Humans ${dmTeamScore.humans}  —  ${dmTeamScore.bots} Bots`;
+}
+function endDmBotMatch(won){
+  // Solo end screen: reuse the mission win/fail screens with bot text.
+  if (dmFinished) return;
+  dmFinished = true; dmClient?.close();
+  if (document.pointerLockElement) document.exitPointerLock();
+  if (won){ showWin(); document.getElementById('winText').textContent = 'You reached 10 takedowns.'; }
+  else { failMission('bots'); document.getElementById('failText').textContent = 'The BOTs reached 10 takedowns.'; }
+}
+function updateDmBots(dt){
+  if (!dmAnyMode) return;
+  const now = performance.now();
+  // Solo reload: the mag refills 1400 ms after it runs dry (the relay
+  // does this for relay modes; solo has no relay).
+  if (soloAiMode && dmReloadUntil && now >= dmReloadUntil){
+    dmAmmo = DM_WEAPON_STATS[dmWeapon()].cap; dmReloadUntil = 0;
+    const ammoEl = document.getElementById('dmAmmo'); if (ammoEl) ammoEl.textContent = dmWeapon() + ' · ' + dmAmmo + ' / ' + DM_WEAPON_STATS[dmWeapon()].cap;
+  }
+  // Solo: run the brain in the page, only while actually playing.
+  if (soloAiMode && dmStarted && !dmFinished && started && !won && !failed){
+    // Player respawn after a bot takedown (2.5 s, like the relay).
+    if (dmHealth <= 0 && now >= dmRespawnAt){
+      dmHealth = 100;
+      const sp = dmSpawn(); player.position.set(sp.x, CHAR_LIFT, sp.z); yaw = sp.yaw; player.rotation.y = yaw;
+      const status = document.getElementById('dmStatus'); if (status) status.textContent = 'First to 10 takedowns';
+    }
+    for (const ent of dmBots){
+      const b = ent.bot;
+      if (b.dead){
+        if (now >= b.respawnAt){ const sp = dmBotSpawn(dmBots.indexOf(ent)); respawnBot(b, sp); ent.group.rotation.x = 0; ent.group.position.y = CHAR_LIFT; ent.group.visible = true; }
+        continue;
+      }
+      const events = updateBot(b, {
+        now, dt,
+        targets: [{ id: 'player', x: player.position.x, z: player.position.z, alive: dmHealth > 0 }],
+        bounds: { x: 19, z: 29 },
+        canMove: dmBotCanMove,
+        // The mall holds no LOS mesh list, so range stands in for line
+        // of sight here — same as the relay, whose bots are range-only.
+        hasLOS: () => true,
+      });
+      ent.group.position.set(b.x, CHAR_LIFT, b.z); ent.group.rotation.y = b.yaw;
+      for (const ev of events){
+        const m = dmBotMuzzle(ent, new THREE.Vector3());
+        const chest = new THREE.Vector3(player.position.x, player.position.y + 1.4, player.position.z);
+        spawnTracer(m, chest);
+        if (ev.hit && dmHealth > 0){
+          dmHealth -= ev.damage;
+          if (dmHealth <= 0){
+            dmHealth = 0; dmBotScore++; dmRespawnAt = now + 2500; updateDmScoreHud();
+            const status = document.getElementById('dmStatus'); if (status) status.textContent = 'Down · respawning in 2.5 seconds';
+            if (dmBotScore >= BOT_SCORE_TARGET) endDmBotMatch(false);
+          }
+        }
+      }
+    }
+  }
+  // Animate every rendered bot (solo + co-op): mixer + walk/idle.
+  for (const ent of dmBots){
+    if (!ent.char.mixer || !ent.group.visible) continue;
+    ent.char.mixer.update(dt);
+    const moved = ent.lastPos ? ent.group.position.distanceTo(ent.lastPos) > 0.02 : false;
+    ent.lastPos = ent.group.position.clone();
+    playCharClip(ent.char, moved ? 'walk' : 'idle');
+  }
+}
+function soloShoot(){
+  // Solo shot: local ammo + reload, hitscan against the bots. The mall
+  // has no gunshot sound wired (same gap as relay deathmatch here).
+  if (!dmStarted || dmPaused || dmFinished) return;
+  const now = performance.now();
+  const st = DM_WEAPON_STATS[dmWeapon()];
+  if (now - dmLastShot < st.rate) return;
+  if (now < dmReloadUntil) return;
+  if (dmAmmo <= 0){ dmReloadUntil = now + 1400; return; }
+  dmLastShot = now; dmAmmo--;
+  if (dmAmmo <= 0) dmReloadUntil = now + 1400;
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+  const end = soloShootResolve(dir);
+  spawnTracer(muzzlePos(), end);
+  const ammoEl = document.getElementById('dmAmmo'); if (ammoEl) ammoEl.textContent = dmWeapon() + ' · ' + dmAmmo + ' / ' + st.cap + (dmReloadUntil ? ' · reloading' : '');
+}
+function soloShootResolve(dir){
+  // Hitscan against the live bots: a hit damages the bot (the relay's
+  // weapon table — the mall's DM_WEAPON_STATS carries rate/cap only), a
+  // kill scores. A miss flies to max range; the mall has no bullet-hole
+  // system, so misses leave no mark (same as relay deathmatch here).
+  shootRay.set(camera.position, dir); shootRay.far = 60;
+  const targets = dmBots.filter(e => !e.bot.dead).map(e => e.group);
+  const hits = shootRay.intersectObjects(targets, true);
+  if (hits.length){
+    let node = hits[0].object, ent = null;
+    while (node){ ent = dmBots.find(x => x.group === node); if (ent) break; node = node.parent; }
+    if (ent){
+      const b = ent.bot;
+      b.health -= BOT_WEAPONS[dmWeapon()].dmg;
+      if (b.health <= 0){
+        b.dead = true; b.respawnAt = performance.now() + 2500; dmPlayerScore++;
+        ent.group.rotation.x = -Math.PI / 2; ent.group.position.y = 0.4 + CHAR_LIFT;
+        updateDmScoreHud();
+        if (dmPlayerScore >= BOT_SCORE_TARGET) endDmBotMatch(true);
+      }
+      return hits[0].point.clone();
+    }
+  }
+  return camera.position.clone().addScaledVector(dir, 60);
+}
 function dmShoot() {
   if (!dmStarted || dmPaused || dmFinished) return;
   const now = performance.now();
@@ -1338,27 +1566,30 @@ function applyDeathmatchState(message) {
   }
   if (message.type !== 'state') return;
   dmPlayers = message.players || [null, null]; dmStarted = !!message.started; dmPaused = !!message.paused; dmFinished = !!message.finished;
+  if (message.teamScore) dmTeamScore = message.teamScore;
+  syncDmBots(message.bots);
   const me = dmPlayers[dmSlot], op = dmPlayers[1 - dmSlot];
   if (me) { player.position.set(me.x, CHAR_LIFT, me.z); yaw = me.yaw; player.rotation.y = yaw; dmAmmo = me.ammo; const ammoEl = document.getElementById('dmAmmo'); if (ammoEl) ammoEl.textContent = dmWeapon() + ' · ' + me.ammo + ' / ' + DM_WEAPON_STATS[dmWeapon()].cap; }
   if (op) { dmRemote.visible = true; dmRemote.position.set(op.x, CHAR_LIFT, op.z); dmRemote.rotation.y = op.yaw; loadDmRemoteCharacter(op.character); }
   else dmRemote.visible = false;
   const score = document.getElementById('dmScore'), status = document.getElementById('dmStatus');
-  if (me && op) score.textContent = me.name + ' ' + me.score + '  —  ' + op.score + ' ' + op.name;
+  if (coopMode) updateDmScoreHud();
+  else if (me && op) score.textContent = me.name + ' ' + me.score + '  —  ' + op.score + ' ' + op.name;
   if (message.paused) status.textContent = 'Match paused · reconnect window 30 seconds';
-  else if (!op) status.textContent = 'Waiting for opponent to join';
+  else if (!op && !coopMode) status.textContent = 'Waiting for opponent to join';
   else if (!message.started) status.textContent = 'Opponent connected · match starting';
-  else status.textContent = 'First to 10 takedowns';
+  else status.textContent = coopMode ? 'First team to 10 takedowns' : 'First to 10 takedowns';
   if (dmFinished) {
     document.exitPointerLock?.(); dmClient?.close();
-    const expired = message.reason === 'expired', wonMatch = message.winner === dmSlot;
+    const expired = message.reason === 'expired', wonMatch = coopMode ? (message.winnerTeam === 'humans') : (message.winner === dmSlot);
     const winH = document.querySelector('#win h1'), failH = document.querySelector('#fail h1');
     if (wonMatch) {
       if (winH) winH.textContent = 'VICTORY';
-      document.getElementById('winText').textContent = expired ? 'This private room expired after two hours.' : 'You reached 10 takedowns.';
+      document.getElementById('winText').textContent = expired ? 'This private room expired after two hours.' : (coopMode ? 'Your team reached 10 takedowns.' : 'You reached 10 takedowns.');
       document.getElementById('win').style.display = 'flex'; document.getElementById('overlay').style.display = 'none';
     } else {
       if (failH) failH.textContent = 'DEFEAT';
-      document.getElementById('failText').textContent = expired ? 'This private room expired after two hours.' : message.reason === 'forfeit' ? 'Your reconnect window expired; the match was forfeited.' : 'The other agent reached 10 takedowns.';
+      document.getElementById('failText').textContent = expired ? 'This private room expired after two hours.' : message.reason === 'forfeit' ? (coopMode ? 'Your team did not reconnect within 30 seconds.' : 'Your reconnect window expired; the match was forfeited.') : (coopMode ? 'The BOTs reached 10 takedowns.' : 'The other agent reached 10 takedowns.');
       document.getElementById('fail').style.display = 'flex'; document.getElementById('overlay').style.display = 'none';
     }
   }
@@ -1372,9 +1603,11 @@ if (deathmatchMode) {
     document.querySelector('#overlay').insertAdjacentHTML('beforeend', '<p>The relay URL is missing. Configure assets/js/deathmatch-config.js after deploying the Worker.</p><a href="deathmatch.html">Return to lobby</a>');
   }
 }
+if (soloAiMode) spawnDmBots();
 function doShoot(ndcX, ndcY) {
   if (!started || won || failed) return;
   if (introActive) { endIntro(); return; } // FIRE during the intro skips it
+  if (soloAiMode) { soloShoot(); return; } // local bots, no relay
   if (deathmatchMode) { dmShoot(); return; } // relay-synced shot, no mission logic
   const nx = ndcX === undefined ? 0 : ndcX;
   const ny = ndcY === undefined ? 0 : ndcY;
@@ -1528,7 +1761,7 @@ document.getElementById('startBtn').onclick = () => {
   document.getElementById('overlay').style.display = 'none'; started = true;
   // Deathmatch starts on the ground floor at the arena spawn — no roof
   // climb. Single-player opens on the roof at sunset (startIntro).
-  if (!deathmatchMode) startIntro();
+  if (!dmAnyMode) startIntro();
   if (!isTouch) renderer.domElement.requestPointerLock();
 };
 addEventListener('keydown', (e) => {
@@ -1667,7 +1900,7 @@ function animate() {
   pollGamepad(rawDt); // PS4 controller: look stays responsive in slow-mo
   // Deathmatch: no mission NPCs (shoppers/terrorists) and no bombs — the
   // arena is empty. Their groups load async, so hide them every frame.
-  if (deathmatchMode) {
+  if (dmAnyMode) {
     for (const b of bombs) if (b.group) b.group.visible = false;
     for (const n of npcs) if (n.outer) n.outer.visible = false;
   } else updateNpcs(dt);
@@ -1676,7 +1909,7 @@ function animate() {
   updateEscalatorSteps(dt); // escalator steps cycle along the incline
   // Bomb blink lights (live bombs only; defused ones stay green).
   // Skipped in deathmatch (the bombs are hidden).
-  if (!deathmatchMode) {
+  if (!dmAnyMode) {
   blinkT += rawDt;
   const blinkOn = Math.sin(blinkT * 6) > 0;
   for (const b of bombs) {
@@ -1689,7 +1922,7 @@ function animate() {
     // Timer runs on real time — bullet time does not extend it. It starts
     // only when the player enters the atrium (ground floor, z < 29.5) —
     // not during the roof-climb intro. No mission timer in deathmatch.
-    if (!deathmatchMode) {
+    if (!dmAnyMode) {
     if (!enteredAtrium && player.position.y < 1 && player.position.z < 29.5) enteredAtrium = true;
     if (enteredAtrium) {
       timeLeft -= rawDt;
@@ -1721,13 +1954,13 @@ function animate() {
     // Deathmatch arena is the ground floor only (x ±19, z ±29) — the
     // relay clamps to the same bounds, so the client must match it or
     // the player rubber-bands at the apron.
-    const dmZMax = deathmatchMode ? 29 : MALL.zMax;
+    const dmZMax = dmAnyMode ? 29 : MALL.zMax;
     player.position.x = Math.max(MALL.xMin, Math.min(MALL.xMax, player.position.x + dx * speed));
     player.position.z = Math.max(MALL.zMin, Math.min(dmZMax, player.position.z + dz * speed));
     // Escalators: board at the entry end, ride the incline, step off.
     // Deathmatch is ground floor only (the relay's shot validation
     // assumes a ground-floor camera height), so no riding there.
-    if (!deathmatchMode) updateEscalatorRide(dt);
+    if (!dmAnyMode) updateEscalatorRide(dt);
     // Upper floor: the central atrium opening (x -8..8, z -12..12) is a
     // void — push the player back onto the ring (the railing is visual;
     // this is the real constraint). Not while riding the escalator.
@@ -1772,7 +2005,7 @@ function animate() {
     // for 3 s. Releasing or walking away resets progress. No defusing
     // during the intro (the player is outside, on the wall) or in
     // deathmatch (the bombs are hidden).
-    const bomb = (introActive || deathmatchMode) ? null : nearestLiveBomb();
+    const bomb = (introActive || dmAnyMode) ? null : nearestLiveBomb();
     const defuseUI = document.getElementById('defuseUI');
     if (bomb) {
       if (defuseUI) defuseUI.style.display = 'block';
@@ -1800,7 +2033,7 @@ function animate() {
   } else if (mixer) {
     mixer.update(dt);
   }
-  if (deathmatchMode) updateDmRemoteAnim(dt);
+  if (dmAnyMode) { updateDmRemoteAnim(dt); updateDmBots(dt); }
   const back = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
   // The look-down beat: the camera swings to the side and looks down at
   // the night city far below (suspense hold while the player hangs).
@@ -1808,7 +2041,7 @@ function animate() {
   if (lookDownStage) {
     camera.position.set(player.position.x + 5, player.position.y + 2.5, player.position.z + 1.5);
     camera.lookAt(player.position.x - 0.5, 0.5, player.position.z + 3);
-  } else if (idleOrbitActive(dt, started && !introActive && !deathmatchMode && !won && !failed)) {
+  } else if (idleOrbitActive(dt, started && !introActive && !dmAnyMode && !won && !failed)) {
     const op = orbitCamPos(new THREE.Vector3());
     camera.position.lerp(op, Math.min(1, dt * 3));
     camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
